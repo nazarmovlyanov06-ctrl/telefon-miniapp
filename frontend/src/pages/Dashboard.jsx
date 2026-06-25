@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 
 const QUICK = [
-  { icon: "🏦", label: "Kasa",    path: "/kasa",     color: "#dcfce7" },
-  { icon: "📱", label: "2. El",   path: "/ikinciel", color: "#f0fdf4" },
-  { icon: "🛡️", label: "Garanti", path: "/garanti",  color: "#eff6ff" },
-  { icon: "🏭", label: "Toptancı",path: "/toptanci", color: "#f0f9ff" },
-  { icon: "🛒", label: "Alışveriş", path: "/parts",   color: "#fdf4ff" },
-  { icon: "🎧", label: "Aksesuar",path: "/aksesuar", color: "#fff7ed" },
+  { icon: "📦", label: "Sıfır",   path: "/sifir-cihaz", color: "#dcfce7" },
+  { icon: "📱", label: "2. El",   path: "/ikinciel",    color: "#f0fdf4" },
+  { icon: "🛡️", label: "Garanti", path: "/garanti",     color: "#eff6ff" },
+  { icon: "🏭", label: "Toptancı",path: "/toptanci",    color: "#f0f9ff" },
+  { icon: "🛒", label: "Alışveriş",path: "/parts",      color: "#fdf4ff" },
+  { icon: "🎧", label: "Aksesuar",path: "/aksesuar",    color: "#fff7ed" },
 ];
 
 export default function Dashboard({ user }) {

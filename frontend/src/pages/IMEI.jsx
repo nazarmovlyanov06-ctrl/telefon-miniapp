@@ -34,8 +34,11 @@ function tacBrand(tac) {
   return null;
 }
 
-function openBTK() {
-  const url = "https://imei.btk.gov.tr/";
+function openEdevlet(imei) {
+  if (imei) {
+    try { navigator.clipboard?.writeText(imei); } catch {}
+  }
+  const url = "https://www.turkiye.gov.tr/imei-sorgulama";
   if (window.Telegram?.WebApp?.openLink) {
     window.Telegram.WebApp.openLink(url);
   } else {
@@ -111,10 +114,15 @@ export default function IMEI() {
           <button className="btn btn-ghost" onClick={sorgulaDB} disabled={loading || imei.length !== 15}>
             {loading ? "..." : "🔍 Kayıtlarımız"}
           </button>
-          <button className="btn btn-primary" onClick={sorgulaBTK} disabled={btkLoading || imei.length !== 15}>
-            {btkLoading ? "⏳ Sorgulanıyor..." : "🇹🇷 BTK Sorgula"}
+          <button className="btn btn-primary" onClick={() => openEdevlet(imei)} disabled={imei.length !== 15}>
+            🇹🇷 e-Devlet Sorgula
           </button>
         </div>
+        {imei.length === 15 && (
+          <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 8 }}>
+            💡 e-Devlet butonuna tıklayınca IMEI panoya kopyalanır, sitede yapıştırın
+          </div>
+        )}
       </div>
 
       {/* BTK Sonucu */}
@@ -127,11 +135,11 @@ export default function IMEI() {
           {btkResult.durum === "btk_erisim_hatasi" && (
             <div style={{ marginTop: 10 }}>
               <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 6 }}>
-                IMEI'yi kopyala ve BTK sitesinde manual sorgula:
+                e-Devlet üzerinden sorgulayabilirsin:
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn btn-ghost btn-sm" onClick={copyImei}>📋 {imei} Kopyala</button>
-                <button className="btn btn-primary btn-sm" onClick={openBTK}>BTK Sitesi →</button>
+                <button className="btn btn-ghost btn-sm" onClick={copyImei}>📋 Kopyala</button>
+                <button className="btn btn-primary btn-sm" onClick={() => openEdevlet(imei)}>🇹🇷 e-Devlet →</button>
               </div>
             </div>
           )}
@@ -178,7 +186,7 @@ export default function IMEI() {
       {/* Bilgi kutusu - BTK ne gösterir */}
       {!btkResult && !result && (
         <div className="card" style={{ marginTop: 4 }}>
-          <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13 }}>🇹🇷 BTK Sorgusu Ne Gösterir?</div>
+          <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13 }}>🇹🇷 e-Devlet IMEI Sorgusu Ne Gösterir?</div>
           {[
             { icon: "✅", title: "Kayıtlı", desc: "Türkiye'de yasal satılmış, sorun yok" },
             { icon: "🌍", title: "Yurt Dışından Getirilmiş", desc: "120 gün kullanım hakkı var" },

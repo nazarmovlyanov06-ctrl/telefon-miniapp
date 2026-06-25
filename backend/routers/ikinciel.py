@@ -139,22 +139,37 @@ async def sat_cihaz(
     satis_fiyati = float(body["satis_fiyati"])
     satis_tarihi = body.get("satis_tarihi", date.today().isoformat())
 
+    musteri_adi = body.get("musteri_adi") or ""
+    musteri_telefon = body.get("musteri_telefon") or ""
+
     await db.execute(
         """UPDATE ikinci_el SET durum='satildi', satis_fiyati=?, satis_kanali=?,
-           satis_tarihi=?, musteri_adi=? WHERE id=?""",
-        (satis_fiyati, body.get("satis_kanali", "dukkan"),
-         satis_tarihi, body.get("musteri_adi"), cihaz_id),
+           satis_tarihi=?, musteri_adi=?, musteri_telefon=? WHERE id=?""",
+        (satis_fiyati, body.get("satis_kanali", "Dükkan"),
+         satis_tarihi, musteri_adi, musteri_telefon, cihaz_id),
     )
 
     # Kasaya yaz
     odeme = body.get("odeme_yontemi", "nakit")
-    musteri = body.get("musteri_adi") or ""
     await db.execute(
         """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
            VALUES (?, 'gelir', ?, ?, ?, '2el_satis')""",
         (satis_tarihi, odeme, satis_fiyati,
-         f"2.El Satış: {cihaz.get('model', '')} → {musteri}".strip(" →")),
+         f"2.El Satış: {cihaz.get('model', '')} → {musteri_adi}".strip(" →")),
     )
+
+    # Yeni müşteri otomatik kayıt
+    if musteri_adi and musteri_telefon:
+        cur2 = await db.execute(
+            "SELECT id FROM customers WHERE name = ? OR phone = ?",
+            (musteri_adi, musteri_telefon)
+        )
+        existing = await cur2.fetchone()
+        if not existing:
+            await db.execute(
+                "INSERT INTO customers (name, phone) VALUES (?, ?)",
+                (musteri_adi, musteri_telefon)
+            )
 
     await db.commit()
     return {"ok": True}

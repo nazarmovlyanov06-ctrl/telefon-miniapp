@@ -6,7 +6,7 @@ from config import FRONTEND_URL, DB_PATH
 from routers import users, customers, repairs, parts, shopping, imei, debts, reports
 from routers import (
     toptanci, ikinciel, garanti, kasa, gider, loaner,
-    aksesuar, hedef, maas, karalist, parca_iade, ai_chat,
+    aksesuar, hedef, maas, karalist, parca_iade, ai_chat, sifir_cihaz,
 )
 
 SCHEMA = """
@@ -245,6 +245,26 @@ CREATE TABLE IF NOT EXISTS kara_liste (
     notlar TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS sifir_cihazlar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model TEXT NOT NULL,
+    imei TEXT,
+    renk TEXT,
+    depolama TEXT,
+    kimden TEXT,
+    kaynak TEXT DEFAULT 'dukkan',
+    alis_fiyati REAL NOT NULL,
+    alis_tarihi TEXT,
+    durum TEXT DEFAULT 'stokta',
+    satis_fiyati REAL,
+    satis_tarihi TEXT,
+    satis_kanali TEXT,
+    musteri_adi TEXT,
+    musteri_telefon TEXT,
+    odeme_yontemi TEXT DEFAULT 'nakit',
+    notlar TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS parca_iadeler (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     toptanci_id INTEGER REFERENCES toptancilar(id),
@@ -316,6 +336,7 @@ async def lifespan(app: FastAPI):
             "UPDATE debts SET total_amount = COALESCE(amount, 0) WHERE total_amount = 0 AND amount > 0",
             "UPDATE debts SET paid_amount = COALESCE(paid, 0) WHERE paid_amount = 0 AND paid > 0",
             "ALTER TABLE parca_iadeler ADD COLUMN part_id INTEGER REFERENCES parts(id)",
+            "ALTER TABLE ikinci_el ADD COLUMN musteri_telefon TEXT",
         ]:
             try:
                 await db.execute(m)
@@ -359,6 +380,7 @@ app.include_router(maas.router)
 app.include_router(karalist.router)
 app.include_router(parca_iade.router)
 app.include_router(ai_chat.router)
+app.include_router(sifir_cihaz.router)
 
 
 @app.get("/health")

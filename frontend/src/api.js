@@ -106,6 +106,16 @@ export const api = {
   ikinciElSatilanlar: () => get("/ikinciel/satilanlar"),
   ikinciElIMEI: (son4) => get(`/ikinciel/imei-gecmis/${son4}`),
 
+  // Sıfır Cihaz
+  sifirList: (params = {}) => {
+    const q = new URLSearchParams(params).toString();
+    return get(`/sifir-cihaz/listesi${q ? "?" + q : ""}`);
+  },
+  sifirOzet: () => get("/sifir-cihaz/ozet"),
+  createSifir: (data) => post("/sifir-cihaz/", data),
+  sifirSat: (id, data) => post(`/sifir-cihaz/${id}/sat`, data),
+  sifirSatilanlar: () => get("/sifir-cihaz/satilanlar"),
+
   // Garanti
   garantiList: (params = {}) => {
     const q = new URLSearchParams(params).toString();

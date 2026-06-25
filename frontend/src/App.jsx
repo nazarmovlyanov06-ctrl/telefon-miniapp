@@ -26,6 +26,7 @@ import KaraListe from "./pages/KaraListe";
 import ParcaIade from "./pages/ParcaIade";
 import AiChat from "./pages/AiChat";
 import CustomerDetail from "./pages/CustomerDetail";
+import SifirCihaz from "./pages/SifirCihaz";
 import "./index.css";
 
 export default function App() {
@@ -93,6 +94,7 @@ export default function App() {
         <Route path="/parca-iade" element={<ParcaIade />} />
         <Route path="/ai" element={<AiChat />} />
         <Route path="/customers/:id" element={<CustomerDetail />} />
+        <Route path="/sifir-cihaz" element={<SifirCihaz />} />
       </Routes>
       <BottomNav />
     </BrowserRouter>

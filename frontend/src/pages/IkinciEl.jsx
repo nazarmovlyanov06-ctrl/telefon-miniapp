@@ -17,7 +17,7 @@ export default function IkinciEl() {
   const [masraflar, setMasraflar] = useState({});
   const [form, setForm] = useState({ model: "", imei: "", kimden: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
-  const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "" });
+  const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit" });
   const [err, setErr] = useState("");
   const [musteriler, setMusteriler] = useState([]);
   const [kimdenOner, setKimdenOner] = useState([]);
@@ -106,7 +106,7 @@ export default function IkinciEl() {
     try {
       await api.ikinciElSat(selected.id, { ...satForm, satis_fiyati: parseFloat(satForm.satis_fiyati) });
       setShowSat(false); setSelected(null);
-      setSatForm({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "" });
+      setSatForm({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit" });
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -311,14 +311,33 @@ export default function IkinciEl() {
                           )}
                         </div>
                         <div className="form-group">
+                          <label className="form-label">Müşteri Telefonu</label>
+                          <input className="form-input" value={satForm.musteri_telefon} inputMode="tel"
+                            onChange={e => setSatForm(f => ({ ...f, musteri_telefon: e.target.value }))}
+                            placeholder="0555..." />
+                          {satForm.musteri_adi && satForm.musteri_telefon && (
+                            <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri otomatik kaydedilecek</div>
+                          )}
+                        </div>
+                        <div className="form-group">
                           <label className="form-label">Satış Fiyatı (₺)</label>
                           <input className="form-input" type="number" required value={satForm.satis_fiyati} onChange={e => setSatForm({ ...satForm, satis_fiyati: e.target.value })} />
                         </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                         <div className="form-group">
                           <label className="form-label">Kanal</label>
                           <select className="form-select" value={satForm.satis_kanali} onChange={e => setSatForm({ ...satForm, satis_kanali: e.target.value })}>
                             {["Dükkan", "Getmobil", "Instagram", "Sahibinden", "Diğer"].map(k => <option key={k}>{k}</option>)}
                           </select>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Ödeme</label>
+                          <select className="form-select" value={satForm.odeme_yontemi} onChange={e => setSatForm({ ...satForm, odeme_yontemi: e.target.value })}>
+                            <option value="nakit">💵 Nakit</option>
+                            <option value="kart">💳 Kart</option>
+                            <option value="taksit">📅 Taksit</option>
+                          </select>
+                        </div>
                         </div>
                         {satForm.satis_fiyati && (
                           <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8, fontWeight: 600 }}>
