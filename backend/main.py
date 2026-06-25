@@ -260,18 +260,25 @@ async def lifespan(app: FastAPI):
     import os, logging
     log = logging.getLogger("startup")
     log.info(f"DB_PATH={DB_PATH}")
-    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
-    async with aiosqlite.connect(DB_PATH) as db:
+    db_abs = os.path.abspath(DB_PATH)
+    parent = os.path.dirname(db_abs)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    async with aiosqlite.connect(db_abs) as db:
         stmts = [s.strip() for s in SCHEMA.split(";") if s.strip()]
+        ok = fail = 0
         for s in stmts:
             try:
                 await db.execute(s)
+                ok += 1
             except Exception as e:
-                log.error(f"Schema hatasi: {e}\nSQL: {s[:80]}")
+                log.error(f"Schema hatasi: {e} | SQL: {s[:80]}")
+                fail += 1
         await db.commit()
-        cur = await db.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
-        tablo_sayisi = (await cur.fetchone())[0]
-        log.info(f"DB hazir — {tablo_sayisi} tablo")
+        cur = await db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tablolar = [r[0] for r in await cur.fetchall()]
+        log.info(f"DB hazir — {len(tablolar)} tablo | schema ok={ok} fail={fail}")
+        log.info(f"Tablolar: {sorted(tablolar)}")
     yield
 
 
