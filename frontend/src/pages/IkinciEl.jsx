@@ -17,14 +17,33 @@ export default function IkinciEl() {
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "" });
   const [err, setErr] = useState("");
+  const [musteriler, setMusteriler] = useState([]);
+  const [kimdenOner, setKimdenOner] = useState([]);
+  const [showKimdenOner, setShowKimdenOner] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.customers("").then(setMusteriler).catch(() => {});
+  }, []);
 
   async function load() {
     try {
       const [l, o, s] = await Promise.all([api.ikinciElList(), api.ikinciElOzet(), api.ikinciElSatilanlar()]);
       setList(l); setOzet(o); setSatilanlar(s);
     } finally { setLoading(false); }
+  }
+
+  function handleKimdenChange(val) {
+    setForm(f => ({ ...f, kimden: val }));
+    if (val.length >= 2) {
+      const found = musteriler.filter(m =>
+        m.name.toLowerCase().includes(val.toLowerCase())
+      ).slice(0, 5);
+      setKimdenOner(found);
+      setShowKimdenOner(found.length > 0);
+    } else {
+      setShowKimdenOner(false);
+    }
   }
 
   async function submitAlim(e) {
@@ -104,9 +123,27 @@ export default function IkinciEl() {
                   <label className="form-label">IMEI</label>
                   <input className="form-input" value={form.imei} onChange={e => setForm({ ...form, imei: e.target.value })} placeholder="15 haneli" />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ position: "relative" }}>
                   <label className="form-label">Kimden</label>
-                  <input className="form-input" value={form.kimden} onChange={e => setForm({ ...form, kimden: e.target.value })} placeholder="Kişi/firma adı" />
+                  <input className="form-input" value={form.kimden}
+                    onChange={e => handleKimdenChange(e.target.value)}
+                    onBlur={() => setTimeout(() => setShowKimdenOner(false), 150)}
+                    placeholder="Kişi/firma adı" autoComplete="off" />
+                  {showKimdenOner && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
+                      background: "var(--card)", border: "1px solid var(--border)",
+                      borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                      {kimdenOner.map(m => (
+                        <div key={m.id}
+                          onMouseDown={() => { setForm(f => ({ ...f, kimden: m.name })); setShowKimdenOner(false); }}
+                          style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
+                            borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
+                          <span>👤 {m.name}</span>
+                          {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Alış Fiyatı (₺) *</label>
