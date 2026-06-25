@@ -3,6 +3,7 @@ from aiosqlite import Connection
 from database import get_db, get_or_create_user
 from auth import get_current_user
 import datetime
+from datetime import date
 
 router = APIRouter(prefix="/shopping", tags=["shopping"])
 
@@ -79,23 +80,33 @@ async def mark_bought(
         (user["id"], body.get("bought_from"), body.get("bought_price"), item_id),
     )
 
+    part_id_log = None
     if body.get("stok_ekle") and item:
         miktar = int(body.get("stok_miktar") or item.get("quantity") or 1)
         parca_adi = item.get("part_name", "")
-        cur = await db.execute(
+        src = await db.execute(
             "SELECT id FROM parts WHERE LOWER(name) LIKE ? LIMIT 1",
             (f"%{parca_adi.lower()}%",)
         )
-        existing = await cur.fetchone()
+        existing = await src.fetchone()
         if existing:
+            part_id_log = existing["id"]
             await db.execute("UPDATE parts SET quantity = quantity + ? WHERE id = ?",
                              (miktar, existing["id"]))
         else:
-            await db.execute(
+            ins = await db.execute(
                 """INSERT INTO parts (name, device_model, part_type, quantity, min_quantity,
                    purchase_price, sale_price, created_by) VALUES (?, ?, NULL, ?, 2, ?, 0, ?)""",
                 (parca_adi, item.get("device_model"), miktar,
                  float(body.get("bought_price") or 0), user["id"])
+            )
+            part_id_log = ins.lastrowid
+
+        if part_id_log:
+            await db.execute(
+                """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih)
+                   VALUES (?, 'giris', ?, 'satin_alma', ?, ?)""",
+                (part_id_log, miktar, body.get("bought_from"), date.today().isoformat())
             )
 
     await db.commit()

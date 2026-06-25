@@ -289,6 +289,10 @@ async def lifespan(app: FastAPI):
         for m in [
             "ALTER TABLE ikinci_el ADD COLUMN musteri_adi TEXT",
             "ALTER TABLE aksesuarlar ADD COLUMN kategori TEXT DEFAULT 'Diğer'",
+            "ALTER TABLE parts ADD COLUMN device_model TEXT",
+            "ALTER TABLE parts ADD COLUMN part_type TEXT",
+            "ALTER TABLE parts ADD COLUMN purchase_price REAL DEFAULT 0",
+            "ALTER TABLE parts ADD COLUMN created_by INTEGER",
         ]:
             try:
                 await db.execute(m)

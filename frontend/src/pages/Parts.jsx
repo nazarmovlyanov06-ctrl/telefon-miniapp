@@ -24,10 +24,12 @@ export default function Parts() {
 
   // Aldım modal
   const [boughtItem, setBoughtItem] = useState(null);
-  const [boughtData, setBoughtData] = useState({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1" });
+  const [boughtData, setBoughtData] = useState({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1", dollarMode: false, dollarAmount: "" });
   const [toptancilar, setToptancilar] = useState([]);
   const [toptanciOner, setToptanciOner] = useState([]);
   const [showToptanciOner, setShowToptanciOner] = useState(false);
+  const [dollarRate, setDollarRate] = useState(null);
+  const [kurLoading, setKurLoading] = useState(false);
 
   // Stok düş panel
   const [selectedPart, setSelectedPart] = useState(null);
@@ -63,19 +65,47 @@ export default function Parts() {
     }
   }
 
+  async function fetchDollarRate() {
+    setKurLoading(true);
+    try {
+      const r = await fetch("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json");
+      const data = await r.json();
+      const rate = Math.round(data.usd.try * 100) / 100;
+      setDollarRate(rate);
+    } catch(e) {
+      setErr("Dolar kuru alınamadı");
+    } finally {
+      setKurLoading(false);
+    }
+  }
+
   async function submitBought(e) {
     e.preventDefault();
     setErr("");
     try {
+      // Yeni toptancıyı otomatik kaydet
+      const toptanciAdi = boughtData.toptanci.trim() || null;
+      if (toptanciAdi && !toptancilar.find(t => t.ad === toptanciAdi)) {
+        try {
+          await api.createToptanci({ ad: toptanciAdi });
+          api.toptanciList().then(setToptancilar);
+        } catch(_) {}
+      }
+
       await api.markBought(boughtItem.id, {
-        bought_from: boughtData.toptanci || null,
+        bought_from: toptanciAdi,
         bought_price: boughtData.fiyat ? parseFloat(boughtData.fiyat) : null,
         stok_ekle: boughtData.stokEkle,
         stok_miktar: parseInt(boughtData.stokMiktar) || 1,
       });
+      const willAddStock = boughtData.stokEkle;
       setBoughtItem(null);
-      setBoughtData({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1" });
+      setBoughtData({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1", dollarMode: false, dollarAmount: "" });
       api.shopping().then(setShopping);
+      if (willAddStock) {
+        api.parts({}).then(setParts);
+        setTab("stok");
+      }
     } catch (e) { setErr(e.message); }
   }
 
@@ -186,7 +216,7 @@ export default function Parts() {
             filteredParts.length === 0 ? <div className="empty"><div className="empty-icon">📦</div>Parça bulunamadı</div> :
             filteredParts.map((p) => {
               const isSelected = selectedPart?.id === p.id;
-              const SEBEP_LABEL = { tamir: "🔧 Tamire", satis: "💰 Satış", hasar: "💥 Hasar", diger: "📦 Diğer" };
+              const SEBEP_LABEL = { tamir: "🔧 Tamire", satis: "💰 Satış", hasar: "💥 Hasar", diger: "📦 Diğer", satin_alma: "📥 Satın Alındı" };
               return (
                 <div key={p.id}>
                   {/* Parça satırı */}
@@ -309,8 +339,8 @@ export default function Parts() {
                               </div>
                               <div style={{ fontSize: 12, color: "var(--hint)" }}>{h.tarih}</div>
                             </div>
-                            <div style={{ fontWeight: 700, color: "var(--danger)", fontSize: 15, flexShrink: 0 }}>
-                              -{h.miktar} adet
+                            <div style={{ fontWeight: 700, color: h.hareket === "giris" ? "var(--success)" : "var(--danger)", fontSize: 15, flexShrink: 0 }}>
+                              {h.hareket === "giris" ? "+" : "-"}{h.miktar} adet
                             </div>
                           </div>
                         ))
@@ -429,10 +459,48 @@ export default function Parts() {
                     )}
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Ödenen Fiyat (₺)</label>
-                    <input className="form-input" type="number" value={boughtData.fiyat} onChange={e => setBoughtData(d => ({ ...d, fiyat: e.target.value }))} placeholder="0" />
+                  {/* Dolar Kuru */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <button type="button"
+                      onClick={() => setBoughtData(d => ({ ...d, dollarMode: !d.dollarMode, dollarAmount: "", fiyat: "" }))}
+                      style={{ padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                        background: boughtData.dollarMode ? "var(--accent)" : "var(--bg2)",
+                        color: boughtData.dollarMode ? "#fff" : "var(--text)" }}>
+                      💵 Dolar ile gir
+                    </button>
+                    {dollarRate && <span style={{ fontSize: 12, color: "var(--hint)" }}>1$ = ₺{dollarRate}</span>}
+                    <button type="button" onClick={fetchDollarRate} disabled={kurLoading}
+                      style={{ marginLeft: "auto", padding: "5px 10px", borderRadius: 16, border: "1px solid var(--border)",
+                        background: "transparent", cursor: "pointer", fontSize: 12, color: "var(--hint)" }}>
+                      {kurLoading ? "..." : "🔄 Kur"}
+                    </button>
                   </div>
+
+                  {boughtData.dollarMode ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 4 }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Dolar ($)</label>
+                        <input className="form-input" type="number" step="0.01" value={boughtData.dollarAmount}
+                          onChange={e => {
+                            const usd = parseFloat(e.target.value) || 0;
+                            const tl = dollarRate ? String(Math.round(usd * dollarRate)) : "";
+                            setBoughtData(d => ({ ...d, dollarAmount: e.target.value, fiyat: tl }));
+                          }}
+                          placeholder="0.00" />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">TL karşılığı</label>
+                        <input className="form-input" type="number" value={boughtData.fiyat}
+                          onChange={e => setBoughtData(d => ({ ...d, fiyat: e.target.value }))}
+                          placeholder={dollarRate ? `≈ ₺${dollarRate}/dolar` : "Kur al →"} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="form-group">
+                      <label className="form-label">Ödenen Fiyat (₺)</label>
+                      <input className="form-input" type="number" value={boughtData.fiyat} onChange={e => setBoughtData(d => ({ ...d, fiyat: e.target.value }))} placeholder="0" />
+                    </div>
+                  )}
 
                   {/* Stoğa Ekle */}
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "10px 12px", background: "var(--bg2)", borderRadius: 10 }}>
