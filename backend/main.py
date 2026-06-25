@@ -257,12 +257,21 @@ CREATE TABLE IF NOT EXISTS parca_iadeler (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import os, logging
+    log = logging.getLogger("startup")
+    log.info(f"DB_PATH={DB_PATH}")
+    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
-        for stmt in SCHEMA.split(";"):
-            s = stmt.strip()
-            if s:
+        stmts = [s.strip() for s in SCHEMA.split(";") if s.strip()]
+        for s in stmts:
+            try:
                 await db.execute(s)
+            except Exception as e:
+                log.error(f"Schema hatasi: {e}\nSQL: {s[:80]}")
         await db.commit()
+        cur = await db.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
+        tablo_sayisi = (await cur.fetchone())[0]
+        log.info(f"DB hazir — {tablo_sayisi} tablo")
     yield
 
 
@@ -300,3 +309,22 @@ app.include_router(parca_iade.router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/health/db")
+async def health_db():
+    """Hangi tablolar var kontrol eder."""
+    import aiosqlite as _aio
+    beklenen = [
+        "users", "customers", "repairs", "parts", "part_orders", "repair_parts",
+        "shopping_list", "imei_history", "debts", "debt_payments",
+        "toptancilar", "toptanci_alislar", "ikinci_el", "ikinci_el_masraflar",
+        "garantiler", "kasa_hareketleri", "giderler", "loaner_cihazlar",
+        "aksesuarlar", "aksesuar_satislar", "aylik_hedefler",
+        "calisanlar", "maas_odemeleri", "avanslar", "kara_liste", "parca_iadeler",
+    ]
+    async with _aio.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        mevcut = {r[0] for r in await cur.fetchall()}
+    eksik = [t for t in beklenen if t not in mevcut]
+    return {"db_path": DB_PATH, "mevcut_tablo": sorted(mevcut), "eksik_tablo": eksik, "ok": len(eksik) == 0}

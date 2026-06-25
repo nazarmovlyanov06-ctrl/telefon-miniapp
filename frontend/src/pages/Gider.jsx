@@ -14,7 +14,10 @@ export default function Gider() {
   useEffect(() => { load(); }, []);
 
   async function load() {
-    try { setList(await api.giderList()); } finally { setLoading(false); }
+    try {
+      const res = await api.giderList();
+      setList(res.giderler || res || []);
+    } finally { setLoading(false); }
   }
 
   async function submit(e) {
@@ -31,7 +34,7 @@ export default function Gider() {
     load();
   }
 
-  const toplam = list.reduce((s, g) => s + (g.tutar || 0), 0);
+  const toplam = Array.isArray(list) ? list.reduce((s, g) => s + (g.tutar || 0), 0) : 0;
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
 

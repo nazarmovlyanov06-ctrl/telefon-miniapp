@@ -27,9 +27,9 @@ async def create_loaner(
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     cur = await db.execute(
-        """INSERT INTO loaner_cihazlar (musteri_id, musteri_adi, cihaz, teslim_tarihi, notlar, aktif)
-           VALUES (?, ?, ?, ?, ?, 1)""",
-        (body.get("musteri_id"), body["musteri_adi"], body["cihaz"],
+        """INSERT INTO loaner_cihazlar (musteri_adi, cihaz, teslim_tarihi, notlar, aktif)
+           VALUES (?, ?, ?, ?, 1)""",
+        (body["musteri_adi"], body["cihaz"],
          body.get("teslim_tarihi", date.today().isoformat()), body.get("notlar")),
     )
     await db.commit()

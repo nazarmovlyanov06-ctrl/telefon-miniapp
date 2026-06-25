@@ -62,7 +62,7 @@ export default function IkinciEl() {
       {ozet && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
           <div className="card" style={{ textAlign: "center", margin: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 700 }}>{ozet.stok_adet}</div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{ozet.stokta_adet ?? ozet.stok_adet ?? 0}</div>
             <div style={{ fontSize: 11, color: "var(--hint)" }}>Stokta</div>
           </div>
           <div className="card" style={{ textAlign: "center", margin: 0 }}>
