@@ -31,6 +31,9 @@ export default function Parts() {
 
   // Stok düş panel
   const [selectedPart, setSelectedPart] = useState(null);
+  const [panelTab, setPanelTab] = useState("dus"); // "dus" | "gecmis"
+  const [hareketler, setHareketler] = useState([]);
+  const [hareketLoading, setHareketLoading] = useState(false);
   const [kullanForm, setKullanForm] = useState({ sebep: "tamir", aciklama: "", miktar: "1" });
   const [kullanErr, setKullanErr] = useState("");
 
@@ -90,6 +93,21 @@ export default function Parts() {
       setShopForm({ part_name: "", device_model: "", quantity: "1", estimated_price: "", supplier_hint: "" });
       api.shopping().then(setShopping);
     } catch (e) { setErr(e.message); }
+  }
+
+  async function openPanel(p, tab = "dus") {
+    if (selectedPart?.id === p.id && panelTab === tab) {
+      setSelectedPart(null); return;
+    }
+    setSelectedPart(p);
+    setPanelTab(tab);
+    setKullanForm({ sebep: "tamir", aciklama: "", miktar: "1" });
+    setKullanErr("");
+    if (tab === "gecmis") {
+      setHareketLoading(true);
+      try { setHareketler(await api.partHareketler(p.id)); }
+      finally { setHareketLoading(false); }
+    }
   }
 
   async function submitKullan(e) {
@@ -168,87 +186,135 @@ export default function Parts() {
             filteredParts.length === 0 ? <div className="empty"><div className="empty-icon">📦</div>Parça bulunamadı</div> :
             filteredParts.map((p) => {
               const isSelected = selectedPart?.id === p.id;
+              const SEBEP_LABEL = { tamir: "🔧 Tamire", satis: "💰 Satış", hasar: "💥 Hasar", diger: "📦 Diğer" };
               return (
                 <div key={p.id}>
-                  <div
-                    className="list-item"
-                    style={{ cursor: "pointer", background: isSelected ? "var(--bg2)" : undefined }}
-                    onClick={() => {
-                      setSelectedPart(isSelected ? null : p);
-                      setKullanForm({ sebep: "tamir", aciklama: "", miktar: "1" });
-                      setKullanErr("");
-                    }}
-                  >
-                    <div className="list-item-body">
+                  {/* Parça satırı */}
+                  <div className="list-item" style={{ background: isSelected ? "var(--bg2)" : undefined }}>
+                    <div className="list-item-body" style={{ cursor: "pointer" }} onClick={() => openPanel(p, "dus")}>
                       <div className="list-item-title">{p.name}</div>
                       <div className="list-item-sub">{p.device_model} · {p.part_type}</div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontWeight: 700, fontSize: 18, color: p.quantity <= p.min_quantity ? "var(--danger)" : "var(--text)" }}>{p.quantity}</div>
-                      <div style={{ fontSize: 11, color: "var(--hint)" }}>adet</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontWeight: 700, fontSize: 18, color: p.quantity <= p.min_quantity ? "var(--danger)" : "var(--text)" }}>{p.quantity}</div>
+                        <div style={{ fontSize: 11, color: "var(--hint)" }}>adet</div>
+                      </div>
+                      {/* Geçmiş butonu */}
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ padding: "4px 8px", fontSize: 16 }}
+                        onClick={e => { e.stopPropagation(); openPanel(p, "gecmis"); }}
+                        title="Stok geçmişi"
+                      >📋</button>
                     </div>
                   </div>
 
+                  {/* Panel */}
                   {isSelected && (
                     <div className="card" style={{ marginTop: -4, borderRadius: "0 0 12px 12px", background: "var(--bg2)", marginBottom: 8 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--hint)", marginBottom: 10 }}>
-                        📦 Stok Düş — {p.name}
+                      {/* Panel sekme */}
+                      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                        <button onClick={() => setPanelTab("dus")}
+                          style={{ padding: "5px 14px", borderRadius: 20, border: "none", cursor: "pointer",
+                            background: panelTab === "dus" ? "var(--accent)" : "var(--bg)",
+                            color: panelTab === "dus" ? "#fff" : "var(--text)", fontWeight: 600, fontSize: 13 }}>
+                          ➖ Stok Düş
+                        </button>
+                        <button onClick={() => {
+                          setPanelTab("gecmis");
+                          if (!hareketler.length || selectedPart?.id !== p.id) {
+                            setHareketLoading(true);
+                            api.partHareketler(p.id).then(setHareketler).finally(() => setHareketLoading(false));
+                          }
+                        }}
+                          style={{ padding: "5px 14px", borderRadius: 20, border: "none", cursor: "pointer",
+                            background: panelTab === "gecmis" ? "var(--accent)" : "var(--bg)",
+                            color: panelTab === "gecmis" ? "#fff" : "var(--text)", fontWeight: 600, fontSize: 13 }}>
+                          📋 Geçmiş
+                        </button>
                       </div>
 
-                      {/* Sebep butonları */}
-                      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-                        {[
-                          { key: "tamir", label: "🔧 Tamire Takıldı" },
-                          { key: "satis", label: "💰 Satıldı" },
-                          { key: "hasar", label: "💥 Hasar/Kayıp" },
-                          { key: "diger", label: "📦 Diğer" },
-                        ].map(s => (
-                          <button key={s.key} type="button"
-                            onClick={() => setKullanForm(f => ({ ...f, sebep: s.key }))}
-                            style={{
-                              padding: "6px 12px", borderRadius: 20, border: "2px solid",
-                              borderColor: kullanForm.sebep === s.key ? "var(--accent)" : "var(--border)",
-                              background: kullanForm.sebep === s.key ? "var(--accent)" : "transparent",
-                              color: kullanForm.sebep === s.key ? "#fff" : "var(--text)",
-                              fontSize: 12, fontWeight: 600, cursor: "pointer",
-                            }}>
-                            {s.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <form onSubmit={submitKullan} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {kullanErr && <div style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600 }}>❌ {kullanErr}</div>}
-
-                        <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8, alignItems: "flex-end" }}>
-                          <div className="form-group" style={{ margin: 0 }}>
-                            <label className="form-label">Adet</label>
-                            <input className="form-input" type="number" min="1" max={p.quantity}
-                              value={kullanForm.miktar}
-                              onChange={e => setKullanForm(f => ({ ...f, miktar: e.target.value }))} />
+                      {/* Stok Düş formu */}
+                      {panelTab === "dus" && (
+                        <>
+                          <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+                            {[
+                              { key: "tamir", label: "🔧 Tamire Takıldı" },
+                              { key: "satis", label: "💰 Satıldı" },
+                              { key: "hasar", label: "💥 Hasar/Kayıp" },
+                              { key: "diger", label: "📦 Diğer" },
+                            ].map(s => (
+                              <button key={s.key} type="button"
+                                onClick={() => setKullanForm(f => ({ ...f, sebep: s.key }))}
+                                style={{
+                                  padding: "6px 12px", borderRadius: 20, border: "2px solid",
+                                  borderColor: kullanForm.sebep === s.key ? "var(--accent)" : "var(--border)",
+                                  background: kullanForm.sebep === s.key ? "var(--accent)" : "transparent",
+                                  color: kullanForm.sebep === s.key ? "#fff" : "var(--text)",
+                                  fontSize: 12, fontWeight: 600, cursor: "pointer",
+                                }}>
+                                {s.label}
+                              </button>
+                            ))}
                           </div>
-                          <div className="form-group" style={{ margin: 0 }}>
-                            <label className="form-label">
-                              {kullanForm.sebep === "tamir" ? "Tamir No / Cihaz" :
-                               kullanForm.sebep === "satis" ? "Müşteri Adı" :
-                               kullanForm.sebep === "hasar" ? "Hasar Açıklaması" : "Açıklama"}
-                            </label>
-                            <input className="form-input"
-                              value={kullanForm.aciklama}
-                              onChange={e => setKullanForm(f => ({ ...f, aciklama: e.target.value }))}
-                              placeholder={
-                                kullanForm.sebep === "tamir" ? "Örn: #1042 iPhone 13" :
-                                kullanForm.sebep === "satis" ? "Ad Soyad" :
-                                kullanForm.sebep === "hasar" ? "Neden hasar gördü?" : "Not"
-                              } />
-                          </div>
-                        </div>
+                          <form onSubmit={submitKullan} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {kullanErr && <div style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600 }}>❌ {kullanErr}</div>}
+                            <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8 }}>
+                              <div className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label">Adet</label>
+                                <input className="form-input" type="number" min="1" max={p.quantity}
+                                  value={kullanForm.miktar}
+                                  onChange={e => setKullanForm(f => ({ ...f, miktar: e.target.value }))} />
+                              </div>
+                              <div className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label">
+                                  {kullanForm.sebep === "tamir" ? "Tamir No / Cihaz" :
+                                   kullanForm.sebep === "satis" ? "Müşteri Adı" :
+                                   kullanForm.sebep === "hasar" ? "Hasar Açıklaması" : "Açıklama"}
+                                </label>
+                                <input className="form-input" value={kullanForm.aciklama}
+                                  onChange={e => setKullanForm(f => ({ ...f, aciklama: e.target.value }))}
+                                  placeholder={
+                                    kullanForm.sebep === "tamir" ? "#1042 iPhone 13" :
+                                    kullanForm.sebep === "satis" ? "Ad Soyad" :
+                                    kullanForm.sebep === "hasar" ? "Neden hasar gördü?" : "Not"
+                                  } />
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button type="submit" className="btn btn-primary btn-sm">Düş</button>
+                              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedPart(null)}>İptal</button>
+                            </div>
+                          </form>
+                        </>
+                      )}
 
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button type="submit" className="btn btn-primary btn-sm">Düş</button>
-                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedPart(null)}>İptal</button>
-                        </div>
-                      </form>
+                      {/* Geçmiş listesi */}
+                      {panelTab === "gecmis" && (
+                        hareketLoading ? <div style={{ textAlign: "center", padding: 12, color: "var(--hint)" }}>Yükleniyor...</div> :
+                        hareketler.length === 0 ? (
+                          <div style={{ textAlign: "center", padding: 12, color: "var(--hint)", fontSize: 14 }}>
+                            Henüz hareket kaydı yok
+                          </div>
+                        ) : hareketler.map((h, i) => (
+                          <div key={h.id} style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+                            padding: "8px 0", borderBottom: i < hareketler.length - 1 ? "1px solid var(--border)" : "none",
+                          }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                                {SEBEP_LABEL[h.sebep] || "📦 Diğer"}
+                                {h.aciklama ? ` — ${h.aciklama}` : ""}
+                              </div>
+                              <div style={{ fontSize: 12, color: "var(--hint)" }}>{h.tarih}</div>
+                            </div>
+                            <div style={{ fontWeight: 700, color: "var(--danger)", fontSize: 15, flexShrink: 0 }}>
+                              -{h.miktar} adet
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
