@@ -3,7 +3,7 @@ import hashlib
 import json
 import time
 import os
-from urllib.parse import parse_qsl, unquote
+from urllib.parse import parse_qsl
 from fastapi import HTTPException, Header
 from config import TELEGRAM_TOKEN
 
@@ -16,7 +16,7 @@ def validate_init_data(init_data: str) -> dict:
     if DEV_MODE or init_data == "mock_dev_mode":
         return {"id": DEV_TELEGRAM_ID, "first_name": "Dev"}
     try:
-        parsed = dict(parse_qsl(unquote(init_data), strict_parsing=True))
+        parsed = dict(parse_qsl(init_data, strict_parsing=False))
         check_hash = parsed.pop("hash", None)
         if not check_hash:
             raise HTTPException(status_code=401, detail="Hash eksik")
