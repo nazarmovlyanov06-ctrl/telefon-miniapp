@@ -15,7 +15,6 @@ export default function IkinciEl() {
   const [showForm, setShowForm] = useState(false);
   const [showMasraf, setShowMasraf] = useState(false);
   const [showSat, setShowSat] = useState(false);
-  const [masraflar, setMasraflar] = useState({});
   const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit" });
@@ -41,17 +40,10 @@ export default function IkinciEl() {
     } finally { setLoading(false); }
   }
 
-  async function loadMasraflar(id) {
-    if (masraflar[id]) return;
-    const data = await api.ikinciElMasraflar(id);
-    setMasraflar(m => ({ ...m, [id]: data }));
-  }
-
   function selectCihaz(c) {
     const isSame = selected?.id === c.id;
     setSelected(isSame ? null : c);
     setShowMasraf(false); setShowSat(false);
-    if (!isSame) loadMasraflar(c.id);
   }
 
   function handleSatMusteriChange(val) {
@@ -94,11 +86,13 @@ export default function IkinciEl() {
     e.preventDefault(); setErr("");
     try {
       await api.ikinciElMasraf(selected.id, { ...masrafForm, tutar: parseFloat(masrafForm.tutar) });
-      setMasraflar(m => ({ ...m, [selected.id]: undefined }));
       setShowMasraf(false);
       setMasrafForm({ aciklama: "", tutar: "", tarih: today() });
-      load();
-      loadMasraflar(selected.id);
+      const [l, o, s] = await Promise.all([api.ikinciElList(), api.ikinciElOzet(), api.ikinciElSatilanlar()]);
+      setList(l); setOzet(o); setSatilanlar(s);
+      // Seçili cihazı güncelle (yeni masraflarla)
+      const updated = l.find(x => x.id === selected.id);
+      if (updated) setSelected(updated);
     } catch (e) { setErr(e.message); }
   }
 
@@ -267,7 +261,7 @@ export default function IkinciEl() {
             <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Stokta 2. el cihaz yok</div>
           ) : filteredList.map(c => {
             const isSelected = selected?.id === c.id;
-            const cMasraflar = masraflar[c.id];
+            const cMasraflar = c.masraflar || [];
             return (
               <div key={c.id}>
                 <div className="card" onClick={() => selectCihaz(c)} style={{ cursor: "pointer" }}>
@@ -295,7 +289,7 @@ export default function IkinciEl() {
                 {isSelected && (
                   <div className="card" style={{ marginTop: -8, borderRadius: "0 0 12px 12px", background: "var(--bg2)" }}>
                     {/* Masraf listesi */}
-                    {cMasraflar && cMasraflar.length > 0 && (
+                    {cMasraflar.length > 0 && (
                       <div style={{ marginBottom: 10 }}>
                         <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--hint)" }}>
                           🔧 Masraflar (toplam: {(c.toplam_masraf || 0).toLocaleString("tr-TR")}₺)
@@ -419,7 +413,9 @@ export default function IkinciEl() {
         <>
           {filteredSatilanlar.length === 0 ? (
             <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Henüz satılan cihaz yok</div>
-          ) : filteredSatilanlar.map(c => (
+          ) : filteredSatilanlar.map(c => {
+            const satMasraflar = c.masraflar || [];
+            return (
             <div key={c.id} className="card">
               <div className="card-row" style={{ marginBottom: 6 }}>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>📱 {c.model}</div>
@@ -430,20 +426,41 @@ export default function IkinciEl() {
                   </div>
                 </div>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 4 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 6 }}>
                 {c.renk && <Chip>{c.renk}</Chip>}
                 {c.depolama && <Chip>💾 {c.depolama}</Chip>}
                 {c.ram && <Chip>🧠 {c.ram}</Chip>}
               </div>
-              <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", gap: 10, flexWrap: "wrap", marginBottom: satMasraflar.length > 0 ? 8 : 0 }}>
                 {c.musteri_adi && <span>👤 {c.musteri_adi}</span>}
                 {c.musteri_telefon && <span>📞 {c.musteri_telefon}</span>}
                 <span>📡 {c.satis_kanali || "Dükkan"}</span>
                 <span>📅 {c.satis_tarihi || "—"}</span>
                 {c.imei && <span>IMEI: {c.imei}</span>}
               </div>
+              {/* Masraflar */}
+              {satMasraflar.length > 0 && (
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hint)", marginBottom: 5 }}>
+                    🔧 MASRAFLAR · toplam {(c.toplam_masraf || 0).toLocaleString("tr-TR")}₺
+                  </div>
+                  {satMasraflar.map(m => (
+                    <div key={m.id} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      fontSize: 13, padding: "4px 0",
+                      borderBottom: "1px solid var(--border)",
+                    }}>
+                      <div>
+                        <span style={{ fontWeight: 500 }}>{m.aciklama}</span>
+                        <span style={{ fontSize: 11, color: "var(--hint)", marginLeft: 6 }}>📅 {m.tarih || "—"}</span>
+                      </div>
+                      <span style={{ fontWeight: 700 }}>₺{(m.tutar || 0).toLocaleString("tr-TR")}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
+          )})}
         </>
       )}
 

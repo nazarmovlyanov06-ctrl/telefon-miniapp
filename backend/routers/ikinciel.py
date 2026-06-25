@@ -54,7 +54,14 @@ async def list_stok(
            ORDER BY c.created_at DESC""",
         params
     )
-    return [dict(r) for r in await cur.fetchall()]
+    rows = [dict(r) for r in await cur.fetchall()]
+    for r in rows:
+        cur2 = await db.execute(
+            "SELECT * FROM ikinci_el_masraflar WHERE cihaz_id=? ORDER BY tarih",
+            (r["id"],)
+        )
+        r["masraflar"] = [dict(m) for m in await cur2.fetchall()]
+    return rows
 
 
 @router.get("/satilanlar")
@@ -71,7 +78,14 @@ async def list_satilanlar(
            WHERE c.durum = 'satildi'
            ORDER BY c.satis_tarihi DESC"""
     )
-    return [dict(r) for r in await cur.fetchall()]
+    rows = [dict(r) for r in await cur.fetchall()]
+    for r in rows:
+        cur2 = await db.execute(
+            "SELECT * FROM ikinci_el_masraflar WHERE cihaz_id=? ORDER BY tarih",
+            (r["id"],)
+        )
+        r["masraflar"] = [dict(m) for m in await cur2.fetchall()]
+    return rows
 
 
 @router.get("/{cihaz_id}/masraflar")
