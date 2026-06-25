@@ -16,7 +16,7 @@ export default function IkinciEl() {
   const [showMasraf, setShowMasraf] = useState(false);
   const [showSat, setShowSat] = useState(false);
   const [masraflar, setMasraflar] = useState({});
-  const [form, setForm] = useState({ model: "", imei: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
+  const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit" });
   const [err, setErr] = useState("");
@@ -85,7 +85,7 @@ export default function IkinciEl() {
     try {
       await api.createIkinciEl({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
       setShowForm(false);
-      setForm({ model: "", imei: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
+      setForm({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -181,6 +181,26 @@ export default function IkinciEl() {
                   <label className="form-label">Model *</label>
                   <input className="form-input" required value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} placeholder="iPhone 13, Samsung A54..." />
                 </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div className="form-group">
+                    <label className="form-label">Renk</label>
+                    <input className="form-input" value={form.renk} onChange={e => setForm({ ...form, renk: e.target.value })} placeholder="Siyah, Beyaz..." />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Hafıza</label>
+                    <input className="form-input" value={form.depolama} onChange={e => setForm({ ...form, depolama: e.target.value })} placeholder="128GB, 256GB..." />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div className="form-group">
+                    <label className="form-label">RAM</label>
+                    <input className="form-input" value={form.ram} onChange={e => setForm({ ...form, ram: e.target.value })} placeholder="6GB, 8GB..." />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Özellikler</label>
+                    <input className="form-input" value={form.ozellikler} onChange={e => setForm({ ...form, ozellikler: e.target.value })} placeholder="Hasar, batarya..." />
+                  </div>
+                </div>
                 <div className="form-group">
                   <label className="form-label">IMEI</label>
                   <ImeiInput
@@ -251,17 +271,25 @@ export default function IkinciEl() {
             return (
               <div key={c.id}>
                 <div className="card" onClick={() => selectCihaz(c)} style={{ cursor: "pointer" }}>
-                  <div className="card-row">
-                    <div>
-                      <div style={{ fontWeight: 600 }}>📱 {c.model}</div>
-                      {c.imei && <div style={{ fontSize: 12, color: "var(--hint)" }}>IMEI: {c.imei}</div>}
-                      {c.kimden && <div style={{ fontSize: 12, color: "var(--hint)" }}>Kimden: {c.kimden}</div>}
-                      {c.kaynak === "getmobile" && <div style={{ fontSize: 11, color: "var(--hint)" }}>📦 Getmobil</div>}
-                    </div>
+                  <div className="card-row" style={{ marginBottom: 6 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>📱 {c.model}</div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontWeight: 700 }}>{((c.alis_fiyati || 0) + (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺</div>
                       <div style={{ fontSize: 11, color: "var(--hint)" }}>maliyet</div>
                     </div>
+                  </div>
+                  {/* Özellik chipler */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 4 }}>
+                    {c.renk && <Chip>{c.renk}</Chip>}
+                    {c.depolama && <Chip>💾 {c.depolama}</Chip>}
+                    {c.ram && <Chip>🧠 {c.ram}</Chip>}
+                    {c.ozellikler && <Chip color="orange">{c.ozellikler}</Chip>}
+                    {c.kaynak === "getmobile" && <Chip color="blue">📦 Getmobil</Chip>}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    {c.imei && <span>IMEI: {c.imei}</span>}
+                    {c.kimden && <span>👤 {c.kimden}</span>}
+                    {c.alis_tarihi && <span>📅 {c.alis_tarihi}</span>}
                   </div>
                 </div>
                 {isSelected && (
@@ -269,11 +297,20 @@ export default function IkinciEl() {
                     {/* Masraf listesi */}
                     {cMasraflar && cMasraflar.length > 0 && (
                       <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: "var(--hint)" }}>Masraflar</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--hint)" }}>
+                          🔧 Masraflar (toplam: {(c.toplam_masraf || 0).toLocaleString("tr-TR")}₺)
+                        </div>
                         {cMasraflar.map(m => (
-                          <div key={m.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "3px 0" }}>
-                            <span>{m.aciklama}</span>
-                            <span style={{ fontWeight: 600 }}>₺{(m.tutar || 0).toLocaleString("tr-TR")}</span>
+                          <div key={m.id} style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            fontSize: 13, padding: "6px 0",
+                            borderBottom: "1px solid var(--border)",
+                          }}>
+                            <div>
+                              <div>{m.aciklama}</div>
+                              <div style={{ fontSize: 11, color: "var(--hint)" }}>📅 {m.tarih || "—"}</div>
+                            </div>
+                            <span style={{ fontWeight: 700 }}>₺{(m.tutar || 0).toLocaleString("tr-TR")}</span>
                           </div>
                         ))}
                       </div>
@@ -287,11 +324,17 @@ export default function IkinciEl() {
                         {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0" }}>❌ {err}</div>}
                         <div className="form-group">
                           <label className="form-label">Masraf Açıklaması</label>
-                          <input className="form-input" required value={masrafForm.aciklama} onChange={e => setMasrafForm({ ...masrafForm, aciklama: e.target.value })} placeholder="Ekran, temizlik..." />
+                          <input className="form-input" required value={masrafForm.aciklama} onChange={e => setMasrafForm({ ...masrafForm, aciklama: e.target.value })} placeholder="Ekran, temizlik, batarya..." />
                         </div>
-                        <div className="form-group">
-                          <label className="form-label">Tutar (₺)</label>
-                          <input className="form-input" type="number" required value={masrafForm.tutar} onChange={e => setMasrafForm({ ...masrafForm, tutar: e.target.value })} />
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          <div className="form-group">
+                            <label className="form-label">Tutar (₺)</label>
+                            <input className="form-input" type="number" required value={masrafForm.tutar} onChange={e => setMasrafForm({ ...masrafForm, tutar: e.target.value })} />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Tarih</label>
+                            <input className="form-input" type="date" value={masrafForm.tarih} onChange={e => setMasrafForm({ ...masrafForm, tarih: e.target.value })} />
+                          </div>
                         </div>
                         <div style={{ display: "flex", gap: 8 }}>
                           <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
@@ -378,22 +421,26 @@ export default function IkinciEl() {
             <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Henüz satılan cihaz yok</div>
           ) : filteredSatilanlar.map(c => (
             <div key={c.id} className="card">
-              <div className="card-row">
-                <div>
-                  <div style={{ fontWeight: 600 }}>📱 {c.model}</div>
-                  {c.musteri_adi && <div style={{ fontSize: 13, color: "var(--text)" }}>👤 {c.musteri_adi}</div>}
-                  <div style={{ fontSize: 12, color: "var(--hint)" }}>
-                    📡 {c.satis_kanali || "Dükkan"}
-                    {c.imei ? ` · ${c.imei}` : ""}
-                  </div>
-                </div>
+              <div className="card-row" style={{ marginBottom: 6 }}>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>📱 {c.model}</div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontWeight: 700, color: "var(--success)" }}>{(c.satis_fiyati || 0).toLocaleString("tr-TR")} ₺</div>
                   <div style={{ fontSize: 12, color: "var(--success)" }}>
                     Kâr: {((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--hint)" }}>{c.satis_tarihi || "—"}</div>
                 </div>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 4 }}>
+                {c.renk && <Chip>{c.renk}</Chip>}
+                {c.depolama && <Chip>💾 {c.depolama}</Chip>}
+                {c.ram && <Chip>🧠 {c.ram}</Chip>}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {c.musteri_adi && <span>👤 {c.musteri_adi}</span>}
+                {c.musteri_telefon && <span>📞 {c.musteri_telefon}</span>}
+                <span>📡 {c.satis_kanali || "Dükkan"}</span>
+                <span>📅 {c.satis_tarihi || "—"}</span>
+                {c.imei && <span>IMEI: {c.imei}</span>}
               </div>
             </div>
           ))}
@@ -451,3 +498,17 @@ export default function IkinciEl() {
 }
 
 function today() { return new Date().toISOString().split("T")[0]; }
+
+function Chip({ children, color }) {
+  const colors = {
+    orange: { bg: "#fff7ed", text: "#c2410c" },
+    blue: { bg: "#eff6ff", text: "#1d4ed8" },
+  };
+  const c = colors[color] || { bg: "var(--bg2)", text: "var(--hint)" };
+  return (
+    <span style={{
+      fontSize: 11, padding: "2px 7px", borderRadius: 6,
+      background: c.bg, color: c.text, fontWeight: 600,
+    }}>{children}</span>
+  );
+}

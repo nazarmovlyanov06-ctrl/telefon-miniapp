@@ -98,9 +98,13 @@ async def create_cihaz(
     kimden = body.get("kimden") or ""
     kimden_telefon = body.get("kimden_telefon") or ""
     cur = await db.execute(
-        """INSERT INTO ikinci_el (model, imei, kimden, kimden_telefon, alis_fiyati, notlar, durum, kaynak)
-           VALUES (?, ?, ?, ?, ?, ?, 'stokta', ?)""",
-        (body["model"], body.get("imei"), kimden, kimden_telefon,
+        """INSERT INTO ikinci_el
+           (model, imei, renk, depolama, ram, ozellikler,
+            kimden, kimden_telefon, alis_fiyati, notlar, durum, kaynak)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'stokta', ?)""",
+        (body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
+         body.get("ram"), body.get("ozellikler"),
+         kimden, kimden_telefon,
          float(body["alis_fiyati"]), body.get("notlar"),
          body.get("kaynak", "dukkan")),
     )
