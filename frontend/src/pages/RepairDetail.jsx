@@ -225,6 +225,15 @@ export default function RepairDetail({ user }) {
               <Row label="Garanti" value={`${repair.warranty_days} gün`} />
             </>}
           </div>
+          {/* Tarihler timeline */}
+          <div className="card">
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: "var(--hint)" }}>📅 TARİHLER</div>
+            <DateRow icon="📝" label="Kayıt Açıldı" val={repair.created_at} done />
+            <DateRow icon="🔧" label="Tamire Alındı" val={repair.tamirde_at} done={!!repair.tamirde_at} />
+            <DateRow icon="✅" label="Hazır Oldu" val={repair.completed_at} done={!!repair.completed_at} />
+            <DateRow icon="🏠" label="Teslim Edildi" val={repair.delivered_at} done={!!repair.delivered_at} />
+          </div>
+
           {repair.notes && (
             <div className="card">
               <Row label="Not" value={repair.notes} />
@@ -258,6 +267,34 @@ function Row({ label, value }) {
     <div className="card-row" style={{ padding: "8px 0" }}>
       <span style={{ color: "var(--hint)", fontSize: 13 }}>{label}</span>
       <span style={{ fontWeight: 500, maxWidth: "60%", textAlign: "right" }}>{value}</span>
+    </div>
+  );
+}
+
+function DateRow({ icon, label, val, done }) {
+  const fmt = (d) => {
+    if (!d) return null;
+    const dt = new Date(d);
+    return dt.toLocaleDateString("tr-TR") + " " + dt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  };
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10,
+      padding: "6px 0",
+      opacity: done ? 1 : 0.35,
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: "50%",
+        background: done ? "var(--accent)" : "var(--bg2)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 15, flexShrink: 0,
+      }}>{icon}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 12, color: done ? "var(--text)" : "var(--hint)" }}>
+          {val ? fmt(val) : "—"}
+        </div>
+      </div>
     </div>
   );
 }

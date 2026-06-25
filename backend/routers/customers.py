@@ -110,6 +110,124 @@ async def customer_ikinciel(
     return [dict(r) for r in await cur.fetchall()]
 
 
+@router.get("/{customer_id}/gecmis")
+async def customer_gecmis(
+    customer_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute("SELECT name, phone FROM customers WHERE id = ?", (customer_id,))
+    row = await cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Musteri bulunamadi")
+    name = row["name"]
+    phone = row["phone"] or ""
+
+    events = []
+
+    # Tamirler
+    cur = await db.execute(
+        "SELECT * FROM repairs WHERE customer_id = ? ORDER BY created_at DESC", (customer_id,)
+    )
+    for r in await cur.fetchall():
+        r = dict(r)
+        events.append({
+            "tur": "tamir", "ikon": "🔧",
+            "baslik": r["device_model"],
+            "alt": r.get("fault_desc") or "",
+            "tutar": r.get("final_price") or r.get("estimated_price"),
+            "tarih": r.get("created_at"),
+            "tamirde_at": r.get("tamirde_at"),
+            "completed_at": r.get("completed_at"),
+            "delivered_at": r.get("delivered_at"),
+            "repair_id": r["id"],
+            "repair_no": r.get("repair_no"),
+            "durum": r.get("status"),
+        })
+
+    # Borçlar
+    cur = await db.execute(
+        "SELECT * FROM debts WHERE customer_id = ? ORDER BY created_at DESC", (customer_id,)
+    )
+    for d in await cur.fetchall():
+        d = dict(d)
+        events.append({
+            "tur": "borc", "ikon": "💰",
+            "baslik": d.get("description") or d.get("notes") or "Borç",
+            "alt": f"Toplam: {d.get('total_amount') or d.get('amount') or 0}₺",
+            "tutar": d.get("total_amount") or d.get("amount"),
+            "tarih": d.get("created_at"),
+        })
+
+    # 2.El — bize sattı (kimden)
+    cur = await db.execute(
+        "SELECT * FROM ikinci_el WHERE LOWER(kimden) = LOWER(?)"
+        + (" OR (kimden_telefon IS NOT NULL AND kimden_telefon != '' AND kimden_telefon = ?)" if phone else ""),
+        (name, phone) if phone else (name,)
+    )
+    for c in await cur.fetchall():
+        c = dict(c)
+        events.append({
+            "tur": "2el_alim", "ikon": "📲",
+            "baslik": c["model"],
+            "alt": f"Bize sattı · IMEI: {c.get('imei') or '—'}",
+            "tutar": c.get("alis_fiyati"),
+            "tarih": c.get("alis_tarihi") or c.get("created_at"),
+        })
+
+    # 2.El — bizden aldı (musteri_adi)
+    cur = await db.execute(
+        "SELECT * FROM ikinci_el WHERE LOWER(musteri_adi) = LOWER(?)"
+        + (" OR (musteri_telefon IS NOT NULL AND musteri_telefon != '' AND musteri_telefon = ?)" if phone else ""),
+        (name, phone) if phone else (name,)
+    )
+    for c in await cur.fetchall():
+        c = dict(c)
+        events.append({
+            "tur": "2el_satim", "ikon": "📱",
+            "baslik": c["model"],
+            "alt": f"Satın aldı · IMEI: {c.get('imei') or '—'}",
+            "tutar": c.get("satis_fiyati"),
+            "tarih": c.get("satis_tarihi") or c.get("created_at"),
+        })
+
+    # Sıfır — bize sattı
+    cur = await db.execute(
+        "SELECT * FROM sifir_cihazlar WHERE LOWER(kimden) = LOWER(?)"
+        + (" OR (kimden_telefon IS NOT NULL AND kimden_telefon != '' AND kimden_telefon = ?)" if phone else ""),
+        (name, phone) if phone else (name,)
+    )
+    for c in await cur.fetchall():
+        c = dict(c)
+        events.append({
+            "tur": "sifir_alim", "ikon": "📦",
+            "baslik": c["model"],
+            "alt": f"Sıfır cihaz · Bize sattı",
+            "tutar": c.get("alis_fiyati"),
+            "tarih": c.get("alis_tarihi") or c.get("created_at"),
+        })
+
+    # Sıfır — bizden aldı
+    cur = await db.execute(
+        "SELECT * FROM sifir_cihazlar WHERE LOWER(musteri_adi) = LOWER(?)"
+        + (" OR (musteri_telefon IS NOT NULL AND musteri_telefon != '' AND musteri_telefon = ?)" if phone else ""),
+        (name, phone) if phone else (name,)
+    )
+    for c in await cur.fetchall():
+        c = dict(c)
+        events.append({
+            "tur": "sifir_satim", "ikon": "📦",
+            "baslik": c["model"],
+            "alt": f"Sıfır cihaz · Satın aldı",
+            "tutar": c.get("satis_fiyati"),
+            "tarih": c.get("satis_tarihi") or c.get("created_at"),
+        })
+
+    events.sort(key=lambda x: x.get("tarih") or "", reverse=True)
+    return events
+
+
 @router.get("/{customer_id}/repairs")
 async def customer_repairs(
     customer_id: int,

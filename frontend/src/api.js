@@ -47,6 +47,7 @@ export const api = {
   customer: (id) => get(`/customers/${id}`),
   customerRepairs: (id) => get(`/customers/${id}/repairs`),
   customerIkinciEl: (id) => get(`/customers/${id}/ikinciel`),
+  customerGecmis: (id) => get(`/customers/${id}/gecmis`),
   createCustomer: (data) => post("/customers/", data),
   updateCustomer: (id, data) => put(`/customers/${id}`, data),
   deleteCustomer: (id) => del(`/customers/${id}`),

@@ -118,12 +118,10 @@ async def update_repair(
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
 
-    completed_at = None
-    delivered_at = None
-    if body.get("status") == "hazir":
-        completed_at = datetime.datetime.now().isoformat()
-    if body.get("status") == "teslim":
-        delivered_at = datetime.datetime.now().isoformat()
+    now = datetime.datetime.now().isoformat()
+    tamirde_at = now if body.get("status") == "tamirde" else None
+    completed_at = now if body.get("status") == "hazir" else None
+    delivered_at = now if body.get("status") == "teslim" else None
 
     cur2 = await db.execute("SELECT repair_no, device_model FROM repairs WHERE id=?", (repair_id,))
     rrow = await cur2.fetchone()
@@ -134,7 +132,8 @@ async def update_repair(
            device_model=?, fault_desc=?, status=?, estimated_price=?,
            final_price=?, payment_type=?, paid_amount=?,
            warranty_days=?, assigned_to=?, notes=?,
-           completed_at=COALESCE(?, completed_at),
+           tamirde_at=COALESCE(tamirde_at, ?),
+           completed_at=COALESCE(completed_at, ?),
            delivered_at=COALESCE(?, delivered_at)
            WHERE id=?""",
         (
@@ -148,6 +147,7 @@ async def update_repair(
             body.get("warranty_days", 0),
             body.get("assigned_to"),
             body.get("notes"),
+            tamirde_at,
             completed_at,
             delivered_at,
             repair_id,
