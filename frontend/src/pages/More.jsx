@@ -19,6 +19,7 @@ const ITEMS = [
   // Çalışan
   { icon: "💵", label: "Maaş",      path: "/maas",       color: "#fdf4ff", iconBg: "#7c3aed" },
   // Araçlar
+  { icon: "🤖", label: "AI Asistan",path: "/ai",         color: "#f0f9ff", iconBg: "#0ea5e9" },
   { icon: "📱", label: "IMEI",      path: "/imei",       color: "#f8fafc", iconBg: "#475569" },
   { icon: "⚙️", label: "Ayarlar",   path: "/settings",   color: "#f8fafc", iconBg: "#64748b" },
 ];

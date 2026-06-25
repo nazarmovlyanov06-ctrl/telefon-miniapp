@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 
@@ -9,11 +9,37 @@ export default function Loaner() {
   const [showForm, setShowForm] = useState(false);
   const [err, setErr] = useState("");
   const [form, setForm] = useState({ musteri_adi: "", cihaz: "", teslim_tarihi: today(), notlar: "" });
+  const [musteriler, setMusteriler] = useState([]);
+  const [oneriler, setOneriler] = useState([]);
+  const [showOneriler, setShowOneriler] = useState(false);
+  const inputRef = useRef(null);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.customers("").then(setMusteriler).catch(() => {});
+  }, []);
 
   async function load() {
     try { setList(await api.loanerList()); } finally { setLoading(false); }
+  }
+
+  function handleMusteriChange(val) {
+    setForm(f => ({ ...f, musteri_adi: val }));
+    if (val.length >= 2) {
+      const q = val.toLowerCase();
+      const found = musteriler.filter(m =>
+        m.name.toLowerCase().includes(q) || (m.phone || "").includes(q)
+      ).slice(0, 5);
+      setOneriler(found);
+      setShowOneriler(found.length > 0);
+    } else {
+      setShowOneriler(false);
+    }
+  }
+
+  function secMusteri(m) {
+    setForm(f => ({ ...f, musteri_adi: m.name }));
+    setShowOneriler(false);
   }
 
   async function submit(e) {
@@ -23,6 +49,7 @@ export default function Loaner() {
       await api.createLoaner(form);
       setShowForm(false);
       setForm({ musteri_adi: "", cihaz: "", teslim_tarihi: today(), notlar: "" });
+      setShowOneriler(false);
       load();
     } catch (e) {
       setErr(e.message);
@@ -46,28 +73,63 @@ export default function Loaner() {
       <div className="card-row" style={{ marginBottom: 14 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
         <h1 className="page-title" style={{ margin: 0 }}>Yedek Telefon</h1>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Teslim Et</button>
+        <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(true); setErr(""); }}>+ Teslim Et</button>
       </div>
 
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
             {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
-            <div className="form-group">
+            <div className="form-group" style={{ position: "relative" }}>
               <label className="form-label">Müşteri Adı *</label>
-              <input className="form-input" required value={form.musteri_adi} onChange={e => setForm({ ...form, musteri_adi: e.target.value })} placeholder="Ad Soyad" />
+              <input
+                ref={inputRef}
+                className="form-input"
+                required
+                value={form.musteri_adi}
+                onChange={e => handleMusteriChange(e.target.value)}
+                onBlur={() => setTimeout(() => setShowOneriler(false), 150)}
+                placeholder="Ad Soyad (kayıtlı müşterilerden önerir)"
+                autoComplete="off"
+              />
+              {showOneriler && (
+                <div style={{
+                  position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
+                  background: "var(--card)", border: "1px solid var(--border)",
+                  borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden",
+                }}>
+                  {oneriler.map(m => (
+                    <div
+                      key={m.id}
+                      onMouseDown={() => secMusteri(m)}
+                      style={{
+                        padding: "10px 14px", cursor: "pointer", fontSize: 14,
+                        borderBottom: "1px solid var(--border)",
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                      }}
+                    >
+                      <span>👤 {m.name}</span>
+                      {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Teslim Edilen Cihaz *</label>
-              <input className="form-input" required value={form.cihaz} onChange={e => setForm({ ...form, cihaz: e.target.value })} placeholder="Samsung A12, Huawei P20..." />
+              <input className="form-input" required value={form.cihaz}
+                onChange={e => setForm({ ...form, cihaz: e.target.value })}
+                placeholder="Samsung A12, Huawei P20..." />
             </div>
             <div className="form-group">
               <label className="form-label">Teslim Tarihi</label>
-              <input className="form-input" type="date" value={form.teslim_tarihi} onChange={e => setForm({ ...form, teslim_tarihi: e.target.value })} />
+              <input className="form-input" type="date" value={form.teslim_tarihi}
+                onChange={e => setForm({ ...form, teslim_tarihi: e.target.value })} />
             </div>
             <div className="form-group">
               <label className="form-label">Not</label>
-              <input className="form-input" value={form.notlar} onChange={e => setForm({ ...form, notlar: e.target.value })} />
+              <input className="form-input" value={form.notlar}
+                onChange={e => setForm({ ...form, notlar: e.target.value })} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button type="submit" className="btn btn-primary">Kaydet</button>

@@ -6,7 +6,7 @@ from config import FRONTEND_URL, DB_PATH
 from routers import users, customers, repairs, parts, shopping, imei, debts, reports
 from routers import (
     toptanci, ikinciel, garanti, kasa, gider, loaner,
-    aksesuar, hedef, maas, karalist, parca_iade,
+    aksesuar, hedef, maas, karalist, parca_iade, ai_chat,
 )
 
 SCHEMA = """
@@ -311,6 +311,7 @@ app.include_router(hedef.router)
 app.include_router(maas.router)
 app.include_router(karalist.router)
 app.include_router(parca_iade.router)
+app.include_router(ai_chat.router)
 
 
 @app.get("/health")

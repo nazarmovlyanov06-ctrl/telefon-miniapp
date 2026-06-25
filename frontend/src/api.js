@@ -141,4 +141,7 @@ export const api = {
   parcaIadeList: () => get("/parca-iade/"),
   createParcaIade: (data) => post("/parca-iade/", data),
   updateParcaIadeDurum: (id, durum) => put(`/parca-iade/${id}/durum`, { durum }),
+
+  // AI
+  aiSor: (soru) => post("/ai/sor", { soru }),
 };

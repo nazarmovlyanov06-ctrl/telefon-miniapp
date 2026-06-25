@@ -24,6 +24,7 @@ import Hedef from "./pages/Hedef";
 import Maas from "./pages/Maas";
 import KaraListe from "./pages/KaraListe";
 import ParcaIade from "./pages/ParcaIade";
+import AiChat from "./pages/AiChat";
 import "./index.css";
 
 export default function App() {
@@ -89,6 +90,7 @@ export default function App() {
         <Route path="/maas" element={<Maas />} />
         <Route path="/karalist" element={<KaraListe />} />
         <Route path="/parca-iade" element={<ParcaIade />} />
+        <Route path="/ai" element={<AiChat />} />
       </Routes>
       <BottomNav />
     </BrowserRouter>

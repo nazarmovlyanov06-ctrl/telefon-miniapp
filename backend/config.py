@@ -6,6 +6,7 @@ load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 DB_PATH = os.getenv("DB_PATH", "../telefon_bot/telefon_bot.db")
 IMEI_API_KEY = os.getenv("IMEI_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 ROLE_PATRON = "patron"

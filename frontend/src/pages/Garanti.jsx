@@ -7,20 +7,41 @@ export default function Garanti() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [customers, setCustomers] = useState([]);
+  const [musteriler, setMusteriler] = useState([]);
+  const [oneriler, setOneriler] = useState([]);
+  const [showOneriler, setShowOneriler] = useState(false);
   const [err, setErr] = useState("");
   const [form, setForm] = useState({
     musteri_adi: "", telefon: "", cihaz: "", tamir_aciklama: "",
     baslangic_tarihi: today(), sure_gun: "90"
   });
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.customers("").then(setMusteriler).catch(() => {});
+  }, []);
 
   async function load() {
-    try {
-      const [g, c] = await Promise.all([api.garantiList(), api.customers()]);
-      setList(g); setCustomers(c);
-    } finally { setLoading(false); }
+    try { setList(await api.garantiList()); } finally { setLoading(false); }
+  }
+
+  function handleMusteriChange(val) {
+    setForm(f => ({ ...f, musteri_adi: val }));
+    if (val.length >= 2) {
+      const q = val.toLowerCase();
+      const found = musteriler.filter(m =>
+        m.name.toLowerCase().includes(q) || (m.phone || "").includes(q)
+      ).slice(0, 5);
+      setOneriler(found);
+      setShowOneriler(found.length > 0);
+    } else {
+      setShowOneriler(false);
+    }
+  }
+
+  function secMusteri(m) {
+    setForm(f => ({ ...f, musteri_adi: m.name, telefon: m.phone || f.telefon }));
+    setShowOneriler(false);
   }
 
   async function submit(e) {
@@ -30,6 +51,7 @@ export default function Garanti() {
       await api.createGaranti({ ...form, sure_gun: parseInt(form.sure_gun) });
       setShowForm(false);
       setForm({ musteri_adi: "", telefon: "", cihaz: "", tamir_aciklama: "", baslangic_tarihi: today(), sure_gun: "90" });
+      setShowOneriler(false);
       load();
     } catch (e) {
       setErr(e.message);
@@ -45,8 +67,7 @@ export default function Garanti() {
   const now = new Date();
 
   function daysLeft(bitis) {
-    const d = Math.ceil((new Date(bitis) - now) / 86400000);
-    return d;
+    return Math.ceil((new Date(bitis) - now) / 86400000);
   }
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
@@ -56,16 +77,38 @@ export default function Garanti() {
       <div className="card-row" style={{ marginBottom: 14 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
         <h1 className="page-title" style={{ margin: 0 }}>Garanti Takibi</h1>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Ekle</button>
+        <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(true); setErr(""); }}>+ Ekle</button>
       </div>
 
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
             {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
-            <div className="form-group">
+            <div className="form-group" style={{ position: "relative" }}>
               <label className="form-label">Müşteri Adı *</label>
-              <input className="form-input" required value={form.musteri_adi} onChange={e => setForm({ ...form, musteri_adi: e.target.value })} placeholder="Ad Soyad" />
+              <input
+                className="form-input" required
+                value={form.musteri_adi}
+                onChange={e => handleMusteriChange(e.target.value)}
+                onBlur={() => setTimeout(() => setShowOneriler(false), 150)}
+                placeholder="Ad Soyad"
+                autoComplete="off"
+              />
+              {showOneriler && (
+                <div style={{
+                  position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
+                  background: "var(--card)", border: "1px solid var(--border)",
+                  borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden",
+                }}>
+                  {oneriler.map(m => (
+                    <div key={m.id} onMouseDown={() => secMusteri(m)}
+                      style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
+                      <span>👤 {m.name}</span>
+                      {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Telefon</label>
@@ -117,10 +160,7 @@ export default function Garanti() {
                 <div style={{ fontSize: 13, color: "var(--hint)" }}>{g.cihaz} · {g.tamir_aciklama}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{
-                  fontWeight: 700, fontSize: 13,
-                  color: expired ? "var(--danger)" : warn ? "var(--warn)" : "var(--success)"
-                }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: expired ? "var(--danger)" : warn ? "var(--warn)" : "var(--success)" }}>
                   {expired ? "Süresi Doldu" : `${dl} gün kaldı`}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--hint)" }}>Bitiş: {g.bitis_tarihi}</div>
