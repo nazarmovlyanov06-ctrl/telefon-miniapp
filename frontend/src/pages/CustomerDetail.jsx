@@ -13,6 +13,7 @@ export default function CustomerDetail() {
   const [customer, setCustomer] = useState(null);
   const [repairs, setRepairs] = useState([]);
   const [debts, setDebts] = useState([]);
+  const [ikinciel, setIkinciel] = useState([]);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", notes: "" });
@@ -23,13 +24,15 @@ export default function CustomerDetail() {
 
   async function load() {
     try {
-      const [c, r, d] = await Promise.all([
+      const [c, r, d, ie] = await Promise.all([
         api.customer(id),
         api.customerRepairs(id),
         api.debts(),
+        api.customerIkinciEl(id),
       ]);
       setCustomer(c);
       setRepairs(r);
+      setIkinciel(ie);
       setForm({ name: c.name, phone: c.phone || "", notes: c.notes || "" });
       setDebts(d.filter(db => db.customer_id === parseInt(id)));
     } catch (e) { setErr(e.message); }
@@ -120,6 +123,9 @@ export default function CustomerDetail() {
         <button className={`tab ${tab === "borclar" ? "active" : ""}`} onClick={() => setTab("borclar")}>
           💰 Borçlar ({debts.length})
         </button>
+        <button className={`tab ${tab === "ikinciel" ? "active" : ""}`} onClick={() => setTab("ikinciel")}>
+          📱 2. El ({ikinciel.length})
+        </button>
       </div>
 
       {tab === "tamirler" && (
@@ -155,6 +161,35 @@ export default function CustomerDetail() {
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontWeight: 700, color: "var(--danger)" }}>₺{(d.remaining || 0).toLocaleString("tr-TR")}</div>
                 <div style={{ fontSize: 11, color: "var(--hint)" }}>/{(d.total_amount || 0).toLocaleString("tr-TR")}</div>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+
+      {tab === "ikinciel" && (
+        ikinciel.length === 0 ? (
+          <div className="empty"><div className="empty-icon">📱</div>2. El kaydı yok</div>
+        ) : ikinciel.map(c => (
+          <div key={c.id + c.yon} className="card">
+            <div className="card-row">
+              <div>
+                <div style={{ fontWeight: 600 }}>📱 {c.model}</div>
+                {c.imei && <div style={{ fontSize: 12, color: "var(--hint)" }}>IMEI: {c.imei}</div>}
+                <div style={{ fontSize: 12, color: c.yon === "alim" ? "var(--success)" : "var(--hint)" }}>
+                  {c.yon === "alim" ? "⬇️ Bizden sattı" : "⬆️ Satın aldı"}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                {c.yon === "alim" && (
+                  <div style={{ fontWeight: 700 }}>₺{(c.alis_fiyati || 0).toLocaleString("tr-TR")}</div>
+                )}
+                {c.yon === "satim" && c.satis_fiyati && (
+                  <div style={{ fontWeight: 700, color: "var(--success)" }}>₺{c.satis_fiyati.toLocaleString("tr-TR")}</div>
+                )}
+                <div style={{ fontSize: 11, color: "var(--hint)" }}>
+                  {c.yon === "alim" ? c.alis_tarihi : c.satis_tarihi || "—"}
+                </div>
               </div>
             </div>
           </div>

@@ -46,6 +46,7 @@ export const api = {
   customers: (q) => get(`/customers/${q ? "?q=" + encodeURIComponent(q) : ""}`),
   customer: (id) => get(`/customers/${id}`),
   customerRepairs: (id) => get(`/customers/${id}/repairs`),
+  customerIkinciEl: (id) => get(`/customers/${id}/ikinciel`),
   createCustomer: (data) => post("/customers/", data),
   updateCustomer: (id, data) => put(`/customers/${id}`, data),
   deleteCustomer: (id) => del(`/customers/${id}`),

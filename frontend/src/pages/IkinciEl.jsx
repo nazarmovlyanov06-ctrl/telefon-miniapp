@@ -22,6 +22,8 @@ export default function IkinciEl() {
   const [musteriler, setMusteriler] = useState([]);
   const [kimdenOner, setKimdenOner] = useState([]);
   const [showKimdenOner, setShowKimdenOner] = useState(false);
+  const [satMusteriOner, setSatMusteriOner] = useState([]);
+  const [showSatMusteriOner, setShowSatMusteriOner] = useState(false);
   const [imeiSon4, setImeiSon4] = useState("");
   const [imeiGecmis, setImeiGecmis] = useState(null);
   const [imeiLoading, setImeiLoading] = useState(false);
@@ -49,6 +51,19 @@ export default function IkinciEl() {
     setSelected(isSame ? null : c);
     setShowMasraf(false); setShowSat(false);
     if (!isSame) loadMasraflar(c.id);
+  }
+
+  function handleSatMusteriChange(val) {
+    setSatForm(f => ({ ...f, musteri_adi: val }));
+    if (val.length >= 2) {
+      const found = musteriler.filter(m =>
+        m.name.toLowerCase().includes(val.toLowerCase())
+      ).slice(0, 5);
+      setSatMusteriOner(found);
+      setShowSatMusteriOner(found.length > 0);
+    } else {
+      setShowSatMusteriOner(false);
+    }
   }
 
   function handleKimdenChange(val) {
@@ -273,9 +288,27 @@ export default function IkinciEl() {
                     {showSat && (
                       <form onSubmit={submitSat} style={{ marginTop: 10 }}>
                         {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0" }}>❌ {err}</div>}
-                        <div className="form-group">
+                        <div className="form-group" style={{ position: "relative" }}>
                           <label className="form-label">Müşteri Adı</label>
-                          <input className="form-input" value={satForm.musteri_adi} onChange={e => setSatForm({ ...satForm, musteri_adi: e.target.value })} placeholder="Ad Soyad (opsiyonel)" />
+                          <input className="form-input" value={satForm.musteri_adi}
+                            onChange={e => handleSatMusteriChange(e.target.value)}
+                            onBlur={() => setTimeout(() => setShowSatMusteriOner(false), 150)}
+                            placeholder="Ad Soyad (opsiyonel)" autoComplete="off" />
+                          {showSatMusteriOner && (
+                            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
+                              background: "var(--card)", border: "1px solid var(--border)",
+                              borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                              {satMusteriOner.map(m => (
+                                <div key={m.id}
+                                  onMouseDown={() => { setSatForm(f => ({ ...f, musteri_adi: m.name })); setShowSatMusteriOner(false); }}
+                                  style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
+                                    borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
+                                  <span>👤 {m.name}</span>
+                                  {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <div className="form-group">
                           <label className="form-label">Satış Fiyatı (₺)</label>

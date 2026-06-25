@@ -87,6 +87,29 @@ async def delete_customer(
     return {"ok": True}
 
 
+@router.get("/{customer_id}/ikinciel")
+async def customer_ikinciel(
+    customer_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute("SELECT name FROM customers WHERE id = ?", (customer_id,))
+    row = await cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Musteri bulunamadi")
+    name = dict(row)["name"]
+    # Kimden = aldığımız cihaz (bize sattı), musteri_adi = sattığımız (müşteri satın aldı)
+    cur = await db.execute(
+        """SELECT *, 'alim' as yon FROM ikinci_el WHERE LOWER(kimden) = LOWER(?)
+           UNION ALL
+           SELECT *, 'satim' as yon FROM ikinci_el WHERE LOWER(musteri_adi) = LOWER(?)
+           ORDER BY created_at DESC""",
+        (name, name)
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
 @router.get("/{customer_id}/repairs")
 async def customer_repairs(
     customer_id: int,

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from aiosqlite import Connection
 from database import get_db, get_or_create_user
 from auth import get_current_user
+from datetime import date
 
 router = APIRouter(prefix="/parca-iade", tags=["parca-iade"])
 
@@ -27,11 +28,30 @@ async def add_iade(
     tg_user=Depends(get_current_user),
     db: Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    miktar = int(body.get("miktar", 1))
+    part_id = body.get("part_id")
+
+    # Stoktan düş
+    if part_id:
+        cur_p = await db.execute("SELECT quantity, name FROM parts WHERE id = ?", (part_id,))
+        part = await cur_p.fetchone()
+        if not part:
+            raise HTTPException(404, "Parça bulunamadı")
+        part = dict(part)
+        if part["quantity"] < miktar:
+            raise HTTPException(400, f"Stok yetersiz ({part['quantity']} adet mevcut)")
+        await db.execute("UPDATE parts SET quantity = quantity - ? WHERE id = ?", (miktar, part_id))
+        await db.execute(
+            """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih)
+               VALUES (?, 'cikis', ?, 'iade', ?, ?)""",
+            (part_id, miktar, body.get("sebep") or "Toptancıya iade", date.today().isoformat())
+        )
+
     cur = await db.execute(
-        """INSERT INTO parca_iadeler (toptanci_id, parca, miktar, sebep, durum)
-           VALUES (?, ?, ?, ?, ?)""",
-        (body.get("toptanci_id"), body["parca"], int(body.get("miktar", 1)),
+        """INSERT INTO parca_iadeler (toptanci_id, part_id, parca, miktar, sebep, durum)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (body.get("toptanci_id"), part_id, body["parca"], miktar,
          body.get("sebep"), body.get("durum", "bekliyor")),
     )
     await db.commit()
