@@ -79,4 +79,65 @@ export const api = {
   // Kullaniciler
   users: () => get("/users/"),
   changeRole: (id, role) => put(`/users/${id}/role`, { role }),
+
+  // Toptanci
+  toptanciList: () => get("/toptanci/"),
+  createToptanci: (data) => post("/toptanci/", data),
+  updateToptanci: (id, data) => put(`/toptanci/${id}`, data),
+  deleteToptanci: (id) => del(`/toptanci/${id}`),
+  toptanciAlislar: (id) => get(`/toptanci/${id}/alislar`),
+  createToptanciAlis: (id, data) => post(`/toptanci/${id}/alislar`, data),
+
+  // 2. El Cihaz
+  ikinciElList: () => get("/ikinciel/listesi"),
+  ikinciElOzet: () => get("/ikinciel/ozet"),
+  createIkinciEl: (data) => post("/ikinciel/", data),
+  ikinciElMasraf: (id, data) => post(`/ikinciel/${id}/masraf`, data),
+  ikinciElSat: (id, data) => post(`/ikinciel/${id}/sat`, data),
+
+  // Garanti
+  garantiList: () => get("/garantiler/"),
+  createGaranti: (data) => post("/garantiler/", data),
+  kapatGaranti: (id) => put(`/garantiler/${id}/kapat`, {}),
+
+  // Kasa
+  kasaBugun: () => get("/kasa/bugun"),
+  kasaTarih: (tarih) => get(`/kasa/tarih/${tarih}`),
+  kasaGider: (data) => post("/kasa/gider", data),
+
+  // Gider
+  giderList: () => get("/giderler/"),
+  createGider: (data) => post("/giderler/", data),
+  deleteGider: (id) => del(`/giderler/${id}`),
+
+  // Loaner
+  loanerList: () => get("/loaner/"),
+  createLoaner: (data) => post("/loaner/", data),
+  iadeLoaner: (id, data = {}) => put(`/loaner/${id}/iade`, data),
+
+  // Aksesuar
+  aksesuarList: () => get("/aksesuarlar/"),
+  createAksesuar: (data) => post("/aksesuarlar/", data),
+  updateAksesuar: (id, data) => put(`/aksesuarlar/${id}`, data),
+  satAksesuar: (id, data) => post(`/aksesuarlar/${id}/sat`, data),
+
+  // Hedef
+  hedefBuAy: () => get("/hedef/bu-ay"),
+  setHedef: (data) => post("/hedef/", data),
+
+  // Maas
+  calisanlar: () => get("/maas/calisanlar"),
+  createCalisan: (data) => post("/maas/calisanlar", data),
+  createAvans: (data) => post("/maas/avans", data),
+  maasOzet: (yil, ay) => get(`/maas/ozet/${yil}/${ay}`),
+
+  // Kara Liste
+  karaListe: (q) => get(`/kara-liste/${q ? "?q=" + encodeURIComponent(q) : ""}`),
+  createKara: (data) => post("/kara-liste/", data),
+  deleteKara: (id) => del(`/kara-liste/${id}`),
+
+  // Parca Iade
+  parcaIadeList: () => get("/parca-iade/"),
+  createParcaIade: (data) => post("/parca-iade/", data),
+  updateParcaIadeDurum: (id, durum) => put(`/parca-iade/${id}/durum`, { durum }),
 };

@@ -1,9 +1,272 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from config import FRONTEND_URL
+import aiosqlite
+from config import FRONTEND_URL, DB_PATH
 from routers import users, customers, repairs, parts, shopping, imei, debts, reports
+from routers import (
+    toptanci, ikinciel, garanti, kasa, gider, loaner,
+    aksesuar, hedef, maas, karalist, parca_iade,
+)
 
-app = FastAPI(title="Telefon Servis API", version="1.0.0")
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    telegram_id INTEGER UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT DEFAULT 'cirak',
+    active INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    phone TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS repairs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repair_no TEXT UNIQUE,
+    customer_id INTEGER REFERENCES customers(id),
+    device_model TEXT NOT NULL,
+    imei TEXT,
+    problem TEXT,
+    diagnosis TEXT,
+    status TEXT DEFAULT 'bekliyor',
+    price REAL DEFAULT 0,
+    advance_payment REAL DEFAULT 0,
+    payment_method TEXT DEFAULT 'nakit',
+    assigned_to INTEGER REFERENCES users(id),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS parts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    category TEXT,
+    quantity INTEGER DEFAULT 0,
+    min_quantity INTEGER DEFAULT 0,
+    cost_price REAL DEFAULT 0,
+    sale_price REAL DEFAULT 0,
+    supplier TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS part_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    part_id INTEGER REFERENCES parts(id),
+    quantity INTEGER NOT NULL,
+    unit_cost REAL DEFAULT 0,
+    supplier TEXT,
+    status TEXT DEFAULT 'siparis_verildi',
+    notes TEXT,
+    ordered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    arrived_at TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS repair_parts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repair_id INTEGER REFERENCES repairs(id),
+    part_id INTEGER REFERENCES parts(id),
+    quantity INTEGER DEFAULT 1,
+    unit_price REAL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS shopping_list (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item TEXT NOT NULL,
+    quantity INTEGER DEFAULT 1,
+    notes TEXT,
+    priority TEXT DEFAULT 'normal',
+    bought INTEGER DEFAULT 0,
+    bought_price REAL,
+    bought_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS imei_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    imei TEXT NOT NULL,
+    device_model TEXT,
+    customer_id INTEGER REFERENCES customers(id),
+    repair_id INTEGER REFERENCES repairs(id),
+    action TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS debts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER REFERENCES customers(id),
+    amount REAL NOT NULL,
+    paid REAL DEFAULT 0,
+    description TEXT,
+    due_date TEXT,
+    status TEXT DEFAULT 'bekliyor',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS debt_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    debt_id INTEGER REFERENCES debts(id),
+    amount REAL NOT NULL,
+    payment_method TEXT DEFAULT 'nakit',
+    paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS toptancilar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ad TEXT NOT NULL,
+    telefon TEXT,
+    sehir TEXT,
+    notlar TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS toptanci_alislar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    toptanci_id INTEGER REFERENCES toptancilar(id),
+    urun TEXT NOT NULL,
+    miktar INTEGER DEFAULT 1,
+    birim_fiyat REAL NOT NULL,
+    toplam REAL NOT NULL,
+    tarih TEXT NOT NULL,
+    notlar TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS ikinci_el (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model TEXT NOT NULL,
+    imei TEXT,
+    kimden TEXT,
+    alis_fiyati REAL NOT NULL,
+    notlar TEXT,
+    durum TEXT DEFAULT 'stokta',
+    satis_fiyati REAL,
+    satis_kanali TEXT,
+    satis_tarihi TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS ikinci_el_masraflar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cihaz_id INTEGER REFERENCES ikinci_el(id),
+    aciklama TEXT NOT NULL,
+    tutar REAL NOT NULL,
+    tarih TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS garantiler (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    musteri_adi TEXT NOT NULL,
+    telefon TEXT,
+    tamir_id INTEGER REFERENCES repairs(id),
+    cihaz TEXT NOT NULL,
+    tamir_aciklama TEXT NOT NULL,
+    baslangic_tarihi TEXT NOT NULL,
+    sure_gun INTEGER NOT NULL,
+    bitis_tarihi TEXT NOT NULL,
+    aktif INTEGER DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS kasa_hareketleri (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tarih TEXT NOT NULL,
+    tur TEXT NOT NULL,
+    odeme_yontemi TEXT DEFAULT 'nakit',
+    tutar REAL NOT NULL,
+    aciklama TEXT,
+    kaynak TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS giderler (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kategori TEXT NOT NULL,
+    tutar REAL NOT NULL,
+    aciklama TEXT,
+    tarih TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS loaner_cihazlar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    musteri_adi TEXT NOT NULL,
+    cihaz TEXT NOT NULL,
+    teslim_tarihi TEXT NOT NULL,
+    iade_tarihi TEXT,
+    notlar TEXT,
+    aktif INTEGER DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS aksesuarlar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ad TEXT NOT NULL,
+    stok INTEGER DEFAULT 0,
+    alis_fiyati REAL NOT NULL,
+    satis_fiyati REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS aksesuar_satislar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    aksesuar_id INTEGER REFERENCES aksesuarlar(id),
+    miktar INTEGER NOT NULL,
+    toplam REAL NOT NULL,
+    musteri_adi TEXT,
+    tarih TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS aylik_hedefler (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    yil INTEGER NOT NULL,
+    ay INTEGER NOT NULL,
+    hedef_tutar REAL NOT NULL,
+    UNIQUE(yil, ay)
+);
+CREATE TABLE IF NOT EXISTS calisanlar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ad TEXT NOT NULL,
+    telefon TEXT,
+    aylik_maas REAL NOT NULL,
+    aktif INTEGER DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS maas_odemeleri (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    calisan_id INTEGER REFERENCES calisanlar(id),
+    yil INTEGER NOT NULL,
+    ay INTEGER NOT NULL,
+    maas REAL NOT NULL,
+    odendi INTEGER DEFAULT 0,
+    odeme_tarihi TEXT
+);
+CREATE TABLE IF NOT EXISTS avanslar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    calisan_id INTEGER REFERENCES calisanlar(id),
+    tutar REAL NOT NULL,
+    tarih TEXT NOT NULL,
+    notlar TEXT
+);
+CREATE TABLE IF NOT EXISTS kara_liste (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ad TEXT,
+    telefon TEXT,
+    imei TEXT,
+    sebep TEXT NOT NULL,
+    notlar TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS parca_iadeler (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    toptanci_id INTEGER REFERENCES toptancilar(id),
+    parca TEXT NOT NULL,
+    miktar INTEGER DEFAULT 1,
+    sebep TEXT,
+    durum TEXT DEFAULT 'bekliyor',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with aiosqlite.connect(DB_PATH) as db:
+        for stmt in SCHEMA.split(";"):
+            s = stmt.strip()
+            if s:
+                await db.execute(s)
+        await db.commit()
+    yield
+
+
+app = FastAPI(title="Telefon Servis API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,10 +284,19 @@ app.include_router(shopping.router)
 app.include_router(imei.router)
 app.include_router(debts.router)
 app.include_router(reports.router)
+app.include_router(toptanci.router)
+app.include_router(ikinciel.router)
+app.include_router(garanti.router)
+app.include_router(kasa.router)
+app.include_router(gider.router)
+app.include_router(loaner.router)
+app.include_router(aksesuar.router)
+app.include_router(hedef.router)
+app.include_router(maas.router)
+app.include_router(karalist.router)
+app.include_router(parca_iade.router)
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-# deploy trigger

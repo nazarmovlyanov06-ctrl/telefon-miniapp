@@ -13,6 +13,17 @@ import More from "./pages/More";
 import IMEI from "./pages/IMEI";
 import Debts from "./pages/Debts";
 import Settings from "./pages/Settings";
+import Toptanci from "./pages/Toptanci";
+import IkinciEl from "./pages/IkinciEl";
+import Garanti from "./pages/Garanti";
+import Kasa from "./pages/Kasa";
+import Gider from "./pages/Gider";
+import Loaner from "./pages/Loaner";
+import Aksesuar from "./pages/Aksesuar";
+import Hedef from "./pages/Hedef";
+import Maas from "./pages/Maas";
+import KaraListe from "./pages/KaraListe";
+import ParcaIade from "./pages/ParcaIade";
 import "./index.css";
 
 export default function App() {
@@ -67,6 +78,17 @@ export default function App() {
         <Route path="/imei" element={<IMEI />} />
         <Route path="/debts" element={<Debts />} />
         <Route path="/settings" element={<Settings user={user} />} />
+        <Route path="/toptanci" element={<Toptanci />} />
+        <Route path="/ikinciel" element={<IkinciEl />} />
+        <Route path="/garanti" element={<Garanti />} />
+        <Route path="/kasa" element={<Kasa />} />
+        <Route path="/gider" element={<Gider />} />
+        <Route path="/loaner" element={<Loaner />} />
+        <Route path="/aksesuar" element={<Aksesuar />} />
+        <Route path="/hedef" element={<Hedef />} />
+        <Route path="/maas" element={<Maas />} />
+        <Route path="/karalist" element={<KaraListe />} />
+        <Route path="/parca-iade" element={<ParcaIade />} />
       </Routes>
       <BottomNav />
     </BrowserRouter>
