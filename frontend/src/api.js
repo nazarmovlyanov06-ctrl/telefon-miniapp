@@ -114,6 +114,7 @@ export const api = {
 
   // Loaner
   loanerList: () => get("/loaner/"),
+  loanerGecmis: () => get("/loaner/gecmis"),
   createLoaner: (data) => post("/loaner/", data),
   iadeLoaner: (id, data = {}) => put(`/loaner/${id}/iade`, data),
 

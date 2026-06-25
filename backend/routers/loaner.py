@@ -36,6 +36,18 @@ async def create_loaner(
     return {"id": cur.lastrowid}
 
 
+@router.get("/gecmis")
+async def list_gecmis(
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        "SELECT * FROM loaner_cihazlar WHERE aktif = 0 ORDER BY iade_tarihi DESC LIMIT 50"
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
 @router.put("/{loaner_id}/iade")
 async def iade_loaner(
     loaner_id: int,

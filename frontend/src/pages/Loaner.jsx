@@ -4,7 +4,9 @@ import { api } from "../api";
 
 export default function Loaner() {
   const navigate = useNavigate();
+  const [tab, setTab] = useState("aktif");
   const [list, setList] = useState([]);
+  const [gecmis, setGecmis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [err, setErr] = useState("");
@@ -20,7 +22,10 @@ export default function Loaner() {
   }, []);
 
   async function load() {
-    try { setList(await api.loanerList()); } finally { setLoading(false); }
+    try {
+      const [aktif, iade] = await Promise.all([api.loanerList(), api.loanerGecmis()]);
+      setList(aktif); setGecmis(iade);
+    } finally { setLoading(false); }
   }
 
   function handleMusteriChange(val) {
@@ -30,30 +35,19 @@ export default function Loaner() {
       const found = musteriler.filter(m =>
         m.name.toLowerCase().includes(q) || (m.phone || "").includes(q)
       ).slice(0, 5);
-      setOneriler(found);
-      setShowOneriler(found.length > 0);
-    } else {
-      setShowOneriler(false);
-    }
-  }
-
-  function secMusteri(m) {
-    setForm(f => ({ ...f, musteri_adi: m.name }));
-    setShowOneriler(false);
+      setOneriler(found); setShowOneriler(found.length > 0);
+    } else { setShowOneriler(false); }
   }
 
   async function submit(e) {
-    e.preventDefault();
-    setErr("");
+    e.preventDefault(); setErr("");
     try {
       await api.createLoaner(form);
       setShowForm(false);
       setForm({ musteri_adi: "", cihaz: "", teslim_tarihi: today(), notlar: "" });
       setShowOneriler(false);
       load();
-    } catch (e) {
-      setErr(e.message);
-    }
+    } catch (e) { setErr(e.message); }
   }
 
   async function iade(id) {
@@ -70,10 +64,19 @@ export default function Loaner() {
 
   return (
     <div className="page">
-      <div className="card-row" style={{ marginBottom: 14 }}>
+      <div className="card-row" style={{ marginBottom: 10 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
         <h1 className="page-title" style={{ margin: 0 }}>Yedek Telefon</h1>
         <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(true); setErr(""); }}>+ Teslim Et</button>
+      </div>
+
+      <div className="tabs" style={{ marginBottom: 12 }}>
+        <button className={`tab ${tab === "aktif" ? "active" : ""}`} onClick={() => setTab("aktif")}>
+          📱 Dışarıda ({list.length})
+        </button>
+        <button className={`tab ${tab === "gecmis" ? "active" : ""}`} onClick={() => setTab("gecmis")}>
+          📋 İade Edildi ({gecmis.length})
+        </button>
       </div>
 
       {showForm && (
@@ -93,21 +96,13 @@ export default function Loaner() {
                 autoComplete="off"
               />
               {showOneriler && (
-                <div style={{
-                  position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
                   background: "var(--card)", border: "1px solid var(--border)",
-                  borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden",
-                }}>
+                  borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
                   {oneriler.map(m => (
-                    <div
-                      key={m.id}
-                      onMouseDown={() => secMusteri(m)}
-                      style={{
-                        padding: "10px 14px", cursor: "pointer", fontSize: 14,
-                        borderBottom: "1px solid var(--border)",
-                        display: "flex", justifyContent: "space-between", alignItems: "center",
-                      }}
-                    >
+                    <div key={m.id} onMouseDown={() => { setForm(f => ({ ...f, musteri_adi: m.name })); setShowOneriler(false); }}
+                      style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
+                        borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
                       <span>👤 {m.name}</span>
                       {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
                     </div>
@@ -139,28 +134,55 @@ export default function Loaner() {
         </div>
       )}
 
-      {list.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Dışarıda yedek telefon yok</div>
-      ) : list.map(l => {
-        const gun = daysOut(l.teslim_tarihi);
-        const warn = gun >= 7;
-        return (
-          <div key={l.id} className="card">
+      {/* AKTİF — Dışarıda olanlar */}
+      {tab === "aktif" && (
+        list.length === 0 ? (
+          <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Dışarıda yedek telefon yok</div>
+        ) : list.map(l => {
+          const gun = daysOut(l.teslim_tarihi);
+          const warn = gun >= 7;
+          return (
+            <div key={l.id} className="card">
+              <div className="card-row">
+                <div>
+                  <div style={{ fontWeight: 600 }}>👤 {l.musteri_adi}</div>
+                  <div style={{ fontSize: 13, color: "var(--hint)" }}>📱 {l.cihaz}</div>
+                  <div style={{ fontSize: 12, color: warn ? "var(--danger)" : "var(--hint)" }}>
+                    📅 {l.teslim_tarihi} · {gun === 0 ? "Bugün" : `${gun} gündür dışarıda`}{warn && " ⚠️"}
+                  </div>
+                  {l.notlar && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>{l.notlar}</div>}
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={() => iade(l.id)}>İade Al</button>
+              </div>
+            </div>
+          );
+        })
+      )}
+
+      {/* GEÇMİŞ — İade edilenler */}
+      {tab === "gecmis" && (
+        gecmis.length === 0 ? (
+          <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>İade kaydı yok</div>
+        ) : gecmis.map(l => (
+          <div key={l.id} className="card" style={{ opacity: 0.85 }}>
             <div className="card-row">
               <div>
-                <div style={{ fontWeight: 600 }}>📱 {l.musteri_adi}</div>
-                <div style={{ fontSize: 13, color: "var(--hint)" }}>{l.cihaz}</div>
-                <div style={{ fontSize: 12, color: warn ? "var(--danger)" : "var(--hint)" }}>
-                  {gun === 0 ? "Bugün teslim edildi" : `${gun} gündür dışarıda`}
-                  {warn && " ⚠️"}
+                <div style={{ fontWeight: 600 }}>✅ {l.musteri_adi}</div>
+                <div style={{ fontSize: 13, color: "var(--hint)" }}>📱 {l.cihaz}</div>
+                <div style={{ fontSize: 12, color: "var(--hint)" }}>
+                  Verildi: {l.teslim_tarihi} · İade: {l.iade_tarihi || "—"}
                 </div>
               </div>
-              <button className="btn btn-primary btn-sm" onClick={() => iade(l.id)}>İade Al</button>
+              {l.teslim_tarihi && l.iade_tarihi && (
+                <div style={{ fontSize: 13, color: "var(--hint)", textAlign: "right" }}>
+                  {Math.floor((new Date(l.iade_tarihi) - new Date(l.teslim_tarihi)) / 86400000)} gün
+                </div>
+              )}
             </div>
-            {l.notlar && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 6 }}>{l.notlar}</div>}
+            {l.notlar && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>{l.notlar}</div>}
           </div>
-        );
-      })}
+        ))
+      )}
     </div>
   );
 }

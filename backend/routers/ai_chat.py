@@ -87,22 +87,26 @@ MEVCUT SERVİS DURUMU:
 
 Bu bilgilere dayanarak yardımcı ol. Eğer bilgi yoksa bunu belirt."""
 
+    MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": sistem_mesaji + "\n\nKullanıcı sorusu: " + soru}]}],
+        "generationConfig": {"maxOutputTokens": 500, "temperature": 0.7}
+    }
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
-            resp = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
-                json={
-                    "contents": [
-                        {"role": "user", "parts": [{"text": sistem_mesaji + "\n\nKullanıcı sorusu: " + soru}]}
-                    ],
-                    "generationConfig": {"maxOutputTokens": 400, "temperature": 0.7}
-                },
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                cevap = data["candidates"][0]["content"]["parts"][0]["text"]
-                return {"cevap": cevap}
-            else:
-                return {"cevap": f"AI hatası: {resp.status_code}"}
+        async with httpx.AsyncClient(timeout=25) as client:
+            for model in MODELS:
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}",
+                    json=payload,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    cevap = data["candidates"][0]["content"]["parts"][0]["text"]
+                    return {"cevap": cevap}
+                elif resp.status_code == 429:
+                    continue
+                else:
+                    return {"cevap": f"AI hatası ({model}): {resp.status_code}"}
+            return {"cevap": "AI şu an yoğun, lütfen birazdan tekrar dene."}
     except Exception as e:
         return {"cevap": f"Bağlantı hatası: {str(e)[:100]}"}

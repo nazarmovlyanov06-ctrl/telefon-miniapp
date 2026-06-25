@@ -67,18 +67,37 @@ async def mark_bought(
     db: Connection = Depends(get_db),
 ):
     user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute("SELECT * FROM alisveris_listesi WHERE id=?", (item_id,))
+    item = await cur.fetchone()
+    item = dict(item) if item else {}
+
     await db.execute(
         """UPDATE alisveris_listesi SET
            status='alindi', bought_by=?, bought_from=?, bought_price=?,
            bought_at=CURRENT_TIMESTAMP
            WHERE id=?""",
-        (
-            user["id"],
-            body.get("bought_from"),
-            body.get("bought_price"),
-            item_id,
-        ),
+        (user["id"], body.get("bought_from"), body.get("bought_price"), item_id),
     )
+
+    if body.get("stok_ekle") and item:
+        miktar = int(body.get("stok_miktar") or item.get("quantity") or 1)
+        parca_adi = item.get("part_name", "")
+        cur = await db.execute(
+            "SELECT id FROM parts WHERE LOWER(name) LIKE ? LIMIT 1",
+            (f"%{parca_adi.lower()}%",)
+        )
+        existing = await cur.fetchone()
+        if existing:
+            await db.execute("UPDATE parts SET quantity = quantity + ? WHERE id = ?",
+                             (miktar, existing["id"]))
+        else:
+            await db.execute(
+                """INSERT INTO parts (name, device_model, part_type, quantity, min_quantity,
+                   purchase_price, sale_price, created_by) VALUES (?, ?, NULL, ?, 2, ?, 0, ?)""",
+                (parca_adi, item.get("device_model"), miktar,
+                 float(body.get("bought_price") or 0), user["id"])
+            )
+
     await db.commit()
     return {"ok": True}
 
