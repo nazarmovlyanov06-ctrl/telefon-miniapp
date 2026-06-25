@@ -15,7 +15,7 @@ export default function IkinciEl() {
   const [showMasraf, setShowMasraf] = useState(false);
   const [showSat, setShowSat] = useState(false);
   const [masraflar, setMasraflar] = useState({});
-  const [form, setForm] = useState({ model: "", imei: "", kimden: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
+  const [form, setForm] = useState({ model: "", imei: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit" });
   const [err, setErr] = useState("");
@@ -84,7 +84,7 @@ export default function IkinciEl() {
     try {
       await api.createIkinciEl({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
       setShowForm(false);
-      setForm({ model: "", imei: "", kimden: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
+      setForm({ model: "", imei: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -185,8 +185,8 @@ export default function IkinciEl() {
                   <input className="form-input" value={form.imei} onChange={e => setForm({ ...form, imei: e.target.value })} placeholder="15 haneli" inputMode="numeric" />
                 </div>
                 <div className="form-group" style={{ position: "relative" }}>
-                  <label className="form-label">Kimden</label>
-                  <input className="form-input" value={form.kimden}
+                  <label className="form-label">Kimden (Ad Soyad) *</label>
+                  <input className="form-input" required value={form.kimden}
                     onChange={e => handleKimdenChange(e.target.value)}
                     onBlur={() => setTimeout(() => setShowKimdenOner(false), 150)}
                     placeholder="Kişi/firma adı" autoComplete="off" />
@@ -196,7 +196,7 @@ export default function IkinciEl() {
                       borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
                       {kimdenOner.map(m => (
                         <div key={m.id}
-                          onMouseDown={() => { setForm(f => ({ ...f, kimden: m.name })); setShowKimdenOner(false); }}
+                          onMouseDown={() => { setForm(f => ({ ...f, kimden: m.name, kimden_telefon: m.phone || f.kimden_telefon })); setShowKimdenOner(false); }}
                           style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
                             borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
                           <span>👤 {m.name}</span>
@@ -204,6 +204,15 @@ export default function IkinciEl() {
                         </div>
                       ))}
                     </div>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Kimden (Telefon) *</label>
+                  <input className="form-input" required inputMode="tel" value={form.kimden_telefon}
+                    onChange={e => setForm(f => ({ ...f, kimden_telefon: e.target.value }))}
+                    placeholder="0555..." />
+                  {form.kimden && form.kimden_telefon && (
+                    <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri listesine otomatik eklenecek</div>
                   )}
                 </div>
                 <div className="form-group">
@@ -289,18 +298,18 @@ export default function IkinciEl() {
                       <form onSubmit={submitSat} style={{ marginTop: 10 }}>
                         {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0" }}>❌ {err}</div>}
                         <div className="form-group" style={{ position: "relative" }}>
-                          <label className="form-label">Müşteri Adı</label>
-                          <input className="form-input" value={satForm.musteri_adi}
+                          <label className="form-label">Müşteri Adı *</label>
+                          <input className="form-input" required value={satForm.musteri_adi}
                             onChange={e => handleSatMusteriChange(e.target.value)}
                             onBlur={() => setTimeout(() => setShowSatMusteriOner(false), 150)}
-                            placeholder="Ad Soyad (opsiyonel)" autoComplete="off" />
+                            placeholder="Ad Soyad" autoComplete="off" />
                           {showSatMusteriOner && (
                             <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
                               background: "var(--card)", border: "1px solid var(--border)",
                               borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
                               {satMusteriOner.map(m => (
                                 <div key={m.id}
-                                  onMouseDown={() => { setSatForm(f => ({ ...f, musteri_adi: m.name })); setShowSatMusteriOner(false); }}
+                                  onMouseDown={() => { setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon })); setShowSatMusteriOner(false); }}
                                   style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
                                     borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
                                   <span>👤 {m.name}</span>
@@ -311,12 +320,12 @@ export default function IkinciEl() {
                           )}
                         </div>
                         <div className="form-group">
-                          <label className="form-label">Müşteri Telefonu</label>
-                          <input className="form-input" value={satForm.musteri_telefon} inputMode="tel"
+                          <label className="form-label">Müşteri Telefonu *</label>
+                          <input className="form-input" required inputMode="tel" value={satForm.musteri_telefon}
                             onChange={e => setSatForm(f => ({ ...f, musteri_telefon: e.target.value }))}
                             placeholder="0555..." />
                           {satForm.musteri_adi && satForm.musteri_telefon && (
-                            <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri otomatik kaydedilecek</div>
+                            <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri listesine otomatik eklenecek</div>
                           )}
                         </div>
                         <div className="form-group">

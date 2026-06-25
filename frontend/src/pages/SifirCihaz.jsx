@@ -19,7 +19,7 @@ export default function SifirCihaz() {
   const [showSatMusteriOner, setShowSatMusteriOner] = useState(false);
 
   const [form, setForm] = useState({
-    model: "", imei: "", renk: "", depolama: "", kimden: "",
+    model: "", imei: "", renk: "", depolama: "", kimden: "", kimden_telefon: "",
     kaynak: "dukkan", alis_fiyati: "", alis_tarihi: today(), notlar: ""
   });
   const [satForm, setSatForm] = useState({
@@ -57,7 +57,7 @@ export default function SifirCihaz() {
     try {
       await api.createSifir({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
       setShowForm(false);
-      setForm({ model: "", imei: "", renk: "", depolama: "", kimden: "", kaynak: "dukkan", alis_fiyati: "", alis_tarihi: today(), notlar: "" });
+      setForm({ model: "", imei: "", renk: "", depolama: "", kimden: "", kimden_telefon: "", kaynak: "dukkan", alis_fiyati: "", alis_tarihi: today(), notlar: "" });
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -157,9 +157,19 @@ export default function SifirCihaz() {
                     onChange={e => setForm({ ...form, imei: e.target.value })} placeholder="15 haneli" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Kimden / Tedarikçi</label>
-                  <input className="form-input" value={form.kimden}
-                    onChange={e => setForm({ ...form, kimden: e.target.value })} />
+                  <label className="form-label">Kimden (Ad Soyad) *</label>
+                  <input className="form-input" required value={form.kimden}
+                    onChange={e => setForm({ ...form, kimden: e.target.value })}
+                    placeholder="Kişi/firma adı" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Kimden (Telefon) *</label>
+                  <input className="form-input" required inputMode="tel" value={form.kimden_telefon}
+                    onChange={e => setForm({ ...form, kimden_telefon: e.target.value })}
+                    placeholder="0555..." />
+                  {form.kimden && form.kimden_telefon && (
+                    <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri listesine otomatik eklenecek</div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Kaynak</label>
@@ -230,8 +240,8 @@ export default function SifirCihaz() {
 
                         {/* Müşteri autocomplete */}
                         <div className="form-group" style={{ position: "relative" }}>
-                          <label className="form-label">Müşteri Adı</label>
-                          <input className="form-input" value={satForm.musteri_adi}
+                          <label className="form-label">Müşteri Adı *</label>
+                          <input className="form-input" required value={satForm.musteri_adi}
                             onChange={e => handleSatMusteriChange(e.target.value)}
                             onBlur={() => setTimeout(() => setShowSatMusteriOner(false), 150)}
                             placeholder="Ad Soyad" autoComplete="off" />
@@ -245,6 +255,7 @@ export default function SifirCihaz() {
                                     setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon }));
                                     setShowSatMusteriOner(false);
                                   }}
+
                                   style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
                                     borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
                                   <span>👤 {m.name}</span>
@@ -256,13 +267,13 @@ export default function SifirCihaz() {
                         </div>
 
                         <div className="form-group">
-                          <label className="form-label">Müşteri Telefonu</label>
-                          <input className="form-input" value={satForm.musteri_telefon} inputMode="tel"
+                          <label className="form-label">Müşteri Telefonu *</label>
+                          <input className="form-input" required inputMode="tel" value={satForm.musteri_telefon}
                             onChange={e => setSatForm(f => ({ ...f, musteri_telefon: e.target.value }))}
                             placeholder="0555..." />
                           {satForm.musteri_adi && satForm.musteri_telefon && (
                             <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>
-                              ✓ Müşteri otomatik kaydedilecek
+                              ✓ Müşteri listesine otomatik eklenecek
                             </div>
                           )}
                         </div>

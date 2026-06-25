@@ -337,6 +337,8 @@ async def lifespan(app: FastAPI):
             "UPDATE debts SET paid_amount = COALESCE(paid, 0) WHERE paid_amount = 0 AND paid > 0",
             "ALTER TABLE parca_iadeler ADD COLUMN part_id INTEGER REFERENCES parts(id)",
             "ALTER TABLE ikinci_el ADD COLUMN musteri_telefon TEXT",
+            "ALTER TABLE ikinci_el ADD COLUMN kimden_telefon TEXT",
+            "ALTER TABLE sifir_cihazlar ADD COLUMN kimden_telefon TEXT",
         ]:
             try:
                 await db.execute(m)

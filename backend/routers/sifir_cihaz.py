@@ -64,15 +64,28 @@ async def create_cihaz(
     db: Connection = Depends(get_db),
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    kimden = body.get("kimden") or ""
+    kimden_telefon = body.get("kimden_telefon") or ""
     cur = await db.execute(
         """INSERT INTO sifir_cihazlar
-           (model, imei, renk, depolama, kimden, kaynak, alis_fiyati, notlar, alis_tarihi)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           (model, imei, renk, depolama, kimden, kimden_telefon, kaynak, alis_fiyati, notlar, alis_tarihi)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
-         body.get("kimden"), body.get("kaynak", "dukkan"),
+         kimden, kimden_telefon, body.get("kaynak", "dukkan"),
          float(body["alis_fiyati"]), body.get("notlar"),
          body.get("alis_tarihi", date.today().isoformat())),
     )
+    # Satıcıyı müşteri olarak kaydet
+    if kimden and kimden_telefon:
+        cur2 = await db.execute(
+            "SELECT id FROM customers WHERE name = ? OR phone = ?",
+            (kimden, kimden_telefon)
+        )
+        if not await cur2.fetchone():
+            await db.execute(
+                "INSERT INTO customers (name, phone) VALUES (?, ?)",
+                (kimden, kimden_telefon)
+            )
     await db.commit()
     return {"id": cur.lastrowid}
 
@@ -113,16 +126,17 @@ async def sat_cihaz(
     )
 
     # Yeni müşteri otomatik kayıt
-    if musteri_adi and musteri_telefon:
-        cur2 = await db.execute(
-            "SELECT id FROM customers WHERE name = ? OR phone = ?",
-            (musteri_adi, musteri_telefon)
-        )
-        existing = await cur2.fetchone()
-        if not existing:
+    if musteri_adi:
+        lookup = [musteri_adi]
+        sql = "SELECT id FROM customers WHERE name = ?"
+        if musteri_telefon:
+            sql += " OR phone = ?"
+            lookup.append(musteri_telefon)
+        cur2 = await db.execute(sql, lookup)
+        if not await cur2.fetchone():
             await db.execute(
                 "INSERT INTO customers (name, phone) VALUES (?, ?)",
-                (musteri_adi, musteri_telefon)
+                (musteri_adi, musteri_telefon or None)
             )
 
     await db.commit()
