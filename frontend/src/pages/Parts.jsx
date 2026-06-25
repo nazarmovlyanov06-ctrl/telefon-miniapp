@@ -8,6 +8,8 @@ const TABS = [
   { key: "gecmis", label: "✅ Geçmiş" },
 ];
 
+const PARCA_TURLERI = ["Ekran", "Batarya", "Entegre", "Şarj Soketi", "Arka Kapak", "Kamera", "Hoparlör", "Mikrofon", "Diğer"];
+
 export default function Parts() {
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") || "stok");
@@ -24,12 +26,17 @@ export default function Parts() {
 
   // Aldım modal
   const [boughtItem, setBoughtItem] = useState(null);
-  const [boughtData, setBoughtData] = useState({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1", dollarMode: false, dollarAmount: "" });
+  const [boughtData, setBoughtData] = useState({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "" });
   const [toptancilar, setToptancilar] = useState([]);
   const [toptanciOner, setToptanciOner] = useState([]);
   const [showToptanciOner, setShowToptanciOner] = useState(false);
   const [dollarRate, setDollarRate] = useState(null);
   const [kurLoading, setKurLoading] = useState(false);
+
+  // Stok ekle formu
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" });
+  const [addErr, setAddErr] = useState("");
 
   // Stok düş panel
   const [selectedPart, setSelectedPart] = useState(null);
@@ -97,11 +104,12 @@ export default function Parts() {
         bought_price: boughtData.fiyat ? parseFloat(boughtData.fiyat) : null,
         stok_ekle: boughtData.stokEkle,
         stok_miktar: parseInt(boughtData.stokMiktar) || 1,
+        part_type: boughtData.partType || null,
       });
       const willAddStock = boughtData.stokEkle;
       const partName = boughtItem.part_name;
       setBoughtItem(null);
-      setBoughtData({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1", dollarMode: false, dollarAmount: "" });
+      setBoughtData({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "" });
       api.shopping().then(setShopping);
       if (willAddStock) {
         setBrandFilter("Tümü");
@@ -158,6 +166,24 @@ export default function Parts() {
     } catch (e) { setKullanErr(e.message); }
   }
 
+  async function submitAddPart(e) {
+    e.preventDefault(); setAddErr("");
+    try {
+      await api.createPart({
+        name: addForm.name,
+        device_model: addForm.device_model || null,
+        part_type: addForm.part_type || null,
+        quantity: parseInt(addForm.quantity) || 0,
+        min_quantity: parseInt(addForm.min_quantity) || 2,
+        purchase_price: addForm.purchase_price ? parseFloat(addForm.purchase_price) : 0,
+        sale_price: 0,
+      });
+      setShowAddForm(false);
+      setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" });
+      api.parts(q ? { q } : {}).then(setParts);
+    } catch (e) { setAddErr(e.message); }
+  }
+
   const brands = ["Tümü", ...new Set(parts.map(p => (p.device_model || "").split(" ")[0]).filter(Boolean).sort())];
   const types = ["Tümü", ...new Set(parts.map(p => p.part_type).filter(Boolean).sort())];
   const filteredParts = parts.filter(p => {
@@ -181,9 +207,65 @@ export default function Parts() {
       {/* STOK TAB */}
       {tab === "stok" && (
         <>
-          <div className="search-bar">
-            <input className="search-input" placeholder="🔍 Parça ara..." value={q} onChange={(e) => setQ(e.target.value)} />
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <div className="search-bar" style={{ flex: 1, margin: 0 }}>
+              <input className="search-input" placeholder="🔍 Parça ara..." value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(v => !v)}>+ Ekle</button>
           </div>
+
+          {showAddForm && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 600, marginBottom: 10 }}>Yeni Parça</div>
+              <form onSubmit={submitAddPart}>
+                {addErr && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>❌ {addErr}</div>}
+                <div className="form-group">
+                  <label className="form-label">Parça Adı *</label>
+                  <input className="form-input" required value={addForm.name}
+                    onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Ekran, batarya, entegre..." />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Cihaz Modeli</label>
+                    <input className="form-input" value={addForm.device_model}
+                      onChange={e => setAddForm(f => ({ ...f, device_model: e.target.value }))}
+                      placeholder="iPhone 13..." />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Parça Türü</label>
+                    <select className="form-select" value={addForm.part_type}
+                      onChange={e => setAddForm(f => ({ ...f, part_type: e.target.value }))}>
+                      <option value="">— Seç —</option>
+                      {PARCA_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Adet</label>
+                    <input className="form-input" type="number" min="0" value={addForm.quantity}
+                      onChange={e => setAddForm(f => ({ ...f, quantity: e.target.value }))} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Min. Stok</label>
+                    <input className="form-input" type="number" min="0" value={addForm.min_quantity}
+                      onChange={e => setAddForm(f => ({ ...f, min_quantity: e.target.value }))} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Alış (₺)</label>
+                    <input className="form-input" type="number" value={addForm.purchase_price}
+                      onChange={e => setAddForm(f => ({ ...f, purchase_price: e.target.value }))}
+                      placeholder="0" />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowAddForm(false)}>İptal</button>
+                </div>
+              </form>
+            </div>
+          )}
           {brands.length > 1 && (
             <div style={{ marginBottom: 8 }}>
               <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 4, fontWeight: 600 }}>MARKA</div>
@@ -507,17 +589,29 @@ export default function Parts() {
                   )}
 
                   {/* Stoğa Ekle */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "10px 12px", background: "var(--bg2)", borderRadius: 10 }}>
-                    <input type="checkbox" id="stokEkle" checked={boughtData.stokEkle}
-                      onChange={e => setBoughtData(d => ({ ...d, stokEkle: e.target.checked }))}
-                      style={{ width: 18, height: 18 }} />
-                    <label htmlFor="stokEkle" style={{ fontWeight: 600, fontSize: 14 }}>Stoğa ekle</label>
+                  <div style={{ background: "var(--bg2)", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <input type="checkbox" id="stokEkle" checked={boughtData.stokEkle}
+                        onChange={e => setBoughtData(d => ({ ...d, stokEkle: e.target.checked }))}
+                        style={{ width: 18, height: 18 }} />
+                      <label htmlFor="stokEkle" style={{ fontWeight: 600, fontSize: 14 }}>Stoğa ekle</label>
+                      {boughtData.stokEkle && (
+                        <input type="number" min="1" value={boughtData.stokMiktar}
+                          onChange={e => setBoughtData(d => ({ ...d, stokMiktar: e.target.value }))}
+                          style={{ width: 60, marginLeft: "auto" }} className="form-input" />
+                      )}
+                      {boughtData.stokEkle && <span style={{ fontSize: 13, color: "var(--hint)" }}>adet</span>}
+                    </div>
                     {boughtData.stokEkle && (
-                      <input type="number" min="1" value={boughtData.stokMiktar}
-                        onChange={e => setBoughtData(d => ({ ...d, stokMiktar: e.target.value }))}
-                        style={{ width: 60, marginLeft: "auto" }} className="form-input" />
+                      <div style={{ marginTop: 8 }}>
+                        <label className="form-label">Parça Türü</label>
+                        <select className="form-select" value={boughtData.partType}
+                          onChange={e => setBoughtData(d => ({ ...d, partType: e.target.value }))}>
+                          <option value="">— Seç (opsiyonel) —</option>
+                          {PARCA_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
                     )}
-                    {boughtData.stokEkle && <span style={{ fontSize: 13, color: "var(--hint)" }}>adet</span>}
                   </div>
 
                   <div style={{ display: "flex", gap: 8 }}>

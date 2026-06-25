@@ -99,9 +99,10 @@ async def mark_bought(
             else:
                 ins = await db.execute(
                     """INSERT INTO parts (name, device_model, part_type, quantity, min_quantity,
-                       purchase_price, sale_price, created_by) VALUES (?, ?, NULL, ?, 2, ?, 0, ?)""",
-                    (parca_adi, item.get("device_model"), miktar,
-                     float(body.get("bought_price") or 0), user["id"])
+                       purchase_price, sale_price, created_by) VALUES (?, ?, ?, ?, 2, ?, 0, ?)""",
+                    (parca_adi, item.get("device_model"),
+                     body.get("part_type") or item.get("part_type"),
+                     miktar, float(body.get("bought_price") or 0), user["id"])
                 )
                 part_id_log = ins.lastrowid
                 stok_mesaj = f"yeni:{parca_adi}"
