@@ -26,3 +26,5 @@ app.include_router(reports.router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# deploy trigger
