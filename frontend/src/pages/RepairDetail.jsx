@@ -18,31 +18,54 @@ export default function RepairDetail({ user }) {
   const [saving, setSaving] = useState(false);
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState({});
+  const [teslimModal, setTeslimModal] = useState(false);
+  const [teslimForm, setTeslimForm] = useState({ final_price: "", payment_type: "nakit", kasa_yazilsin: true });
 
   useEffect(() => {
     api.repair(id).then((r) => {
       setRepair(r);
       setForm({
         device_model: r.device_model,
-        fault_desc: r.fault_desc,
+        fault_desc: r.fault_desc || "",
         estimated_price: r.estimated_price || "",
         final_price: r.final_price || "",
         payment_type: r.payment_type || "nakit",
         status: r.status,
         notes: r.notes || "",
+        warranty_days: r.warranty_days || "",
       });
+      if (r.final_price) setTeslimForm(f => ({ ...f, final_price: r.final_price, payment_type: r.payment_type || "nakit" }));
     }).finally(() => setLoading(false));
   }, [id]);
 
   async function changeStatus(status) {
+    if (status === "teslim" && repair?.status !== "teslim") {
+      setTeslimModal(true);
+      return;
+    }
     setSaving(true);
     try {
       await api.updateRepair(id, { ...form, status });
       setRepair((r) => ({ ...r, status }));
       setForm((f) => ({ ...f, status }));
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
+  }
+
+  async function teslimEt() {
+    setSaving(true);
+    try {
+      const final = parseFloat(teslimForm.final_price) || 0;
+      await api.updateRepair(id, {
+        ...form,
+        status: "teslim",
+        final_price: final,
+        payment_type: teslimForm.payment_type,
+        kasa_yazilsin: teslimForm.kasa_yazilsin && final > 0,
+      });
+      setRepair(r => ({ ...r, status: "teslim", final_price: final, payment_type: teslimForm.payment_type }));
+      setForm(f => ({ ...f, status: "teslim", final_price: final, payment_type: teslimForm.payment_type }));
+      setTeslimModal(false);
+    } finally { setSaving(false); }
   }
 
   async function save() {
@@ -51,9 +74,7 @@ export default function RepairDetail({ user }) {
       await api.updateRepair(id, form);
       setRepair((r) => ({ ...r, ...form }));
       setEdit(false);
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
@@ -75,7 +96,7 @@ export default function RepairDetail({ user }) {
         {STATUSES.map((s) => (
           <button
             key={s.key}
-            className={`tab ${form.status === s.key ? "active" : ""}`}
+            className={`tab ${(form.status || repair.status) === s.key ? "active" : ""}`}
             onClick={() => changeStatus(s.key)}
             disabled={saving}
             style={{ fontSize: 12 }}
@@ -84,6 +105,53 @@ export default function RepairDetail({ user }) {
           </button>
         ))}
       </div>
+
+      {/* Teslim modalı */}
+      {teslimModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16
+        }}>
+          <div className="card" style={{ width: "100%", maxWidth: 400 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>🏠 Teslim Et</div>
+            <div className="form-group">
+              <label className="form-label">Son Ücret (₺)</label>
+              <input className="form-input" type="number"
+                value={teslimForm.final_price}
+                onChange={e => setTeslimForm(f => ({ ...f, final_price: e.target.value }))}
+                placeholder={repair.estimated_price || "0"} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Ödeme Tipi</label>
+              <select className="form-select" value={teslimForm.payment_type}
+                onChange={e => setTeslimForm(f => ({ ...f, payment_type: e.target.value }))}>
+                <option value="nakit">💵 Nakit</option>
+                <option value="kart">💳 Kart</option>
+                <option value="taksit">📅 Taksit</option>
+                <option value="borc">📝 Borç</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <input type="checkbox" id="kasaYazilsin"
+                checked={teslimForm.kasa_yazilsin}
+                onChange={e => setTeslimForm(f => ({ ...f, kasa_yazilsin: e.target.checked }))} />
+              <label htmlFor="kasaYazilsin" style={{ fontSize: 14 }}>Kasaya yaz</label>
+            </div>
+            {teslimForm.final_price && (
+              <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>
+                💵 {parseFloat(teslimForm.final_price).toLocaleString("tr-TR")}₺ · {teslimForm.payment_type}
+                {teslimForm.kasa_yazilsin && " · kasaya yazılacak"}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" onClick={teslimEt} disabled={saving}>
+                {saving ? "..." : "✅ Teslim Et"}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setTeslimModal(false)}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {edit ? (
         <div className="card">
@@ -120,6 +188,11 @@ export default function RepairDetail({ user }) {
             </select>
           </div>
           <div className="form-group">
+            <label className="form-label">Garanti (gün)</label>
+            <input className="form-input" type="number" value={form.warranty_days}
+              onChange={(e) => setForm({ ...form, warranty_days: e.target.value })} />
+          </div>
+          <div className="form-group">
             <label className="form-label">Not</label>
             <input className="form-input" value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })} />
@@ -139,7 +212,7 @@ export default function RepairDetail({ user }) {
             <div className="divider" />
             <Row label="IMEI" value={repair.imei || "—"} />
             <div className="divider" />
-            <Row label="Arıza" value={repair.fault_desc} />
+            <Row label="Arıza" value={repair.fault_desc || "—"} />
           </div>
           <div className="card">
             <Row label="Tahmini Ücret" value={repair.estimated_price ? `₺${repair.estimated_price}` : "—"} />
@@ -147,6 +220,10 @@ export default function RepairDetail({ user }) {
             <Row label="Son Ücret" value={repair.final_price ? `₺${repair.final_price}` : "—"} />
             <div className="divider" />
             <Row label="Ödeme" value={repair.payment_type || "—"} />
+            {repair.warranty_days > 0 && <>
+              <div className="divider" />
+              <Row label="Garanti" value={`${repair.warranty_days} gün`} />
+            </>}
           </div>
           {repair.notes && (
             <div className="card">

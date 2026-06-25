@@ -48,6 +48,22 @@ async def list_gecmis(
     return [dict(r) for r in await cur.fetchall()]
 
 
+@router.post("/{loaner_id}/hasar")
+async def hasar_ekle(
+    loaner_id: int,
+    body: dict,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    await db.execute(
+        "UPDATE loaner_cihazlar SET hasar_notu=?, hasar_tutar=? WHERE id=?",
+        (body.get("notu"), float(body.get("tutar") or 0), loaner_id)
+    )
+    await db.commit()
+    return {"ok": True}
+
+
 @router.put("/{loaner_id}/iade")
 async def iade_loaner(
     loaner_id: int,

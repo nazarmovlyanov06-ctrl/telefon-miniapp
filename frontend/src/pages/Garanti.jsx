@@ -11,6 +11,8 @@ export default function Garanti() {
   const [oneriler, setOneriler] = useState([]);
   const [showOneriler, setShowOneriler] = useState(false);
   const [err, setErr] = useState("");
+  const [aramaQ, setAramaQ] = useState("");
+  const [gosterTab, setGosterTab] = useState("aktif");
   const [form, setForm] = useState({
     musteri_adi: "", telefon: "", cihaz: "", tamir_aciklama: "",
     baslangic_tarihi: today(), sure_gun: "90"
@@ -19,10 +21,19 @@ export default function Garanti() {
   useEffect(() => {
     load();
     api.customers("").then(setMusteriler).catch(() => {});
-  }, []);
+  }, [gosterTab]);
 
   async function load() {
-    try { setList(await api.garantiList()); } finally { setLoading(false); }
+    try {
+      setLoading(true);
+      setList(await api.garantiList({ goster: gosterTab, q: aramaQ }));
+    } finally { setLoading(false); }
+  }
+
+  async function search() {
+    try {
+      setList(await api.garantiList({ goster: gosterTab, q: aramaQ }));
+    } catch {}
   }
 
   function handleMusteriChange(val) {
@@ -70,14 +81,35 @@ export default function Garanti() {
     return Math.ceil((new Date(bitis) - now) / 86400000);
   }
 
-  if (loading) return <div className="loading">Yükleniyor...</div>;
-
   return (
     <div className="page">
       <div className="card-row" style={{ marginBottom: 14 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
         <h1 className="page-title" style={{ margin: 0 }}>Garanti Takibi</h1>
         <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(true); setErr(""); }}>+ Ekle</button>
+      </div>
+
+      {/* Arama */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <input className="form-input" style={{ flex: 1 }}
+          placeholder="Ad, cihaz veya tamir ara..."
+          value={aramaQ}
+          onChange={e => setAramaQ(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && search()} />
+        <button className="btn btn-ghost btn-sm" onClick={search}>🔍</button>
+      </div>
+
+      {/* Sekmeler */}
+      <div className="tabs" style={{ marginBottom: 12 }}>
+        {[
+          { key: "aktif", label: "✅ Aktif" },
+          { key: "bitmis", label: "⏰ Süresi Doldu" },
+          { key: "kapali", label: "🔒 Kapalı" },
+          { key: "hepsi", label: "📋 Hepsi" },
+        ].map(t => (
+          <button key={t.key} className={`tab ${gosterTab === t.key ? "active" : ""}`}
+            onClick={() => setGosterTab(t.key)}>{t.label}</button>
+        ))}
       </div>
 
       {showForm && (
@@ -129,13 +161,10 @@ export default function Garanti() {
               </div>
               <div className="form-group">
                 <label className="form-label">Süre (gün)</label>
-                <select className="form-select" value={form.sure_gun} onChange={e => setForm({ ...form, sure_gun: e.target.value })}>
-                  <option value="30">30 gün</option>
-                  <option value="60">60 gün</option>
-                  <option value="90">90 gün</option>
-                  <option value="180">6 ay</option>
-                  <option value="365">1 yıl</option>
-                </select>
+                <input className="form-input" type="number" min="1" max="3650"
+                  value={form.sure_gun}
+                  onChange={e => setForm({ ...form, sure_gun: e.target.value })}
+                  placeholder="90" />
               </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -146,8 +175,10 @@ export default function Garanti() {
         </div>
       )}
 
-      {list.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Aktif garanti kaydı yok</div>
+      {loading ? (
+        <div className="loading">Yükleniyor...</div>
+      ) : list.length === 0 ? (
+        <div className="empty"><div className="empty-icon">🛡️</div>Kayıt yok</div>
       ) : list.map(g => {
         const dl = daysLeft(g.bitis_tarihi);
         const warn = dl <= 7 && dl >= 0;
@@ -160,16 +191,18 @@ export default function Garanti() {
                 <div style={{ fontSize: 13, color: "var(--hint)" }}>{g.cihaz} · {g.tamir_aciklama}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: expired ? "var(--danger)" : warn ? "var(--warn)" : "var(--success)" }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: expired ? "var(--danger)" : warn ? "var(--warn, orange)" : "var(--success)" }}>
                   {expired ? "Süresi Doldu" : `${dl} gün kaldı`}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--hint)" }}>Bitiş: {g.bitis_tarihi}</div>
               </div>
             </div>
             {g.telefon && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>📞 {g.telefon}</div>}
-            <div style={{ marginTop: 8 }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => kapat(g.id)}>✓ Kapat</button>
-            </div>
+            {!g.aktif || expired ? null : (
+              <div style={{ marginTop: 8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => kapat(g.id)}>✓ Kapat</button>
+              </div>
+            )}
           </div>
         );
       })}

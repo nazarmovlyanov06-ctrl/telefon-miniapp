@@ -78,6 +78,7 @@ export const api = {
   debts: () => get("/debts/"),
   createDebt: (data) => post("/debts/", data),
   payDebt: (id, data) => post(`/debts/${id}/pay`, data),
+  debtOdemeler: (id) => get(`/debts/${id}/odemeler`),
 
   // Kullaniciler
   users: () => get("/users/"),
@@ -92,15 +93,23 @@ export const api = {
   createToptanciAlis: (id, data) => post(`/toptanci/${id}/alislar`, data),
 
   // 2. El Cihaz
-  ikinciElList: () => get("/ikinciel/listesi"),
+  ikinciElList: (params = {}) => {
+    const q = new URLSearchParams(params).toString();
+    return get(`/ikinciel/listesi${q ? "?" + q : ""}`);
+  },
   ikinciElOzet: () => get("/ikinciel/ozet"),
   createIkinciEl: (data) => post("/ikinciel/", data),
   ikinciElMasraf: (id, data) => post(`/ikinciel/${id}/masraf`, data),
+  ikinciElMasraflar: (id) => get(`/ikinciel/${id}/masraflar`),
   ikinciElSat: (id, data) => post(`/ikinciel/${id}/sat`, data),
   ikinciElSatilanlar: () => get("/ikinciel/satilanlar"),
+  ikinciElIMEI: (son4) => get(`/ikinciel/imei-gecmis/${son4}`),
 
   // Garanti
-  garantiList: () => get("/garantiler/"),
+  garantiList: (params = {}) => {
+    const q = new URLSearchParams(params).toString();
+    return get(`/garantiler/${q ? "?" + q : ""}`);
+  },
   createGaranti: (data) => post("/garantiler/", data),
   kapatGaranti: (id) => put(`/garantiler/${id}/kapat`, {}),
 
@@ -119,6 +128,7 @@ export const api = {
   loanerGecmis: () => get("/loaner/gecmis"),
   createLoaner: (data) => post("/loaner/", data),
   iadeLoaner: (id, data = {}) => put(`/loaner/${id}/iade`, data),
+  loanerHasar: (id, data) => post(`/loaner/${id}/hasar`, data),
 
   // Aksesuar
   aksesuarList: () => get("/aksesuarlar/"),

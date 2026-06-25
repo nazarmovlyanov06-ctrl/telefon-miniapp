@@ -5,6 +5,7 @@ import { api } from "../api";
 export default function IkinciEl() {
   const navigate = useNavigate();
   const [tab, setTab] = useState("stok");
+  const [kaynak, setKaynak] = useState("hepsi");
   const [list, setList] = useState([]);
   const [satilanlar, setSatilanlar] = useState([]);
   const [ozet, setOzet] = useState(null);
@@ -13,13 +14,17 @@ export default function IkinciEl() {
   const [showForm, setShowForm] = useState(false);
   const [showMasraf, setShowMasraf] = useState(false);
   const [showSat, setShowSat] = useState(false);
-  const [form, setForm] = useState({ model: "", imei: "", kimden: "", alis_fiyati: "", notlar: "" });
+  const [masraflar, setMasraflar] = useState({});
+  const [form, setForm] = useState({ model: "", imei: "", kimden: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "" });
   const [err, setErr] = useState("");
   const [musteriler, setMusteriler] = useState([]);
   const [kimdenOner, setKimdenOner] = useState([]);
   const [showKimdenOner, setShowKimdenOner] = useState(false);
+  const [imeiSon4, setImeiSon4] = useState("");
+  const [imeiGecmis, setImeiGecmis] = useState(null);
+  const [imeiLoading, setImeiLoading] = useState(false);
 
   useEffect(() => {
     load();
@@ -31,6 +36,19 @@ export default function IkinciEl() {
       const [l, o, s] = await Promise.all([api.ikinciElList(), api.ikinciElOzet(), api.ikinciElSatilanlar()]);
       setList(l); setOzet(o); setSatilanlar(s);
     } finally { setLoading(false); }
+  }
+
+  async function loadMasraflar(id) {
+    if (masraflar[id]) return;
+    const data = await api.ikinciElMasraflar(id);
+    setMasraflar(m => ({ ...m, [id]: data }));
+  }
+
+  function selectCihaz(c) {
+    const isSame = selected?.id === c.id;
+    setSelected(isSame ? null : c);
+    setShowMasraf(false); setShowSat(false);
+    if (!isSame) loadMasraflar(c.id);
   }
 
   function handleKimdenChange(val) {
@@ -51,7 +69,7 @@ export default function IkinciEl() {
     try {
       await api.createIkinciEl({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
       setShowForm(false);
-      setForm({ model: "", imei: "", kimden: "", alis_fiyati: "", notlar: "" });
+      setForm({ model: "", imei: "", kimden: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -60,9 +78,11 @@ export default function IkinciEl() {
     e.preventDefault(); setErr("");
     try {
       await api.ikinciElMasraf(selected.id, { ...masrafForm, tutar: parseFloat(masrafForm.tutar) });
+      setMasraflar(m => ({ ...m, [selected.id]: undefined }));
       setShowMasraf(false);
       setMasrafForm({ aciklama: "", tutar: "", tarih: today() });
       load();
+      loadMasraflar(selected.id);
     } catch (e) { setErr(e.message); }
   }
 
@@ -75,6 +95,19 @@ export default function IkinciEl() {
       load();
     } catch (e) { setErr(e.message); }
   }
+
+  async function searchIMEI() {
+    if (imeiSon4.length < 4) return;
+    setImeiLoading(true); setImeiGecmis(null);
+    try {
+      const data = await api.ikinciElIMEI(imeiSon4);
+      setImeiGecmis(data);
+    } catch { setImeiGecmis([]); }
+    finally { setImeiLoading(false); }
+  }
+
+  const filteredList = kaynak === "hepsi" ? list : list.filter(c => (c.kaynak || "dukkan") === kaynak);
+  const filteredSatilanlar = kaynak === "hepsi" ? satilanlar : satilanlar.filter(c => (c.kaynak || "dukkan") === kaynak);
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
 
@@ -103,9 +136,22 @@ export default function IkinciEl() {
         </div>
       )}
 
+      {/* Kaynak filtresi */}
+      <div className="tabs" style={{ marginBottom: 8 }}>
+        {[
+          { key: "hepsi", label: "Hepsi" },
+          { key: "dukkan", label: "🏪 Dükkan" },
+          { key: "getmobile", label: "📦 Getmobil" },
+        ].map(k => (
+          <button key={k.key} className={`tab ${kaynak === k.key ? "active" : ""}`}
+            onClick={() => setKaynak(k.key)}>{k.label}</button>
+        ))}
+      </div>
+
       <div className="tabs" style={{ marginBottom: 12 }}>
         <button className={`tab ${tab === "stok" ? "active" : ""}`} onClick={() => setTab("stok")}>📦 Stok</button>
-        <button className={`tab ${tab === "satilanlar" ? "active" : ""}`} onClick={() => setTab("satilanlar")}>✅ Satılanlar ({satilanlar.length})</button>
+        <button className={`tab ${tab === "satilanlar" ? "active" : ""}`} onClick={() => setTab("satilanlar")}>✅ Satılanlar ({filteredSatilanlar.length})</button>
+        <button className={`tab ${tab === "imei" ? "active" : ""}`} onClick={() => setTab("imei")}>🔍 IMEI</button>
       </div>
 
       {tab === "stok" && (
@@ -121,7 +167,7 @@ export default function IkinciEl() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">IMEI</label>
-                  <input className="form-input" value={form.imei} onChange={e => setForm({ ...form, imei: e.target.value })} placeholder="15 haneli" />
+                  <input className="form-input" value={form.imei} onChange={e => setForm({ ...form, imei: e.target.value })} placeholder="15 haneli" inputMode="numeric" />
                 </div>
                 <div className="form-group" style={{ position: "relative" }}>
                   <label className="form-label">Kimden</label>
@@ -146,6 +192,13 @@ export default function IkinciEl() {
                   )}
                 </div>
                 <div className="form-group">
+                  <label className="form-label">Kaynak</label>
+                  <select className="form-select" value={form.kaynak} onChange={e => setForm({ ...form, kaynak: e.target.value })}>
+                    <option value="dukkan">🏪 Dükkan</option>
+                    <option value="getmobile">📦 Getmobil</option>
+                  </select>
+                </div>
+                <div className="form-group">
                   <label className="form-label">Alış Fiyatı (₺) *</label>
                   <input className="form-input" type="number" required value={form.alis_fiyati} onChange={e => setForm({ ...form, alis_fiyati: e.target.value })} placeholder="0" />
                 </div>
@@ -161,18 +214,20 @@ export default function IkinciEl() {
             </div>
           )}
 
-          {list.length === 0 ? (
+          {filteredList.length === 0 ? (
             <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Stokta 2. el cihaz yok</div>
-          ) : list.map(c => {
+          ) : filteredList.map(c => {
             const isSelected = selected?.id === c.id;
+            const cMasraflar = masraflar[c.id];
             return (
               <div key={c.id}>
-                <div className="card" onClick={() => { setSelected(isSelected ? null : c); setShowMasraf(false); setShowSat(false); }} style={{ cursor: "pointer" }}>
+                <div className="card" onClick={() => selectCihaz(c)} style={{ cursor: "pointer" }}>
                   <div className="card-row">
                     <div>
                       <div style={{ fontWeight: 600 }}>📱 {c.model}</div>
                       {c.imei && <div style={{ fontSize: 12, color: "var(--hint)" }}>IMEI: {c.imei}</div>}
                       {c.kimden && <div style={{ fontSize: 12, color: "var(--hint)" }}>Kimden: {c.kimden}</div>}
+                      {c.kaynak === "getmobile" && <div style={{ fontSize: 11, color: "var(--hint)" }}>📦 Getmobil</div>}
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontWeight: 700 }}>{((c.alis_fiyati || 0) + (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺</div>
@@ -182,13 +237,25 @@ export default function IkinciEl() {
                 </div>
                 {isSelected && (
                   <div className="card" style={{ marginTop: -8, borderRadius: "0 0 12px 12px", background: "var(--bg2)" }}>
+                    {/* Masraf listesi */}
+                    {cMasraflar && cMasraflar.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: "var(--hint)" }}>Masraflar</div>
+                        {cMasraflar.map(m => (
+                          <div key={m.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "3px 0" }}>
+                            <span>{m.aciklama}</span>
+                            <span style={{ fontWeight: 600 }}>₺{(m.tutar || 0).toLocaleString("tr-TR")}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <div style={{ display: "flex", gap: 8 }}>
                       <button className="btn btn-ghost btn-sm" onClick={() => { setShowMasraf(true); setShowSat(false); }}>+ Masraf</button>
                       <button className="btn btn-primary btn-sm" onClick={() => { setShowSat(true); setShowMasraf(false); }}>💰 Sat</button>
                     </div>
                     {showMasraf && (
                       <form onSubmit={submitMasraf} style={{ marginTop: 10 }}>
-                        {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+                        {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0" }}>❌ {err}</div>}
                         <div className="form-group">
                           <label className="form-label">Masraf Açıklaması</label>
                           <input className="form-input" required value={masrafForm.aciklama} onChange={e => setMasrafForm({ ...masrafForm, aciklama: e.target.value })} placeholder="Ekran, temizlik..." />
@@ -205,7 +272,7 @@ export default function IkinciEl() {
                     )}
                     {showSat && (
                       <form onSubmit={submitSat} style={{ marginTop: 10 }}>
-                        {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+                        {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0" }}>❌ {err}</div>}
                         <div className="form-group">
                           <label className="form-label">Müşteri Adı</label>
                           <input className="form-input" value={satForm.musteri_adi} onChange={e => setSatForm({ ...satForm, musteri_adi: e.target.value })} placeholder="Ad Soyad (opsiyonel)" />
@@ -241,16 +308,14 @@ export default function IkinciEl() {
 
       {tab === "satilanlar" && (
         <>
-          {satilanlar.length === 0 ? (
+          {filteredSatilanlar.length === 0 ? (
             <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Henüz satılan cihaz yok</div>
-          ) : satilanlar.map(c => (
+          ) : filteredSatilanlar.map(c => (
             <div key={c.id} className="card">
               <div className="card-row">
                 <div>
                   <div style={{ fontWeight: 600 }}>📱 {c.model}</div>
-                  {c.musteri_adi && (
-                    <div style={{ fontSize: 13, color: "var(--text)" }}>👤 {c.musteri_adi}</div>
-                  )}
+                  {c.musteri_adi && <div style={{ fontSize: 13, color: "var(--text)" }}>👤 {c.musteri_adi}</div>}
                   <div style={{ fontSize: 12, color: "var(--hint)" }}>
                     📡 {c.satis_kanali || "Dükkan"}
                     {c.imei ? ` · ${c.imei}` : ""}
@@ -267,6 +332,53 @@ export default function IkinciEl() {
             </div>
           ))}
         </>
+      )}
+
+      {tab === "imei" && (
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 10 }}>IMEI Son 4 Hane ile Sorgula</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <input className="form-input" style={{ flex: 1 }}
+              placeholder="Son 4 hane (örn: 1234)"
+              maxLength={4}
+              inputMode="numeric"
+              value={imeiSon4}
+              onChange={e => setImeiSon4(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={e => e.key === "Enter" && searchIMEI()} />
+            <button className="btn btn-primary btn-sm" onClick={searchIMEI} disabled={imeiSon4.length < 4 || imeiLoading}>
+              {imeiLoading ? "..." : "Ara"}
+            </button>
+          </div>
+          {imeiGecmis === null ? (
+            <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center" }}>IMEI son 4 hanesini girin</div>
+          ) : imeiGecmis.length === 0 ? (
+            <div className="empty"><div className="empty-icon">🔍</div>Kayıt bulunamadı</div>
+          ) : imeiGecmis.map(c => (
+            <div key={c.id} className="card">
+              <div style={{ fontWeight: 600 }}>📱 {c.model}</div>
+              <div style={{ fontSize: 12, color: "var(--hint)" }}>IMEI: {c.imei}</div>
+              {c.kimden && <div style={{ fontSize: 12, color: "var(--hint)" }}>Kimden: {c.kimden}</div>}
+              <div style={{ fontSize: 12, color: "var(--hint)" }}>
+                Alış: ₺{c.alis_fiyati} · {c.alis_tarihi || "—"}
+              </div>
+              {c.satis_fiyati && (
+                <div style={{ fontSize: 12, color: "var(--success)" }}>
+                  Satış: ₺{c.satis_fiyati} · {c.musteri_adi || ""} · {c.satis_tarihi || ""}
+                </div>
+              )}
+              {c.masraflar && c.masraflar.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--hint)", marginBottom: 2 }}>Masraflar:</div>
+                  {c.masraflar.map(m => (
+                    <div key={m.id} style={{ fontSize: 12, display: "flex", justifyContent: "space-between" }}>
+                      <span>{m.aciklama}</span><span>₺{m.tutar}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

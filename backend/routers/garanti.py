@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from aiosqlite import Connection
 from database import get_db, get_or_create_user
 from auth import get_current_user
@@ -9,15 +9,35 @@ router = APIRouter(prefix="/garantiler", tags=["garanti"])
 
 @router.get("/")
 async def list_garanti(
+    q: str = Query(None),
+    goster: str = Query("aktif"),  # aktif | bitmis | kapali | hepsi
     tg_user=Depends(get_current_user),
     db: Connection = Depends(get_db),
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    where = []
+    params = []
+    bugun = date.today().isoformat()
+
+    if goster == "aktif":
+        where.append("aktif = 1 AND bitis_tarihi >= ?")
+        params.append(bugun)
+    elif goster == "bitmis":
+        where.append("aktif = 1 AND bitis_tarihi < ?")
+        params.append(bugun)
+    elif goster == "kapali":
+        where.append("aktif = 0")
+
+    if q:
+        where.append("(musteri_adi LIKE ? OR cihaz LIKE ? OR telefon LIKE ?)")
+        params += [f"%{q}%"] * 3
+
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
     cur = await db.execute(
-        "SELECT * FROM garantiler WHERE aktif = 1 ORDER BY bitis_tarihi ASC"
+        f"SELECT * FROM garantiler {where_sql} ORDER BY bitis_tarihi ASC",
+        params
     )
     rows = [dict(r) for r in await cur.fetchall()]
-    bugun = date.today().isoformat()
     for r in rows:
         r["suresi_doldu"] = r["bitis_tarihi"] < bugun
     return rows

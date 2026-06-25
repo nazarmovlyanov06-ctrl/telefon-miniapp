@@ -50,6 +50,20 @@ async def create_debt(
     return {"id": cur.lastrowid}
 
 
+@router.get("/{debt_id}/odemeler")
+async def debt_odemeler(
+    debt_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        "SELECT * FROM debt_payments WHERE debt_id=? ORDER BY paid_at DESC",
+        (debt_id,)
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
 @router.post("/{debt_id}/pay")
 async def pay_debt(
     debt_id: int,

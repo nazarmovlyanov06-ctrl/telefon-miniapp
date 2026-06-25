@@ -9,6 +9,8 @@ export default function Loaner() {
   const [gecmis, setGecmis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [hasarModal, setHasarModal] = useState(null);
+  const [hasarForm, setHasarForm] = useState({ notu: "", tutar: "" });
   const [err, setErr] = useState("");
   const [form, setForm] = useState({ musteri_adi: "", cihaz: "", teslim_tarihi: today(), notlar: "" });
   const [musteriler, setMusteriler] = useState([]);
@@ -50,10 +52,33 @@ export default function Loaner() {
     } catch (e) { setErr(e.message); }
   }
 
-  async function iade(id) {
-    if (!confirm("Cihaz iade alındı mı?")) return;
-    await api.iadeLoaner(id);
-    load();
+  function openHasarModal(loaner) {
+    setHasarModal(loaner);
+    setHasarForm({ notu: loaner.hasar_notu || "", tutar: loaner.hasar_tutar || "" });
+  }
+
+  async function saveHasar(e) {
+    e.preventDefault();
+    try {
+      await api.loanerHasar(hasarModal.id, { notu: hasarForm.notu, tutar: hasarForm.tutar });
+      setHasarModal(null);
+      load();
+    } catch (ex) { alert(ex.message); }
+  }
+
+  async function iade(loaner) {
+    openHasarModal(loaner);
+  }
+
+  async function iadeKaydet() {
+    try {
+      if (hasarForm.notu || hasarForm.tutar) {
+        await api.loanerHasar(hasarModal.id, { notu: hasarForm.notu, tutar: hasarForm.tutar });
+      }
+      await api.iadeLoaner(hasarModal.id);
+      setHasarModal(null);
+      load();
+    } catch (ex) { alert(ex.message); }
   }
 
   function daysOut(teslim) {
@@ -134,7 +159,37 @@ export default function Loaner() {
         </div>
       )}
 
-      {/* AKTİF — Dışarıda olanlar */}
+      {/* Hasar modalı */}
+      {hasarModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16
+        }}>
+          <div className="card" style={{ width: "100%", maxWidth: 400 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
+              İade Al — {hasarModal.musteri_adi} ({hasarModal.cihaz})
+            </div>
+            <div className="form-group">
+              <label className="form-label">Hasar Notu</label>
+              <input className="form-input" value={hasarForm.notu}
+                onChange={e => setHasarForm(f => ({ ...f, notu: e.target.value }))}
+                placeholder="Ekran çatlak, tuş eksik... (opsiyonel)" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Hasar Tutarı (₺)</label>
+              <input className="form-input" type="number" value={hasarForm.tutar}
+                onChange={e => setHasarForm(f => ({ ...f, tutar: e.target.value }))}
+                placeholder="0" />
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button className="btn btn-primary" onClick={iadeKaydet}>✅ İade Al</button>
+              <button className="btn btn-ghost" onClick={() => setHasarModal(null)}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AKTİF */}
       {tab === "aktif" && (
         list.length === 0 ? (
           <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Dışarıda yedek telefon yok</div>
@@ -151,15 +206,20 @@ export default function Loaner() {
                     📅 {l.teslim_tarihi} · {gun === 0 ? "Bugün" : `${gun} gündür dışarıda`}{warn && " ⚠️"}
                   </div>
                   {l.notlar && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>{l.notlar}</div>}
+                  {l.hasar_notu && (
+                    <div style={{ fontSize: 12, color: "var(--danger)", marginTop: 4 }}>
+                      ⚠️ Hasar: {l.hasar_notu}{l.hasar_tutar ? ` (₺${l.hasar_tutar})` : ""}
+                    </div>
+                  )}
                 </div>
-                <button className="btn btn-primary btn-sm" onClick={() => iade(l.id)}>İade Al</button>
+                <button className="btn btn-primary btn-sm" onClick={() => iade(l)}>İade Al</button>
               </div>
             </div>
           );
         })
       )}
 
-      {/* GEÇMİŞ — İade edilenler */}
+      {/* GEÇMİŞ */}
       {tab === "gecmis" && (
         gecmis.length === 0 ? (
           <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>İade kaydı yok</div>
@@ -172,6 +232,11 @@ export default function Loaner() {
                 <div style={{ fontSize: 12, color: "var(--hint)" }}>
                   Verildi: {l.teslim_tarihi} · İade: {l.iade_tarihi || "—"}
                 </div>
+                {l.hasar_notu && (
+                  <div style={{ fontSize: 12, color: "var(--danger)", marginTop: 2 }}>
+                    ⚠️ {l.hasar_notu}{l.hasar_tutar ? ` · ₺${l.hasar_tutar}` : ""}
+                  </div>
+                )}
               </div>
               {l.teslim_tarihi && l.iade_tarihi && (
                 <div style={{ fontSize: 13, color: "var(--hint)", textAlign: "right" }}>

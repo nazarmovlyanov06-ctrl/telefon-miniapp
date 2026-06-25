@@ -125,6 +125,10 @@ async def update_repair(
     if body.get("status") == "teslim":
         delivered_at = datetime.datetime.now().isoformat()
 
+    cur2 = await db.execute("SELECT repair_no, device_model FROM repairs WHERE id=?", (repair_id,))
+    rrow = await cur2.fetchone()
+    repair_no = dict(rrow)["repair_no"] if rrow else ""
+
     await db.execute(
         """UPDATE repairs SET
            device_model=?, fault_desc=?, status=?, estimated_price=?,
@@ -149,6 +153,21 @@ async def update_repair(
             repair_id,
         ),
     )
+
+    # Teslim edildiginde kasaya yaz
+    if body.get("status") == "teslim" and body.get("kasa_yazilsin"):
+        final = float(body.get("final_price") or 0)
+        if final > 0:
+            cihaz = body.get("device_model", "")
+            await db.execute(
+                """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+                   VALUES (?, 'gelir', ?, ?, ?, 'tamir')""",
+                (datetime.date.today().isoformat(),
+                 body.get("payment_type", "nakit"),
+                 final,
+                 f"Tamir #{repair_no} {cihaz}".strip()),
+            )
+
     await db.commit()
     return {"ok": True}
 

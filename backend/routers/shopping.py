@@ -116,6 +116,24 @@ async def mark_bought(
         except Exception as e:
             stok_mesaj = f"hata:{str(e)}"
 
+    # Toptancı alış geçmişine ekle
+    if body.get("bought_from") and item:
+        try:
+            src = await db.execute("SELECT id FROM toptancilar WHERE ad = ?", (body["bought_from"],))
+            topt = await src.fetchone()
+            if topt:
+                miktar2 = int(body.get("stok_miktar") or item.get("quantity") or 1)
+                fiyat2 = float(body.get("bought_price") or 0)
+                birim = fiyat2 / miktar2 if miktar2 > 0 else fiyat2
+                await db.execute(
+                    """INSERT INTO toptanci_alislar (toptanci_id, urun, miktar, birim_fiyat, toplam, tarih)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (topt["id"], item.get("part_name", "Parça"),
+                     miktar2, birim, fiyat2, date.today().isoformat())
+                )
+        except Exception:
+            pass
+
     await db.commit()
     return {"ok": True, "stok_mesaj": stok_mesaj}
 
