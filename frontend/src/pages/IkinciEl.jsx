@@ -139,7 +139,7 @@ export default function IkinciEl() {
                   {c.kimden && <div style={{ fontSize: 12, color: "var(--hint)" }}>Kimden: {c.kimden}</div>}
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 700 }}>{(c.toplam_maliyet || c.alis_fiyati || 0).toLocaleString("tr-TR")} ₺</div>
+                  <div style={{ fontWeight: 700 }}>{((c.alis_fiyati || 0) + (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺</div>
                   <div style={{ fontSize: 11, color: "var(--hint)" }}>maliyet</div>
                 </div>
               </div>
@@ -182,7 +182,7 @@ export default function IkinciEl() {
                     </div>
                     {satForm.satis_fiyati && (
                       <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8, fontWeight: 600 }}>
-                        Kâr: {(parseFloat(satForm.satis_fiyati) - (c.toplam_maliyet || c.alis_fiyati || 0)).toLocaleString("tr-TR")} ₺
+                        Kâr: {(parseFloat(satForm.satis_fiyati) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺
                       </div>
                     )}
                     <div style={{ display: "flex", gap: 8 }}>
