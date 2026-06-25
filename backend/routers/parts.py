@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from aiosqlite import Connection
 from database import get_db, get_or_create_user
 from auth import get_current_user
+from datetime import date
 
 router = APIRouter(prefix="/parts", tags=["parts"])
 
@@ -94,6 +95,46 @@ async def delete_part(
     await db.execute("DELETE FROM parts WHERE id = ?", (part_id,))
     await db.commit()
     return {"ok": True}
+
+
+@router.post("/{part_id}/kullan")
+async def kullan_part(
+    part_id: int,
+    body: dict,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute("SELECT id, name, quantity FROM parts WHERE id=?", (part_id,))
+    part = await cur.fetchone()
+    if not part:
+        raise HTTPException(404, "Parça bulunamadı")
+    part = dict(part)
+    miktar = int(body.get("miktar", 1))
+    if part["quantity"] < miktar:
+        raise HTTPException(400, f"Yetersiz stok (mevcut: {part['quantity']})")
+    await db.execute("UPDATE parts SET quantity = quantity - ? WHERE id = ?", (miktar, part_id))
+    await db.execute(
+        """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih)
+           VALUES (?, 'cikis', ?, ?, ?, ?)""",
+        (part_id, miktar, body.get("sebep", "diger"), body.get("aciklama"), date.today().isoformat())
+    )
+    await db.commit()
+    return {"ok": True, "kalan": part["quantity"] - miktar}
+
+
+@router.get("/{part_id}/hareketler")
+async def part_hareketler(
+    part_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        "SELECT * FROM stok_hareketleri WHERE part_id=? ORDER BY created_at DESC LIMIT 20",
+        (part_id,)
+    )
+    return [dict(r) for r in await cur.fetchall()]
 
 
 # Parça siparisleri

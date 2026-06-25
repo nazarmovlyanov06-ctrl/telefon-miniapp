@@ -254,6 +254,16 @@ CREATE TABLE IF NOT EXISTS parca_iadeler (
     durum TEXT DEFAULT 'bekliyor',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS stok_hareketleri (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    part_id INTEGER REFERENCES parts(id),
+    hareket TEXT NOT NULL,
+    miktar INTEGER NOT NULL,
+    sebep TEXT,
+    aciklama TEXT,
+    tarih TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
