@@ -25,8 +25,9 @@ async def create_aksesuar(
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     cur = await db.execute(
-        "INSERT INTO aksesuarlar (ad, stok, alis_fiyati, satis_fiyati) VALUES (?, ?, ?, ?)",
-        (body["ad"], int(body.get("stok", 0)), float(body["alis_fiyati"]), float(body["satis_fiyati"])),
+        "INSERT INTO aksesuarlar (ad, stok, alis_fiyati, satis_fiyati, kategori) VALUES (?, ?, ?, ?, ?)",
+        (body["ad"], int(body.get("stok", 0)), float(body["alis_fiyati"]), float(body["satis_fiyati"]),
+         body.get("kategori", "Diğer")),
     )
     await db.commit()
     return {"id": cur.lastrowid}
@@ -41,9 +42,9 @@ async def update_aksesuar(
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     await db.execute(
-        "UPDATE aksesuarlar SET ad=?, stok=?, alis_fiyati=?, satis_fiyati=? WHERE id=?",
+        "UPDATE aksesuarlar SET ad=?, stok=?, alis_fiyati=?, satis_fiyati=?, kategori=? WHERE id=?",
         (body.get("ad"), int(body.get("stok", 0)), float(body.get("alis_fiyati", 0)),
-         float(body.get("satis_fiyati", 0)), aksesuar_id),
+         float(body.get("satis_fiyati", 0)), body.get("kategori", "Diğer"), aksesuar_id),
     )
     await db.commit()
     return {"ok": True}

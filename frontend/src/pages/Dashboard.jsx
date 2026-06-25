@@ -7,7 +7,7 @@ const QUICK = [
   { icon: "📱", label: "2. El",   path: "/ikinciel", color: "#f0fdf4" },
   { icon: "🛡️", label: "Garanti", path: "/garanti",  color: "#eff6ff" },
   { icon: "🏭", label: "Toptancı",path: "/toptanci", color: "#f0f9ff" },
-  { icon: "🎯", label: "Hedef",   path: "/hedef",    color: "#fdf4ff" },
+  { icon: "🛒", label: "Alışveriş", path: "/parts",   color: "#fdf4ff" },
   { icon: "🎧", label: "Aksesuar",path: "/aksesuar", color: "#fff7ed" },
 ];
 

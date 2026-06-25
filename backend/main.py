@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS ikinci_el (
     satis_fiyati REAL,
     satis_kanali TEXT,
     satis_tarihi TEXT,
+    musteri_adi TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS ikinci_el_masraflar (
@@ -193,7 +194,8 @@ CREATE TABLE IF NOT EXISTS aksesuarlar (
     ad TEXT NOT NULL,
     stok INTEGER DEFAULT 0,
     alis_fiyati REAL NOT NULL,
-    satis_fiyati REAL NOT NULL
+    satis_fiyati REAL NOT NULL,
+    kategori TEXT DEFAULT 'Diğer'
 );
 CREATE TABLE IF NOT EXISTS aksesuar_satislar (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -274,6 +276,14 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 log.error(f"Schema hatasi: {e} | SQL: {s[:80]}")
                 fail += 1
+        for m in [
+            "ALTER TABLE ikinci_el ADD COLUMN musteri_adi TEXT",
+            "ALTER TABLE aksesuarlar ADD COLUMN kategori TEXT DEFAULT 'Diğer'",
+        ]:
+            try:
+                await db.execute(m)
+            except Exception:
+                pass
         await db.commit()
         cur = await db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tablolar = [r[0] for r in await cur.fetchall()]

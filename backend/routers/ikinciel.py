@@ -24,6 +24,23 @@ async def list_stok(
     return [dict(r) for r in await cur.fetchall()]
 
 
+@router.get("/satilanlar")
+async def list_satilanlar(
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        """SELECT c.*,
+                  COALESCE((SELECT SUM(m.tutar) FROM ikinci_el_masraflar m
+                            WHERE m.cihaz_id = c.id), 0) as toplam_masraf
+           FROM ikinci_el c
+           WHERE c.durum = 'satildi'
+           ORDER BY c.satis_tarihi DESC"""
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
 @router.post("/")
 async def create_cihaz(
     body: dict,
@@ -70,10 +87,11 @@ async def sat_cihaz(
     if not await cur.fetchone():
         raise HTTPException(404, "Cihaz bulunamadi")
     await db.execute(
-        """UPDATE ikinci_el SET durum='satildi', satis_fiyati=?, satis_kanali=?, satis_tarihi=?
-           WHERE id=?""",
+        """UPDATE ikinci_el SET durum='satildi', satis_fiyati=?, satis_kanali=?,
+           satis_tarihi=?, musteri_adi=? WHERE id=?""",
         (float(body["satis_fiyati"]), body.get("satis_kanali", "magaza"),
-         body.get("satis_tarihi", date.today().isoformat()), cihaz_id),
+         body.get("satis_tarihi", date.today().isoformat()),
+         body.get("musteri_adi"), cihaz_id),
     )
     await db.commit()
     return {"ok": True}

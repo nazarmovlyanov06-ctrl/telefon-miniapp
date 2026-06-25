@@ -95,6 +95,7 @@ export const api = {
   createIkinciEl: (data) => post("/ikinciel/", data),
   ikinciElMasraf: (id, data) => post(`/ikinciel/${id}/masraf`, data),
   ikinciElSat: (id, data) => post(`/ikinciel/${id}/sat`, data),
+  ikinciElSatilanlar: () => get("/ikinciel/satilanlar"),
 
   // Garanti
   garantiList: () => get("/garantiler/"),
