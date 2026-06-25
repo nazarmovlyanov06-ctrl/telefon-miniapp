@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import ImeiInput from "../components/ImeiInput";
 
 export default function SifirCihaz() {
   const navigate = useNavigate();
@@ -153,8 +154,11 @@ export default function SifirCihaz() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">IMEI</label>
-                  <input className="form-input" value={form.imei} inputMode="numeric"
-                    onChange={e => setForm({ ...form, imei: e.target.value })} placeholder="15 haneli" />
+                  <ImeiInput
+                    value={form.imei}
+                    onChange={v => setForm({ ...form, imei: v })}
+                    placeholder="15 haneli veya 📷 okut"
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Kimden (Ad Soyad) *</label>

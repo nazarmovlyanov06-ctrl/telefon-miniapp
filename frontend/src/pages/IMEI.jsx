@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import ImeiInput from "../components/ImeiInput";
 
 const BTK_DURUM = {
   kayitli:          { label: "✅ Kayıtlı",               color: "#16a34a", bg: "#dcfce7", aciklama: "Türkiye'de yasal yollarla satılmış, sorun yok." },
@@ -95,16 +96,11 @@ export default function IMEI() {
       <div className="card">
         <div className="form-group" style={{ marginBottom: 8 }}>
           <label className="form-label">IMEI Numarası (15 hane) — *#06# ile öğren</label>
-          <input
-            className="form-input"
-            placeholder="Örn: 352099001761481"
-            inputMode="numeric"
+          <ImeiInput
             value={imei}
-            onChange={(e) => {
-              setImei(e.target.value.replace(/\D/g, "").slice(0, 15));
-              setResult(null); setBtkResult(null); setError("");
-            }}
-            style={{ fontSize: 20, letterSpacing: 3, fontFamily: "monospace" }}
+            onChange={(v) => { setImei(v); setResult(null); setBtkResult(null); setError(""); }}
+            placeholder="Örn: 352099001761481 veya 📷 okut"
+            style={{ fontSize: 18, letterSpacing: 2 }}
           />
         </div>
         {brand && <div style={{ fontSize: 13, color: "var(--accent)", marginBottom: 8 }}>📱 {brand} cihazı</div>}
