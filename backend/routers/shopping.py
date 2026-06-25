@@ -80,37 +80,43 @@ async def mark_bought(
         (user["id"], body.get("bought_from"), body.get("bought_price"), item_id),
     )
 
+    stok_mesaj = None
     part_id_log = None
     if body.get("stok_ekle") and item:
         miktar = int(body.get("stok_miktar") or item.get("quantity") or 1)
         parca_adi = item.get("part_name", "")
-        src = await db.execute(
-            "SELECT id FROM parts WHERE LOWER(name) LIKE ? LIMIT 1",
-            (f"%{parca_adi.lower()}%",)
-        )
-        existing = await src.fetchone()
-        if existing:
-            part_id_log = existing["id"]
-            await db.execute("UPDATE parts SET quantity = quantity + ? WHERE id = ?",
-                             (miktar, existing["id"]))
-        else:
-            ins = await db.execute(
-                """INSERT INTO parts (name, device_model, part_type, quantity, min_quantity,
-                   purchase_price, sale_price, created_by) VALUES (?, ?, NULL, ?, 2, ?, 0, ?)""",
-                (parca_adi, item.get("device_model"), miktar,
-                 float(body.get("bought_price") or 0), user["id"])
+        try:
+            src = await db.execute(
+                "SELECT id, name FROM parts WHERE LOWER(name) LIKE ? LIMIT 1",
+                (f"%{parca_adi.lower()}%",)
             )
-            part_id_log = ins.lastrowid
+            existing = await src.fetchone()
+            if existing:
+                part_id_log = existing["id"]
+                await db.execute("UPDATE parts SET quantity = quantity + ? WHERE id = ?",
+                                 (miktar, existing["id"]))
+                stok_mesaj = f"guncellendi:{existing['name']}"
+            else:
+                ins = await db.execute(
+                    """INSERT INTO parts (name, device_model, part_type, quantity, min_quantity,
+                       purchase_price, sale_price, created_by) VALUES (?, ?, NULL, ?, 2, ?, 0, ?)""",
+                    (parca_adi, item.get("device_model"), miktar,
+                     float(body.get("bought_price") or 0), user["id"])
+                )
+                part_id_log = ins.lastrowid
+                stok_mesaj = f"yeni:{parca_adi}"
 
-        if part_id_log:
-            await db.execute(
-                """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih)
-                   VALUES (?, 'giris', ?, 'satin_alma', ?, ?)""",
-                (part_id_log, miktar, body.get("bought_from"), date.today().isoformat())
-            )
+            if part_id_log:
+                await db.execute(
+                    """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih)
+                       VALUES (?, 'giris', ?, 'satin_alma', ?, ?)""",
+                    (part_id_log, miktar, body.get("bought_from"), date.today().isoformat())
+                )
+        except Exception as e:
+            stok_mesaj = f"hata:{str(e)}"
 
     await db.commit()
-    return {"ok": True}
+    return {"ok": True, "stok_mesaj": stok_mesaj}
 
 
 @router.delete("/{item_id}")

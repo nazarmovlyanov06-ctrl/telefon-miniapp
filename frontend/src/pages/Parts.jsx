@@ -99,11 +99,15 @@ export default function Parts() {
         stok_miktar: parseInt(boughtData.stokMiktar) || 1,
       });
       const willAddStock = boughtData.stokEkle;
+      const partName = boughtItem.part_name;
       setBoughtItem(null);
       setBoughtData({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1", dollarMode: false, dollarAmount: "" });
       api.shopping().then(setShopping);
       if (willAddStock) {
-        api.parts({}).then(setParts);
+        setBrandFilter("Tümü");
+        setTypeFilter("Tümü");
+        setQ(partName);
+        api.parts({ q: partName }).then(setParts);
         setTab("stok");
       }
     } catch (e) { setErr(e.message); }
