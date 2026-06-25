@@ -328,3 +328,22 @@ async def health_db():
         mevcut = {r[0] for r in await cur.fetchall()}
     eksik = [t for t in beklenen if t not in mevcut]
     return {"db_path": DB_PATH, "mevcut_tablo": sorted(mevcut), "eksik_tablo": eksik, "ok": len(eksik) == 0}
+
+
+@app.post("/health/init-tables")
+async def force_init_tables():
+    """Tablolari zorla olustur — tani icin."""
+    import aiosqlite as _aio, logging
+    log = logging.getLogger("init")
+    results = []
+    async with _aio.connect(DB_PATH) as db:
+        stmts = [s.strip() for s in SCHEMA.split(";") if s.strip()]
+        for s in stmts:
+            try:
+                await db.execute(s)
+                tname = s.split("EXISTS")[-1].strip().split("(")[0].strip()
+                results.append({"tablo": tname, "ok": True})
+            except Exception as e:
+                results.append({"sql": s[:60], "hata": str(e)})
+        await db.commit()
+    return {"sonuc": results}

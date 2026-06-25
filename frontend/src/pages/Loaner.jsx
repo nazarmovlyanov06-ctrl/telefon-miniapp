@@ -7,6 +7,7 @@ export default function Loaner() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [err, setErr] = useState("");
   const [form, setForm] = useState({ musteri_adi: "", cihaz: "", teslim_tarihi: today(), notlar: "" });
 
   useEffect(() => { load(); }, []);
@@ -17,10 +18,15 @@ export default function Loaner() {
 
   async function submit(e) {
     e.preventDefault();
-    await api.createLoaner(form);
-    setShowForm(false);
-    setForm({ musteri_adi: "", cihaz: "", teslim_tarihi: today(), notlar: "" });
-    load();
+    setErr("");
+    try {
+      await api.createLoaner(form);
+      setShowForm(false);
+      setForm({ musteri_adi: "", cihaz: "", teslim_tarihi: today(), notlar: "" });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function iade(id) {
@@ -46,6 +52,7 @@ export default function Loaner() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Müşteri Adı *</label>
               <input className="form-input" required value={form.musteri_adi} onChange={e => setForm({ ...form, musteri_adi: e.target.value })} placeholder="Ad Soyad" />

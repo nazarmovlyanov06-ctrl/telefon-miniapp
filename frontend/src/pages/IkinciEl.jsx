@@ -15,6 +15,7 @@ export default function IkinciEl() {
   const [form, setForm] = useState({ model: "", imei: "", kimden: "", alis_fiyati: "", notlar: "" });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan" });
+  const [err, setErr] = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -27,26 +28,41 @@ export default function IkinciEl() {
 
   async function submitAlim(e) {
     e.preventDefault();
-    await api.createIkinciEl({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
-    setShowForm(false);
-    setForm({ model: "", imei: "", kimden: "", alis_fiyati: "", notlar: "" });
-    load();
+    setErr("");
+    try {
+      await api.createIkinciEl({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
+      setShowForm(false);
+      setForm({ model: "", imei: "", kimden: "", alis_fiyati: "", notlar: "" });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function submitMasraf(e) {
     e.preventDefault();
-    await api.ikinciElMasraf(selected.id, { ...masrafForm, tutar: parseFloat(masrafForm.tutar) });
-    setShowMasraf(false);
-    setMasrafForm({ aciklama: "", tutar: "", tarih: today() });
-    load();
+    setErr("");
+    try {
+      await api.ikinciElMasraf(selected.id, { ...masrafForm, tutar: parseFloat(masrafForm.tutar) });
+      setShowMasraf(false);
+      setMasrafForm({ aciklama: "", tutar: "", tarih: today() });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function submitSat(e) {
     e.preventDefault();
-    await api.ikinciElSat(selected.id, { ...satForm, satis_fiyati: parseFloat(satForm.satis_fiyati) });
-    setShowSat(false);
-    setSelected(null);
-    load();
+    setErr("");
+    try {
+      await api.ikinciElSat(selected.id, { ...satForm, satis_fiyati: parseFloat(satForm.satis_fiyati) });
+      setShowSat(false);
+      setSelected(null);
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
@@ -80,6 +96,7 @@ export default function IkinciEl() {
         <div className="card">
           <div style={{ fontWeight: 600, marginBottom: 10 }}>Yeni Alım</div>
           <form onSubmit={submitAlim}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Model *</label>
               <input className="form-input" required value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} placeholder="iPhone 13, Samsung A54..." />
@@ -135,6 +152,7 @@ export default function IkinciEl() {
                 </div>
                 {showMasraf && (
                   <form onSubmit={submitMasraf} style={{ marginTop: 10 }}>
+                    {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
                     <div className="form-group">
                       <label className="form-label">Masraf Açıklaması</label>
                       <input className="form-input" required value={masrafForm.aciklama} onChange={e => setMasrafForm({ ...masrafForm, aciklama: e.target.value })} placeholder="Ekran, temizlik..." />
@@ -151,6 +169,7 @@ export default function IkinciEl() {
                 )}
                 {showSat && (
                   <form onSubmit={submitSat} style={{ marginTop: 10 }}>
+                    {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
                     <div className="form-group">
                       <label className="form-label">Satış Fiyatı (₺)</label>
                       <input className="form-input" type="number" required value={satForm.satis_fiyati} onChange={e => setSatForm({ ...satForm, satis_fiyati: e.target.value })} />

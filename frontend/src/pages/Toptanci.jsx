@@ -13,6 +13,7 @@ export default function Toptanci() {
   const [showAlisForm, setShowAlisForm] = useState(false);
   const [form, setForm] = useState({ ad: "", telefon: "", sehir: "", notlar: "" });
   const [alisForm, setAlisForm] = useState({ urun: "", miktar: "1", birim_fiyat: "", tarih: today(), notlar: "" });
+  const [err, setErr] = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -28,10 +29,15 @@ export default function Toptanci() {
 
   async function submitToptanci(e) {
     e.preventDefault();
-    await api.createToptanci(form);
-    setShowForm(false);
-    setForm({ ad: "", telefon: "", sehir: "", notlar: "" });
-    load();
+    setErr("");
+    try {
+      await api.createToptanci(form);
+      setShowForm(false);
+      setForm({ ad: "", telefon: "", sehir: "", notlar: "" });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function deleteToptanci(id) {
@@ -43,10 +49,15 @@ export default function Toptanci() {
 
   async function submitAlis(e) {
     e.preventDefault();
-    await api.createToptanciAlis(selected.id, alisForm);
-    setShowAlisForm(false);
-    setAlisForm({ urun: "", miktar: "1", birim_fiyat: "", tarih: today(), notlar: "" });
-    selectToptanci(selected);
+    setErr("");
+    try {
+      await api.createToptanciAlis(selected.id, alisForm);
+      setShowAlisForm(false);
+      setAlisForm({ urun: "", miktar: "1", birim_fiyat: "", tarih: today(), notlar: "" });
+      selectToptanci(selected);
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
@@ -79,6 +90,7 @@ export default function Toptanci() {
         {showAlisForm && (
           <div className="card">
             <form onSubmit={submitAlis}>
+              {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
               <div className="form-group">
                 <label className="form-label">Ürün/Parça</label>
                 <input className="form-input" required value={alisForm.urun} onChange={e => setAlisForm({ ...alisForm, urun: e.target.value })} placeholder="Ekran, batarya..." />
@@ -137,6 +149,7 @@ export default function Toptanci() {
       {showForm && (
         <div className="card">
           <form onSubmit={submitToptanci}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Toptancı Adı *</label>
               <input className="form-input" required value={form.ad} onChange={e => setForm({ ...form, ad: e.target.value })} placeholder="Firma adı" />

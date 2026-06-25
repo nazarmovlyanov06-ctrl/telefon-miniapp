@@ -9,6 +9,7 @@ export default function Gider() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [err, setErr] = useState("");
   const [form, setForm] = useState({ kategori: "Kira", tutar: "", aciklama: "", tarih: today() });
 
   useEffect(() => { load(); }, []);
@@ -22,10 +23,15 @@ export default function Gider() {
 
   async function submit(e) {
     e.preventDefault();
-    await api.createGider({ ...form, tutar: parseFloat(form.tutar) });
-    setShowForm(false);
-    setForm({ kategori: "Kira", tutar: "", aciklama: "", tarih: today() });
-    load();
+    setErr("");
+    try {
+      await api.createGider({ ...form, tutar: parseFloat(form.tutar) });
+      setShowForm(false);
+      setForm({ kategori: "Kira", tutar: "", aciklama: "", tarih: today() });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function sil(id) {
@@ -56,6 +62,7 @@ export default function Gider() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Kategori</label>
               <select className="form-select" value={form.kategori} onChange={e => setForm({ ...form, kategori: e.target.value })}>

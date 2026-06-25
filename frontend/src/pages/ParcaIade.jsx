@@ -12,6 +12,7 @@ export default function ParcaIade() {
   const [toptancilar, setToptancilar] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [err, setErr] = useState("");
   const [form, setForm] = useState({ toptanci_id: "", parca: "", miktar: "1", sebep: "" });
 
   useEffect(() => { load(); }, []);
@@ -25,10 +26,15 @@ export default function ParcaIade() {
 
   async function submit(e) {
     e.preventDefault();
-    await api.createParcaIade({ ...form, toptanci_id: parseInt(form.toptanci_id), miktar: parseInt(form.miktar) });
-    setShowForm(false);
-    setForm({ toptanci_id: "", parca: "", miktar: "1", sebep: "" });
-    load();
+    setErr("");
+    try {
+      await api.createParcaIade({ ...form, toptanci_id: parseInt(form.toptanci_id), miktar: parseInt(form.miktar) });
+      setShowForm(false);
+      setForm({ toptanci_id: "", parca: "", miktar: "1", sebep: "" });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function updateDurum(id, durum) {
@@ -49,6 +55,7 @@ export default function ParcaIade() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Toptancı *</label>
               <select className="form-select" required value={form.toptanci_id} onChange={e => setForm({ ...form, toptanci_id: e.target.value })}>

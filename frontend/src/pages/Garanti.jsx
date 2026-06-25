@@ -8,6 +8,7 @@ export default function Garanti() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [customers, setCustomers] = useState([]);
+  const [err, setErr] = useState("");
   const [form, setForm] = useState({
     musteri_adi: "", telefon: "", cihaz: "", tamir_aciklama: "",
     baslangic_tarihi: today(), sure_gun: "90"
@@ -24,10 +25,15 @@ export default function Garanti() {
 
   async function submit(e) {
     e.preventDefault();
-    await api.createGaranti({ ...form, sure_gun: parseInt(form.sure_gun) });
-    setShowForm(false);
-    setForm({ musteri_adi: "", telefon: "", cihaz: "", tamir_aciklama: "", baslangic_tarihi: today(), sure_gun: "90" });
-    load();
+    setErr("");
+    try {
+      await api.createGaranti({ ...form, sure_gun: parseInt(form.sure_gun) });
+      setShowForm(false);
+      setForm({ musteri_adi: "", telefon: "", cihaz: "", tamir_aciklama: "", baslangic_tarihi: today(), sure_gun: "90" });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function kapat(id) {
@@ -56,6 +62,7 @@ export default function Garanti() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Müşteri Adı *</label>
               <input className="form-input" required value={form.musteri_adi} onChange={e => setForm({ ...form, musteri_adi: e.target.value })} placeholder="Ad Soyad" />

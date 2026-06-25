@@ -8,6 +8,7 @@ export default function KaraListe() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [err, setErr] = useState("");
   const [form, setForm] = useState({ ad: "", telefon: "", imei: "", sebep: "", notlar: "" });
 
   useEffect(() => { load(); }, []);
@@ -23,10 +24,15 @@ export default function KaraListe() {
 
   async function submit(e) {
     e.preventDefault();
-    await api.createKara(form);
-    setShowForm(false);
-    setForm({ ad: "", telefon: "", imei: "", sebep: "", notlar: "" });
-    load(q);
+    setErr("");
+    try {
+      await api.createKara(form);
+      setShowForm(false);
+      setForm({ ad: "", telefon: "", imei: "", sebep: "", notlar: "" });
+      load(q);
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function sil(id) {
@@ -56,6 +62,7 @@ export default function KaraListe() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Ad Soyad</label>
               <input className="form-input" value={form.ad} onChange={e => setForm({ ...form, ad: e.target.value })} placeholder="İsteğe bağlı" />

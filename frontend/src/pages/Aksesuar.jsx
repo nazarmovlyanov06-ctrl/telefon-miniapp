@@ -10,6 +10,7 @@ export default function Aksesuar() {
   const [satForm, setSatForm] = useState(null);
   const [form, setForm] = useState({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "" });
   const [satData, setSatData] = useState({ miktar: "1", musteri_adi: "" });
+  const [err, setErr] = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -19,23 +20,33 @@ export default function Aksesuar() {
 
   async function submit(e) {
     e.preventDefault();
-    await api.createAksesuar({
-      ad: form.ad,
-      stok: parseInt(form.stok),
-      alis_fiyati: parseFloat(form.alis_fiyati),
-      satis_fiyati: parseFloat(form.satis_fiyati),
-    });
-    setShowForm(false);
-    setForm({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "" });
-    load();
+    setErr("");
+    try {
+      await api.createAksesuar({
+        ad: form.ad,
+        stok: parseInt(form.stok),
+        alis_fiyati: parseFloat(form.alis_fiyati),
+        satis_fiyati: parseFloat(form.satis_fiyati),
+      });
+      setShowForm(false);
+      setForm({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "" });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function submitSat(e) {
     e.preventDefault();
-    await api.satAksesuar(satForm.id, { miktar: parseInt(satData.miktar), musteri_adi: satData.musteri_adi, tarih: today() });
-    setSatForm(null);
-    setSatData({ miktar: "1", musteri_adi: "" });
-    load();
+    setErr("");
+    try {
+      await api.satAksesuar(satForm.id, { miktar: parseInt(satData.miktar), musteri_adi: satData.musteri_adi, tarih: today() });
+      setSatForm(null);
+      setSatData({ miktar: "1", musteri_adi: "" });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
@@ -51,6 +62,7 @@ export default function Aksesuar() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Ürün Adı *</label>
               <input className="form-input" required value={form.ad} onChange={e => setForm({ ...form, ad: e.target.value })} placeholder="Kılıf, şarj aleti, powerbank..." />
@@ -81,6 +93,7 @@ export default function Aksesuar() {
         <div className="card" style={{ background: "var(--bg2)" }}>
           <div style={{ fontWeight: 600, marginBottom: 8 }}>Satış: {satForm.ad}</div>
           <form onSubmit={submitSat}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Adet (max {satForm.stok})</label>
               <input className="form-input" type="number" min="1" max={satForm.stok} required value={satData.miktar} onChange={e => setSatData({ ...satData, miktar: e.target.value })} />

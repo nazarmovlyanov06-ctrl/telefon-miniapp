@@ -9,6 +9,7 @@ export default function Kasa() {
   const [loading, setLoading] = useState(true);
   const [showGider, setShowGider] = useState(false);
   const [giderForm, setGiderForm] = useState({ tutar: "", aciklama: "", odeme_yontemi: "nakit" });
+  const [err, setErr] = useState("");
 
   useEffect(() => { load(tarih); }, [tarih]);
 
@@ -22,10 +23,15 @@ export default function Kasa() {
 
   async function submitGider(e) {
     e.preventDefault();
-    await api.kasaGider({ ...giderForm, tutar: parseFloat(giderForm.tutar), tarih });
-    setShowGider(false);
-    setGiderForm({ tutar: "", aciklama: "", odeme_yontemi: "nakit" });
-    load(tarih);
+    setErr("");
+    try {
+      await api.kasaGider({ ...giderForm, tutar: parseFloat(giderForm.tutar), tarih });
+      setShowGider(false);
+      setGiderForm({ tutar: "", aciklama: "", odeme_yontemi: "nakit" });
+      load(tarih);
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   return (
@@ -88,6 +94,7 @@ export default function Kasa() {
         <div className="card" style={{ position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)", width: "calc(100% - 24px)", maxWidth: 456, zIndex: 100 }}>
           <div style={{ fontWeight: 600, marginBottom: 10 }}>Gider Ekle</div>
           <form onSubmit={submitGider}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Tutar (₺)</label>
               <input className="form-input" type="number" required value={giderForm.tutar} onChange={e => setGiderForm({ ...giderForm, tutar: e.target.value })} placeholder="0" />

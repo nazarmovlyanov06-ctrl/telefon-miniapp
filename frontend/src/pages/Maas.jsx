@@ -13,6 +13,7 @@ export default function Maas() {
   const [showAvans, setShowAvans] = useState(false);
   const [cForm, setCForm] = useState({ ad: "", telefon: "", aylik_maas: "" });
   const [aForm, setAForm] = useState({ calisan_id: "", tutar: "", tarih: today(), notlar: "" });
+  const [err, setErr] = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -28,18 +29,28 @@ export default function Maas() {
 
   async function submitCalisan(e) {
     e.preventDefault();
-    await api.createCalisan({ ...cForm, aylik_maas: parseFloat(cForm.aylik_maas) });
-    setShowCalisan(false);
-    setCForm({ ad: "", telefon: "", aylik_maas: "" });
-    load();
+    setErr("");
+    try {
+      await api.createCalisan({ ...cForm, aylik_maas: parseFloat(cForm.aylik_maas) });
+      setShowCalisan(false);
+      setCForm({ ad: "", telefon: "", aylik_maas: "" });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   async function submitAvans(e) {
     e.preventDefault();
-    await api.createAvans({ ...aForm, calisan_id: parseInt(aForm.calisan_id), tutar: parseFloat(aForm.tutar) });
-    setShowAvans(false);
-    setAForm({ calisan_id: "", tutar: "", tarih: today(), notlar: "" });
-    load();
+    setErr("");
+    try {
+      await api.createAvans({ ...aForm, calisan_id: parseInt(aForm.calisan_id), tutar: parseFloat(aForm.tutar) });
+      setShowAvans(false);
+      setAForm({ calisan_id: "", tutar: "", tarih: today(), notlar: "" });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
@@ -68,6 +79,7 @@ export default function Maas() {
           {showCalisan && (
             <div className="card">
               <form onSubmit={submitCalisan}>
+                {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
                 <div className="form-group">
                   <label className="form-label">Ad Soyad *</label>
                   <input className="form-input" required value={cForm.ad} onChange={e => setCForm({ ...cForm, ad: e.target.value })} />
@@ -91,6 +103,7 @@ export default function Maas() {
           {showAvans && (
             <div className="card">
               <form onSubmit={submitAvans}>
+                {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
                 <div className="form-group">
                   <label className="form-label">Çalışan *</label>
                   <select className="form-select" required value={aForm.calisan_id} onChange={e => setAForm({ ...aForm, calisan_id: e.target.value })}>

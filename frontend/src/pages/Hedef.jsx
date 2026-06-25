@@ -8,6 +8,7 @@ export default function Hedef() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [hedefTutar, setHedefTutar] = useState("");
+  const [err, setErr] = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -17,10 +18,15 @@ export default function Hedef() {
 
   async function submit(e) {
     e.preventDefault();
-    const now = new Date();
-    await api.setHedef({ yil: now.getFullYear(), ay: now.getMonth() + 1, hedef_tutar: parseFloat(hedefTutar) });
-    setShowForm(false);
-    load();
+    setErr("");
+    try {
+      const now = new Date();
+      await api.setHedef({ yil: now.getFullYear(), ay: now.getMonth() + 1, hedef_tutar: parseFloat(hedefTutar) });
+      setShowForm(false);
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
@@ -67,6 +73,7 @@ export default function Hedef() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group">
               <label className="form-label">Bu Ay Hedef (₺)</label>
               <input className="form-input" type="number" required value={hedefTutar} onChange={e => setHedefTutar(e.target.value)} placeholder="Örn: 50000" />
