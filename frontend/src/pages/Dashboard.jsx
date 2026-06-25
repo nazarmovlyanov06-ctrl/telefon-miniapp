@@ -2,6 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 
+const QUICK = [
+  { icon: "🏦", label: "Kasa",    path: "/kasa",     color: "#dcfce7" },
+  { icon: "📱", label: "2. El",   path: "/ikinciel", color: "#f0fdf4" },
+  { icon: "🛡️", label: "Garanti", path: "/garanti",  color: "#eff6ff" },
+  { icon: "🏭", label: "Toptancı",path: "/toptanci", color: "#f0f9ff" },
+  { icon: "🎯", label: "Hedef",   path: "/hedef",    color: "#fdf4ff" },
+  { icon: "🎧", label: "Aksesuar",path: "/aksesuar", color: "#fff7ed" },
+];
+
 export default function Dashboard({ user }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -18,81 +27,94 @@ export default function Dashboard({ user }) {
 
   return (
     <div className="page">
-      <div className="page-title">👋 Merhaba, {user?.name?.split(" ")[0] || "Hoş geldin"}</div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: "var(--hint)" }}>Hoş geldin 👋</div>
+        <div style={{ fontSize: 22, fontWeight: 800 }}>{user?.name?.split(" ")[0] || "Mağaza"}</div>
+      </div>
 
-      <div className="section-title">Bugün</div>
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value">{bugun.tamir_sayisi}</div>
-          <div className="stat-label">Yeni Tamir</div>
+      {/* Bugün özet */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+        <div className="card" style={{ margin: 0, textAlign: "center", padding: "12px 8px" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "var(--accent)" }}>{bugun.tamir_sayisi}</div>
+          <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>Yeni Tamir</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-value">{bugun.teslim_sayisi}</div>
-          <div className="stat-label">Teslim Edilen</div>
+        <div className="card" style={{ margin: 0, textAlign: "center", padding: "12px 8px" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "var(--success)" }}>{bugun.teslim_sayisi}</div>
+          <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>Teslim</div>
+        </div>
+        <div className="card" style={{ margin: 0, textAlign: "center", padding: "12px 8px" }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text)" }}>
+            {bugun.gelir > 999 ? (bugun.gelir / 1000).toFixed(1) + "K" : bugun.gelir}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>₺ Gelir</div>
         </div>
       </div>
-      <div className="card">
+
+      {/* Bu ay gelir */}
+      <div className="card" style={{ marginBottom: 14 }}>
         <div className="card-row">
-          <span style={{ color: "var(--hint)" }}>Bugünkü Gelir</span>
-          <span style={{ fontWeight: 700, fontSize: 18 }}>
-            ₺{bugun.gelir.toLocaleString("tr-TR", { minimumFractionDigits: 0 })}
-          </span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 17 }}>₺{bu_ay.gelir.toLocaleString("tr-TR")}</div>
+            <div style={{ fontSize: 12, color: "var(--hint)" }}>Bu ay toplam gelir</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontWeight: 600 }}>{bu_ay.tamir_sayisi} tamir</div>
+            <div style={{ fontSize: 12, color: "var(--hint)" }}>{bu_ay.yeni_musteri} yeni müşteri</div>
+          </div>
         </div>
       </div>
 
-      <div className="section-title">Bu Ay</div>
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value">{bu_ay.tamir_sayisi}</div>
-          <div className="stat-label">Tamir</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{bu_ay.yeni_musteri}</div>
-          <div className="stat-label">Yeni Müşteri</div>
-        </div>
+      {/* Hızlı Erişim */}
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hint)", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+        Hızlı Erişim
       </div>
-      <div className="card">
-        <div className="card-row">
-          <span style={{ color: "var(--hint)" }}>Aylık Gelir</span>
-          <span style={{ fontWeight: 700, fontSize: 18 }}>
-            ₺{bu_ay.gelir.toLocaleString("tr-TR", { minimumFractionDigits: 0 })}
-          </span>
-        </div>
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 14, scrollbarWidth: "none" }}>
+        {QUICK.map(q => (
+          <div
+            key={q.path}
+            onClick={() => navigate(q.path)}
+            style={{
+              flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center",
+              gap: 5, cursor: "pointer", width: 64,
+            }}
+          >
+            <div style={{
+              width: 52, height: 52, borderRadius: 14, background: q.color,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
+            }}>
+              {q.icon}
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", textAlign: "center", lineHeight: 1.2 }}>
+              {q.label}
+            </span>
+          </div>
+        ))}
       </div>
 
-      <div className="section-title">Bekleyenler</div>
-      <div className="card">
+      {/* Bekleyenler */}
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hint)", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+        Bekleyenler
+      </div>
+      <div className="card" style={{ marginBottom: 14 }}>
         {[
           { label: "🔧 Aktif Tamir", value: bekleyen.tamir, path: "/repairs" },
           { label: "📦 Sipariş", value: bekleyen.siparis, path: "/parts?tab=orders" },
           { label: "💰 Borçlu", value: bekleyen.borc, path: "/debts" },
-          { label: "🛒 Alışveriş", value: bekleyen.alisveris, path: "/shopping" },
         ].map((item, i) => (
           <div key={i}>
-            <div
-              className="card-row"
-              style={{ padding: "10px 0", cursor: "pointer" }}
-              onClick={() => navigate(item.path)}
-            >
+            <div className="card-row" style={{ padding: "10px 0", cursor: "pointer" }} onClick={() => navigate(item.path)}>
               <span>{item.label}</span>
-              <span style={{
-                fontWeight: 700,
-                color: item.value > 0 ? "var(--accent)" : "var(--hint)"
-              }}>
+              <span style={{ fontWeight: 700, color: item.value > 0 ? "var(--accent)" : "var(--hint)" }}>
                 {item.value}
               </span>
             </div>
-            {i < 3 && <div className="divider" />}
+            {i < 2 && <div className="divider" />}
           </div>
         ))}
       </div>
 
       {stok_uyari > 0 && (
-        <div
-          className="card"
-          style={{ background: "#fff7ed", cursor: "pointer" }}
-          onClick={() => navigate("/parts?low=1")}
-        >
+        <div className="card" style={{ background: "#fff7ed", cursor: "pointer", marginBottom: 14 }} onClick={() => navigate("/parts?low=1")}>
           <div className="card-row">
             <span>⚠️ Azalan Stok</span>
             <span style={{ fontWeight: 700, color: "var(--warn)" }}>{stok_uyari} ürün</span>
@@ -100,11 +122,9 @@ export default function Dashboard({ user }) {
         </div>
       )}
 
-      <div style={{ marginTop: 16 }}>
-        <button className="btn btn-primary" onClick={() => navigate("/repairs/new")}>
-          ➕ Yeni Tamir Kaydı
-        </button>
-      </div>
+      <button className="btn btn-primary" onClick={() => navigate("/repairs/new")}>
+        ➕ Yeni Tamir Kaydı
+      </button>
     </div>
   );
 }

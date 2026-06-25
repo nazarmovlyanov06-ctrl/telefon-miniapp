@@ -2,7 +2,39 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 
-function openBTK(imei) {
+const BTK_DURUM = {
+  kayitli:          { label: "✅ Kayıtlı",               color: "#16a34a", bg: "#dcfce7", aciklama: "Türkiye'de yasal yollarla satılmış, sorun yok." },
+  calinitli_engelli:{ label: "🚫 Çalıntı / Engelli",     color: "#dc2626", bg: "#fef2f2", aciklama: "BTK tarafından engellenmiş. Bu cihazı alma!" },
+  yurt_disi:        { label: "🌍 Yurt Dışından Getirilmiş",color: "#d97706", bg: "#fff7ed", aciklama: "120 gün kullanım hakkı var. Kayıt yaptırılmamış." },
+  kayitsiz:         { label: "⚠️ Kayıtsız",               color: "#d97706", bg: "#fefce8", aciklama: "Yurt dışından gelmiş, kayıt yaptırılmamış." },
+  bilinmiyor:       { label: "❓ Bilinmiyor",              color: "#6b7280", bg: "#f9fafb", aciklama: "Durum belirlenemedi." },
+  btk_erisim_hatasi:{ label: "⚡ BTK'ya Erişilemedi",      color: "#6b7280", bg: "#f9fafb", aciklama: "Lütfen BTK sitesini manuel ziyaret edin." },
+};
+
+function tacBrand(tac) {
+  if (!tac) return null;
+  const map = [
+    ["35384","Apple"],["35323","Apple"],["35348","Apple"],["35352","Apple"],["01301","Apple"],["35440","Apple"],["35453","Apple"],
+    ["35720","Samsung"],["35925","Samsung"],["35446","Samsung"],["35740","Samsung"],["35204","Samsung"],["35570","Samsung"],
+    ["86484","Huawei"],["86903","Huawei"],["86307","Huawei"],["86906","Huawei"],
+    ["35881","Xiaomi"],["86503","Xiaomi"],["86850","Xiaomi"],["86925","Xiaomi"],
+    ["35362","Sony"],["35843","Sony"],
+    ["35269","Nokia"],["35526","Nokia"],
+    ["35739","Google"],["35292","Google"],
+    ["86239","OPPO"],["86925","OPPO"],
+    ["86675","vivo"],["86786","vivo"],
+    ["86823","Realme"],["86832","Realme"],
+    ["35268","Motorola"],["01465","Motorola"],
+    ["35540","OnePlus"],["86201","OnePlus"],
+    ["35769","Huawei"],["86494","Huawei"],
+  ];
+  for (const [prefix, brand] of map) {
+    if (tac.startsWith(prefix)) return brand;
+  }
+  return null;
+}
+
+function openBTK() {
   const url = "https://imei.btk.gov.tr/";
   if (window.Telegram?.WebApp?.openLink) {
     window.Telegram.WebApp.openLink(url);
@@ -11,154 +43,105 @@ function openBTK(imei) {
   }
 }
 
-function copyText(text) {
-  navigator.clipboard?.writeText(text).catch(() => {});
-}
-
-function tacBrand(tac) {
-  const t = tac?.slice(0, 6) || "";
-  const prefixes = {
-    "352844": "Apple", "353284": "Apple", "353288": "Apple", "353523": "Apple",
-    "013012": "Apple", "013017": "Apple", "353489": "Apple", "354403": "Apple",
-    "356728": "Samsung", "357204": "Samsung", "359259": "Samsung", "354463": "Samsung",
-    "357405": "Samsung", "352046": "Samsung", "355703": "Samsung",
-    "864840": "Huawei", "869036": "Huawei", "863071": "Huawei",
-    "358811": "Xiaomi", "865034": "Xiaomi", "868508": "Xiaomi",
-    "353620": "Sony", "358430": "Sony",
-    "352698": "LG", "359966": "LG",
-    "357390": "Google", "352921": "Google",
-    "353617": "Nokia", "355267": "Nokia",
-    "862397": "OPPO", "869259": "OPPO",
-    "866754": "vivo", "867867": "vivo",
-    "868239": "Realme", "868329": "Realme",
-    "352688": "Motorola", "014651": "Motorola",
-    "355408": "OnePlus", "862019": "OnePlus",
-  };
-  for (const [prefix, brand] of Object.entries(prefixes)) {
-    if (t.startsWith(prefix.slice(0, 4))) return brand;
-  }
-  return null;
-}
-
-function parseIMEI(imei) {
-  if (!imei || imei.length !== 15) return null;
-  return {
-    tac: imei.slice(0, 8),
-    raporlayici: imei.slice(0, 2),
-    snr: imei.slice(8, 14),
-    kontrol: imei.slice(14),
-  };
-}
-
 export default function IMEI() {
+  const navigate = useNavigate();
   const [imei, setImei] = useState("");
   const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(true && false);
+  const [btkResult, setBtkResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [btkLoading, setBtkLoading] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
 
-  async function query() {
+  const brand = imei.length >= 6 ? tacBrand(imei.slice(0, 5)) : null;
+
+  async function sorgulaDB() {
     if (imei.length !== 15) { setError("IMEI 15 haneli olmalı"); return; }
     setLoading(true); setError(""); setResult(null);
     try {
-      const r = await api.imei(imei);
-      setResult(r);
+      setResult(await api.imei(imei));
     } catch (e) {
       setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
-  const parsed = parseIMEI(imei);
-  const brand = parsed ? tacBrand(parsed.tac) : null;
+  async function sorgulaBTK() {
+    if (imei.length !== 15) { setError("IMEI 15 haneli olmalı"); return; }
+    setBtkLoading(true); setError(""); setBtkResult(null);
+    try {
+      const r = await api.imeiBtk(imei);
+      setBtkResult(r);
+    } catch (e) {
+      setBtkResult({ durum: "btk_erisim_hatasi" });
+    } finally { setBtkLoading(false); }
+  }
+
+  function copyImei() {
+    navigator.clipboard?.writeText(imei);
+  }
+
+  const durumInfo = btkResult ? (BTK_DURUM[btkResult.durum] || BTK_DURUM.bilinmiyor) : null;
 
   return (
     <div className="page">
       <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate("/more")}>← Geri</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
         <div className="page-title" style={{ margin: 0 }}>📱 IMEI Sorgula</div>
       </div>
 
+      {/* IMEI giriş */}
       <div className="card">
-        <div className="form-group">
-          <label className="form-label">IMEI Numarası (15 hane)</label>
+        <div className="form-group" style={{ marginBottom: 8 }}>
+          <label className="form-label">IMEI Numarası (15 hane) — *#06# ile öğren</label>
           <input
             className="form-input"
             placeholder="Örn: 352099001761481"
             inputMode="numeric"
             value={imei}
-            onChange={(e) => setImei(e.target.value.replace(/\D/g, "").slice(0, 15))}
-            style={{ fontSize: 18, letterSpacing: 2 }}
+            onChange={(e) => {
+              setImei(e.target.value.replace(/\D/g, "").slice(0, 15));
+              setResult(null); setBtkResult(null); setError("");
+            }}
+            style={{ fontSize: 20, letterSpacing: 3, fontFamily: "monospace" }}
           />
         </div>
-        {parsed && brand && (
-          <div style={{ fontSize: 13, color: "var(--accent)", marginBottom: 10 }}>
-            📱 {brand} cihazı (TAC: {parsed.tac})
-          </div>
-        )}
-        <button className="btn btn-primary" onClick={query} disabled={loading || imei.length !== 15}>
-          {loading ? "Sorgulanıyor..." : "🔍 Sistemde Sorgula"}
-        </button>
-      </div>
+        {brand && <div style={{ fontSize: 13, color: "var(--accent)", marginBottom: 8 }}>📱 {brand} cihazı</div>}
+        {error && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
-      {/* BTK Resmi Sorgulama */}
-      <div className="card" style={{ background: "#eff6ff", marginTop: 0 }}>
-        <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 14 }}>🇹🇷 BTK Resmi Sorgulama</div>
-        <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 10, lineHeight: 1.5 }}>
-          Cihazın Türkiye'de <strong>kayıtlı mı</strong>, <strong>çalıntı mı</strong> veya <strong>yurt dışından mı</strong> geldiğini öğrenmek için BTK'nın resmi sitesini kullan.
-        </div>
-        {imei.length === 15 && (
-          <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "8px 12px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontFamily: "monospace", fontSize: 15, letterSpacing: 1 }}>{imei}</span>
-            <button className="btn btn-ghost btn-sm" onClick={() => copyText(imei)} style={{ padding: "4px 10px" }}>Kopyala</button>
-          </div>
-        )}
-        <button
-          className="btn btn-primary"
-          style={{ background: "#1d4ed8" }}
-          onClick={() => openBTK(imei)}
-        >
-          🌐 BTK'da Sorgula →
-        </button>
-        <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 8, textAlign: "center" }}>
-          imei.btk.gov.tr — resmi kayıt/çalıntı sorgulama
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <button className="btn btn-ghost" onClick={sorgulaDB} disabled={loading || imei.length !== 15}>
+            {loading ? "..." : "🔍 Kayıtlarımız"}
+          </button>
+          <button className="btn btn-primary" onClick={sorgulaBTK} disabled={btkLoading || imei.length !== 15}>
+            {btkLoading ? "⏳ Sorgulanıyor..." : "🇹🇷 BTK Sorgula"}
+          </button>
         </div>
       </div>
 
-      {/* BTK'da ne göreceksin */}
-      <div className="card">
-        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>BTK'da Ne Görürsün?</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 18 }}>✅</span>
-            <div style={{ fontSize: 13 }}><strong>Kayıtlı</strong> — Cihaz Türkiye'de yasal yollarla satılmış, sorun yok</div>
+      {/* BTK Sonucu */}
+      {btkResult && durumInfo && (
+        <div className="card" style={{ background: durumInfo.bg, border: `2px solid ${durumInfo.color}20` }}>
+          <div style={{ fontWeight: 800, fontSize: 17, color: durumInfo.color, marginBottom: 4 }}>
+            {durumInfo.label}
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 18 }}>🌍</span>
-            <div style={{ fontSize: 13 }}><strong>Yurt Dışından Getirilmiş</strong> — 120 gün kullanım hakkı var, kayıt yaptırılmamış</div>
-          </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 18 }}>🚫</span>
-            <div style={{ fontSize: 13 }}><strong>Çalıntı / Engelli</strong> — BTK tarafından engellenmiş, şebekeye giremez</div>
-          </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 18 }}>⚠️</span>
-            <div style={{ fontSize: 13 }}><strong>Kayıtsız</strong> — Yurt dışından getirilmiş, kayıt yaptırılmamış</div>
-          </div>
+          <div style={{ fontSize: 13, color: "var(--hint)" }}>{durumInfo.aciklama}</div>
+          {btkResult.durum === "btk_erisim_hatasi" && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 6 }}>
+                IMEI'yi kopyala ve BTK sitesinde manual sorgula:
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={copyImei}>📋 {imei} Kopyala</button>
+                <button className="btn btn-primary btn-sm" onClick={openBTK}>BTK Sitesi →</button>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {error && <div style={{ color: "var(--danger)", padding: "10px 0", fontWeight: 600 }}>{error}</div>}
-
+      {/* Sistemimizdeki kayıtlar */}
       {result && (
         <>
-          <div className="card" style={{ background: "#f0fdf4", marginTop: 8 }}>
-            <div style={{ color: "#16a34a", fontWeight: 700, marginBottom: 6 }}>✅ Geçerli IMEI</div>
-            <div style={{ fontSize: 13, color: "var(--hint)" }}>TAC: {result.tac} {brand ? `· ${brand}` : ""}</div>
-          </div>
-
-          {result.local_repairs?.length > 0 && (
+          {result.local_repairs?.length > 0 ? (
             <>
               <div style={{ fontWeight: 700, fontSize: 14, margin: "12px 0 6px" }}>📋 Servis Geçmişimizde</div>
               {result.local_repairs.map((r, i) => (
@@ -170,28 +153,46 @@ export default function IMEI() {
                 </div>
               ))}
             </>
-          )}
-
-          {result.local_repairs?.length === 0 && (
+          ) : (
             <div className="card" style={{ color: "var(--hint)", textAlign: "center" }}>
-              Bu IMEI ile daha önce tamir kaydı bulunamadı
+              Kayıtlarımızda bu IMEI ile tamir bulunamadı
             </div>
           )}
 
-          {result.api_info && Object.keys(result.api_info).length > 0 && (
+          {result.second_hand?.length > 0 && (
             <>
-              <div style={{ fontWeight: 700, fontSize: 14, margin: "12px 0 6px" }}>🌐 Cihaz Bilgisi</div>
-              <div className="card">
-                {Object.entries(result.api_info).slice(0, 8).map(([k, v]) => (
-                  <div key={k} className="card-row" style={{ padding: "6px 0", borderBottom: "1px solid var(--bg2)" }}>
-                    <span style={{ color: "var(--hint)", fontSize: 13 }}>{k}</span>
-                    <span style={{ fontWeight: 500, fontSize: 13 }}>{String(v)}</span>
+              <div style={{ fontWeight: 700, fontSize: 14, margin: "12px 0 6px" }}>📱 2. El Geçmişi</div>
+              {result.second_hand.map((s, i) => (
+                <div key={i} className="card">
+                  <div className="card-row">
+                    <span style={{ fontWeight: 600 }}>{s.model}</span>
+                    <span className={`badge ${s.durum === "stokta" ? "badge-tamirde" : "badge-teslim"}`}>{s.durum}</span>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </>
           )}
         </>
+      )}
+
+      {/* Bilgi kutusu - BTK ne gösterir */}
+      {!btkResult && !result && (
+        <div className="card" style={{ marginTop: 4 }}>
+          <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13 }}>🇹🇷 BTK Sorgusu Ne Gösterir?</div>
+          {[
+            { icon: "✅", title: "Kayıtlı", desc: "Türkiye'de yasal satılmış, sorun yok" },
+            { icon: "🌍", title: "Yurt Dışından Getirilmiş", desc: "120 gün kullanım hakkı var" },
+            { icon: "🚫", title: "Çalıntı / Engelli", desc: "Şebekeye giremez — alma!" },
+            { icon: "⚠️", title: "Kayıtsız", desc: "Yurt dışından gelmiş, kayıt yaptırılmamış" },
+          ].map(item => (
+            <div key={item.title} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 18, lineHeight: 1.3 }}>{item.icon}</span>
+              <div style={{ fontSize: 13 }}>
+                <strong>{item.title}</strong> — {item.desc}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

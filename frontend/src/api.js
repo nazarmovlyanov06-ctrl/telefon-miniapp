@@ -70,6 +70,7 @@ export const api = {
 
   // IMEI
   imei: (imei) => get(`/imei/${imei}`),
+  imeiBtk: (imei) => get(`/imei/btk/${imei}`),
 
   // Borc
   debts: () => get("/debts/"),
