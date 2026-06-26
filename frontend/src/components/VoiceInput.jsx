@@ -1,17 +1,15 @@
 import { useState } from "react";
 
-// Uygulama ömrü boyunca bir kez izin alındı mı?
-let _micReady = false;
+// Oturum boyunca mikrofon stream'ini açık tut → tekrar izin sorulmaz
+let _stream = null;
 
-async function ensureMicPermission() {
-  if (_micReady) return true;
+async function getMicStream() {
+  if (_stream && _stream.active) return _stream;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach((t) => t.stop()); // hemen bırak
-    _micReady = true;
-    return true;
+    _stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    return _stream;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -25,8 +23,8 @@ export default function VoiceInput({ onResult, style = {} }) {
       return;
     }
 
-    const ok = await ensureMicPermission();
-    if (!ok) {
+    const stream = await getMicStream();
+    if (!stream) {
       alert("Mikrofon erişimine izin verilmedi");
       return;
     }
