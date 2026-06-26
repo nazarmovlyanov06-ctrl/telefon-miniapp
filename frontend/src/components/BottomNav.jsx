@@ -8,9 +8,13 @@ const items = [
   { path: "/more", icon: "⋯", label: "Daha" },
 ];
 
+const HIDE_ON = ["/ai"];
+
 export default function BottomNav() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+
+  if (HIDE_ON.includes(pathname)) return null;
 
   return (
     <nav className="bottom-nav">
