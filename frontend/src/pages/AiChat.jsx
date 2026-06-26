@@ -40,15 +40,15 @@ export default function AiChat() {
   }
 
   return (
-    <div className="page" style={{ display: "flex", flexDirection: "column", height: "100vh", paddingBottom: 0 }}>
-      <div className="card-row" style={{ marginBottom: 12, flexShrink: 0 }}>
+    <div className="page" style={{ display: "flex", flexDirection: "column", height: "100dvh", padding: 0, overflow: "hidden" }}>
+      <div className="card-row" style={{ margin: "12px 16px 8px", flexShrink: 0 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
         <div style={{ fontWeight: 700, fontSize: 17 }}>🤖 AI Asistan</div>
         <div />
       </div>
 
       {/* Sohbet alanı */}
-      <div style={{ flex: 1, overflowY: "auto", paddingBottom: 16 }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 16px 12px" }}>
         {messages.map((m, i) => (
           <div key={i} style={{
             display: "flex",
@@ -106,14 +106,13 @@ export default function AiChat() {
       <div style={{
         flexShrink: 0,
         background: "var(--bg)",
-        paddingTop: 8,
-        paddingBottom: 80,
+        padding: "10px 16px 16px",
         borderTop: "1px solid var(--border)",
       }}>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input
             className="form-input"
-            style={{ flex: 1, borderRadius: 24 }}
+            style={{ flex: 1, borderRadius: 24, minHeight: 44 }}
             placeholder="Sormak istediğin şeyi yaz..."
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -122,7 +121,7 @@ export default function AiChat() {
           />
           <button
             className="btn btn-primary"
-            style={{ borderRadius: 24, padding: "0 18px", flexShrink: 0 }}
+            style={{ borderRadius: 24, width: 44, height: 44, padding: 0, flexShrink: 0, fontSize: 20 }}
             onClick={() => sor()}
             disabled={loading || !input.trim()}
           >
