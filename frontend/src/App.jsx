@@ -29,7 +29,6 @@ import CustomerDetail from "./pages/CustomerDetail";
 import SifirCihaz from "./pages/SifirCihaz";
 import Stats from "./pages/Stats";
 import Search from "./pages/Search";
-import FAB from "./components/FAB";
 import "./index.css";
 
 export default function App() {
@@ -102,7 +101,6 @@ export default function App() {
         <Route path="/search" element={<Search />} />
       </Routes>
       <BottomNav />
-      <FAB />
     </BrowserRouter>
   );
 }
