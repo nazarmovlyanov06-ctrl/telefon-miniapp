@@ -310,6 +310,49 @@ async def _servis_verisi(db: Connection) -> str:
     return "\n".join(satirlar)
 
 
+@router.post("/stt")
+async def stt(
+    body: dict,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    audio_b64 = body.get("audio", "")
+    mime = body.get("mime", "audio/webm")
+    if not audio_b64:
+        return {"text": ""}
+    if not GEMINI_API_KEY:
+        return {"text": ""}
+
+    payload = {
+        "contents": [{
+            "role": "user",
+            "parts": [
+                {"text": "Bu ses kaydındaki Türkçe konuşmayı sadece yazıya dök. Başka hiçbir şey ekleme, noktalama koyma."},
+                {"inline_data": {"mime_type": mime, "data": audio_b64}},
+            ],
+        }],
+        "generationConfig": {"maxOutputTokens": 200, "temperature": 0},
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            for model in ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"]:
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}",
+                    json=payload,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    return {"text": text.strip()}
+                elif resp.status_code == 429:
+                    continue
+        return {"text": ""}
+    except Exception:
+        return {"text": ""}
+
+
 @router.post("/sor")
 async def sor(
     body: dict,

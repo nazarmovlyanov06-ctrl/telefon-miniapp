@@ -197,4 +197,5 @@ export const api = {
 
   // AI
   aiSor: (soru) => post("/ai/sor", { soru }),
+  aiStt: (audio, mime) => post("/ai/stt", { audio, mime }),
 };
