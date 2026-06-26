@@ -1,19 +1,41 @@
 import { useState } from "react";
 
+// Uygulama ömrü boyunca bir kez izin alındı mı?
+let _micReady = false;
+
+async function ensureMicPermission() {
+  if (_micReady) return true;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((t) => t.stop()); // hemen bırak
+    _micReady = true;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export default function VoiceInput({ onResult, style = {} }) {
   const [listening, setListening] = useState(false);
 
-  function start() {
+  async function start() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       alert("Tarayıcınız ses girişini desteklemiyor");
       return;
     }
+
+    const ok = await ensureMicPermission();
+    if (!ok) {
+      alert("Mikrofon erişimine izin verilmedi");
+      return;
+    }
+
+    setListening(true);
     const recognition = new SR();
     recognition.lang = "tr-TR";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
-    setListening(true);
     recognition.onresult = (e) => {
       onResult(e.results[0][0].transcript);
       setListening(false);
