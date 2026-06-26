@@ -7,6 +7,7 @@ from routers import users, customers, repairs, parts, shopping, imei, debts, rep
 from routers import (
     toptanci, ikinciel, garanti, kasa, gider, loaner,
     aksesuar, hedef, maas, karalist, parca_iade, ai_chat, sifir_cihaz,
+    arama, sablonlar,
 )
 
 SCHEMA = """
@@ -284,6 +285,23 @@ CREATE TABLE IF NOT EXISTS stok_hareketleri (
     tarih TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS tamir_sablonlar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ad TEXT NOT NULL,
+    cihaz_model TEXT,
+    ariza TEXT,
+    tahmini_ucret REAL,
+    notlar TEXT,
+    kullanim_sayisi INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS tamir_fotograflari (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repair_id INTEGER REFERENCES repairs(id) ON DELETE CASCADE,
+    foto TEXT NOT NULL,
+    aciklama TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -344,6 +362,10 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE ikinci_el ADD COLUMN depolama TEXT",
             "ALTER TABLE ikinci_el ADD COLUMN ram TEXT",
             "ALTER TABLE ikinci_el ADD COLUMN ozellikler TEXT",
+            "ALTER TABLE repairs ADD COLUMN on_odeme INTEGER DEFAULT 0",
+            "ALTER TABLE repairs ADD COLUMN musteri_onayi INTEGER DEFAULT 0",
+            "ALTER TABLE repairs ADD COLUMN eski_parca INTEGER DEFAULT 0",
+            "ALTER TABLE repairs ADD COLUMN veri_yedegi INTEGER DEFAULT 0",
         ]:
             try:
                 await db.execute(m)
@@ -388,6 +410,8 @@ app.include_router(karalist.router)
 app.include_router(parca_iade.router)
 app.include_router(ai_chat.router)
 app.include_router(sifir_cihaz.router)
+app.include_router(arama.router)
+app.include_router(sablonlar.router)
 
 
 @app.get("/health")

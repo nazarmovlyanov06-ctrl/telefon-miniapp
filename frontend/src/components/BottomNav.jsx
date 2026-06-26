@@ -3,12 +3,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 const items = [
   { path: "/", icon: "🏠", label: "Ana Sayfa" },
   { path: "/repairs", icon: "🔧", label: "Tamirler" },
+  { path: "/search", icon: "🔍", label: "Ara" },
   { path: "/customers", icon: "👥", label: "Müşteriler" },
-  { path: "/parts", icon: "📦", label: "Stok" },
   { path: "/more", icon: "⋯", label: "Daha" },
 ];
 
-const HIDE_ON = ["/ai"];
+const HIDE_ON = ["/ai", "/search"];
 
 export default function BottomNav() {
   const navigate = useNavigate();

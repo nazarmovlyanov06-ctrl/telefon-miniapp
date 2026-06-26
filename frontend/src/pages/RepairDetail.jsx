@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../api";
 
@@ -9,6 +9,14 @@ const STATUSES = [
   { key: "hazir", label: "✅ Hazır" },
   { key: "teslim", label: "🏠 Teslim Edildi" },
 ];
+
+function fmt(n) { return (n || 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 }); }
+
+function fmtDate(d) {
+  if (!d) return null;
+  const dt = new Date(d);
+  return dt.toLocaleDateString("tr-TR") + " " + dt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+}
 
 export default function RepairDetail({ user }) {
   const { id } = useParams();
@@ -21,9 +29,34 @@ export default function RepairDetail({ user }) {
   const [teslimModal, setTeslimModal] = useState(false);
   const [teslimForm, setTeslimForm] = useState({ final_price: "", payment_type: "nakit", kasa_yazilsin: true });
 
+  // Parçalar
+  const [parcalar, setParcalar] = useState([]);
+  const [partsList, setPartsList] = useState([]);
+  const [parcaForm, setParcaForm] = useState({ part_id: "", quantity: 1 });
+  const [parcaEkleOpen, setParcaEkleOpen] = useState(false);
+  const [parcaSaving, setParcaSaving] = useState(false);
+
+  // Fotoğraflar
+  const [fotolar, setFotolar] = useState([]);
+  const [fotoView, setFotoView] = useState(null);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+  const fotoInputRef = useRef(null);
+
+  // Fiş modal
+  const [fisModal, setFisModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
-    api.repair(id).then((r) => {
+    Promise.all([
+      api.repair(id),
+      api.repairParcalar(id),
+      api.repairFotolar(id),
+      api.parts(),
+    ]).then(([r, p, f, parts]) => {
       setRepair(r);
+      setParcalar(p);
+      setFotolar(f);
+      setPartsList(parts);
       setForm({
         device_model: r.device_model,
         fault_desc: r.fault_desc || "",
@@ -56,9 +89,7 @@ export default function RepairDetail({ user }) {
     try {
       const final = parseFloat(teslimForm.final_price) || 0;
       await api.updateRepair(id, {
-        ...form,
-        status: "teslim",
-        final_price: final,
+        ...form, status: "teslim", final_price: final,
         payment_type: teslimForm.payment_type,
         kasa_yazilsin: teslimForm.kasa_yazilsin && final > 0,
       });
@@ -77,8 +108,129 @@ export default function RepairDetail({ user }) {
     } finally { setSaving(false); }
   }
 
+  // ── PARÇA işlemleri ──────────────────────────────────────────
+
+  async function addParca() {
+    if (!parcaForm.part_id) return;
+    setParcaSaving(true);
+    try {
+      const sel = partsList.find(p => p.id === parseInt(parcaForm.part_id));
+      await api.addRepairParca(id, {
+        part_id: parseInt(parcaForm.part_id),
+        quantity: parseInt(parcaForm.quantity) || 1,
+        unit_price: sel?.sale_price || 0,
+      });
+      const [p, parts] = await Promise.all([api.repairParcalar(id), api.parts()]);
+      setParcalar(p);
+      setPartsList(parts);
+      setParcaForm({ part_id: "", quantity: 1 });
+      setParcaEkleOpen(false);
+    } catch (e) {
+      alert(e.message);
+    } finally { setParcaSaving(false); }
+  }
+
+  async function removeParca(rpId) {
+    if (!confirm("Bu parçayı kaldır?")) return;
+    await api.deleteRepairParca(id, rpId);
+    const [p, parts] = await Promise.all([api.repairParcalar(id), api.parts()]);
+    setParcalar(p);
+    setPartsList(parts);
+  }
+
+  // ── FOTOĞRAF işlemleri ───────────────────────────────────────
+
+  function resizeAndUpload(file) {
+    setUploadingFoto(true);
+    const canvas = document.createElement("canvas");
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = async () => {
+      const MAX = 800;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const base64 = canvas.toDataURL("image/jpeg", 0.75);
+      try {
+        await api.addRepairFoto(id, { foto: base64 });
+        const f = await api.repairFotolar(id);
+        setFotolar(f);
+      } catch (e) { alert(e.message); }
+      finally { setUploadingFoto(false); }
+    };
+    img.src = url;
+  }
+
+  async function deleteFoto(fotoId) {
+    if (!confirm("Fotoğrafı sil?")) return;
+    await api.deleteRepairFoto(id, fotoId);
+    setFotolar(f => f.filter(x => x.id !== fotoId));
+    setFotoView(null);
+  }
+
+  // ── WhatsApp ─────────────────────────────────────────────────
+
+  function openWhatsApp(mesaj) {
+    const phone = repair?.customer_phone?.replace(/\D/g, "");
+    if (!phone) { alert("Müşteri telefon numarası kayıtlı değil"); return; }
+    const num = phone.startsWith("90") ? phone : phone.startsWith("0") ? "9" + phone : "90" + phone;
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(mesaj)}`, "_blank");
+  }
+
+  // ── FİŞ ──────────────────────────────────────────────────────
+
+  function generateFis() {
+    if (!repair) return "";
+    const lines = [
+      "📋 TAMİR FİŞİ",
+      "═══════════════════",
+      `Tamir No : #${repair.repair_no}`,
+      `Tarih    : ${new Date(repair.created_at).toLocaleDateString("tr-TR")}`,
+      "───────────────────",
+      `Müşteri  : ${repair.customer_name || "—"}`,
+      repair.customer_phone ? `Tel      : ${repair.customer_phone}` : null,
+      "───────────────────",
+      `Cihaz    : ${repair.device_model}`,
+      repair.imei ? `IMEI     : ${repair.imei}` : null,
+      `Arıza    : ${repair.fault_desc || "—"}`,
+      repair.notes ? `Not      : ${repair.notes}` : null,
+    ];
+    if (parcalar.length > 0) {
+      lines.push("───────────────────");
+      lines.push("Kullanılan Parçalar:");
+      parcalar.forEach(p => lines.push(`  • ${p.name} x${p.quantity} = ${fmt(p.quantity * p.unit_price)}₺`));
+    }
+    lines.push("───────────────────");
+    lines.push(`Ücret    : ${repair.final_price ? fmt(repair.final_price) + "₺" : "—"}`);
+    lines.push(`Ödeme    : ${repair.payment_type || "—"}`);
+    if (repair.warranty_days > 0) lines.push(`Garanti  : ${repair.warranty_days} gün`);
+    if (repair.delivered_at) lines.push(`Teslim   : ${new Date(repair.delivered_at).toLocaleDateString("tr-TR")}`);
+    lines.push("═══════════════════");
+    lines.push("✅ İyi günler dileriz!");
+    return lines.filter(l => l !== null).join("\n");
+  }
+
+  async function copyFis() {
+    const text = generateFis();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { alert(text); }
+  }
+
+  const parcaToplamTutar = parcalar.reduce((s, p) => s + p.quantity * p.unit_price, 0);
+
   if (loading) return <div className="loading">Yükleniyor...</div>;
   if (!repair) return <div className="empty">Bulunamadı</div>;
+
+  const isHazir = repair.status === "hazir";
+  const isTeslim = repair.status === "teslim";
 
   return (
     <div className="page">
@@ -94,13 +246,11 @@ export default function RepairDetail({ user }) {
       <div className="section-title">Durum</div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         {STATUSES.map((s) => (
-          <button
-            key={s.key}
+          <button key={s.key}
             className={`tab ${(form.status || repair.status) === s.key ? "active" : ""}`}
             onClick={() => changeStatus(s.key)}
             disabled={saving}
-            style={{ fontSize: 12 }}
-          >
+            style={{ fontSize: 12 }}>
             {s.label}
           </button>
         ))}
@@ -108,16 +258,12 @@ export default function RepairDetail({ user }) {
 
       {/* Teslim modalı */}
       {teslimModal && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16
-        }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div className="card" style={{ width: "100%", maxWidth: 400 }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>🏠 Teslim Et</div>
             <div className="form-group">
               <label className="form-label">Son Ücret (₺)</label>
-              <input className="form-input" type="number"
-                value={teslimForm.final_price}
+              <input className="form-input" type="number" value={teslimForm.final_price}
                 onChange={e => setTeslimForm(f => ({ ...f, final_price: e.target.value }))}
                 placeholder={repair.estimated_price || "0"} />
             </div>
@@ -149,6 +295,46 @@ export default function RepairDetail({ user }) {
               </button>
               <button className="btn btn-ghost" onClick={() => setTeslimModal(false)}>İptal</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fiş modal */}
+      {fisModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 16 }}
+          onClick={() => setFisModal(false)}>
+          <div className="card" style={{ width: "100%", maxWidth: 480, maxHeight: "80vh", overflowY: "auto" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>🧾 Tamir Fişi</div>
+            <pre style={{ fontFamily: "monospace", fontSize: 12, lineHeight: 1.7, whiteSpace: "pre-wrap", background: "var(--bg2)", padding: 12, borderRadius: 8, marginBottom: 12 }}>
+              {generateFis()}
+            </pre>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={copyFis}>
+                {copied ? "✅ Kopyalandı!" : "📋 Kopyala"}
+              </button>
+              {repair.customer_phone && (
+                <button className="btn btn-ghost" style={{ flex: 1 }}
+                  onClick={() => openWhatsApp(generateFis())}>
+                  💬 WhatsApp
+                </button>
+              )}
+              <button className="btn btn-ghost" onClick={() => setFisModal(false)}>Kapat</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fotoğraf büyük görünüm */}
+      {fotoView && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setFotoView(null)}>
+          <img src={fotoView.foto} alt="" style={{ maxWidth: "95%", maxHeight: "80vh", borderRadius: 8, objectFit: "contain" }} onClick={e => e.stopPropagation()} />
+          <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+            <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); deleteFoto(fotoView.id); }}>
+              🗑️ Sil
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setFotoView(null)}>Kapat</button>
           </div>
         </div>
       )}
@@ -203,6 +389,7 @@ export default function RepairDetail({ user }) {
         </div>
       ) : (
         <>
+          {/* Temel bilgiler */}
           <div className="card">
             <Row label="Müşteri" value={repair.customer_name || "—"} />
             <div className="divider" />
@@ -214,10 +401,11 @@ export default function RepairDetail({ user }) {
             <div className="divider" />
             <Row label="Arıza" value={repair.fault_desc || "—"} />
           </div>
+
           <div className="card">
-            <Row label="Tahmini Ücret" value={repair.estimated_price ? `₺${repair.estimated_price}` : "—"} />
+            <Row label="Tahmini Ücret" value={repair.estimated_price ? `₺${fmt(repair.estimated_price)}` : "—"} />
             <div className="divider" />
-            <Row label="Son Ücret" value={repair.final_price ? `₺${repair.final_price}` : "—"} />
+            <Row label="Son Ücret" value={repair.final_price ? `₺${fmt(repair.final_price)}` : "—"} />
             <div className="divider" />
             <Row label="Ödeme" value={repair.payment_type || "—"} />
             {repair.warranty_days > 0 && <>
@@ -225,13 +413,158 @@ export default function RepairDetail({ user }) {
               <Row label="Garanti" value={`${repair.warranty_days} gün`} />
             </>}
           </div>
-          {/* Tarihler timeline */}
+
+          {/* Kontrol Listesi */}
+          <div className="card">
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: "var(--hint)" }}>✅ KONTROL LİSTESİ</div>
+            {[
+              { key: "on_odeme", label: "Ön ödeme alındı" },
+              { key: "musteri_onayi", label: "Müşteri onayı alındı" },
+              { key: "eski_parca", label: "Eski parça müşteriye verildi" },
+              { key: "veri_yedegi", label: "Veri yedeği alındı" },
+            ].map(item => (
+              <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+                <div
+                  onClick={async () => {
+                    const yeni = repair[item.key] ? 0 : 1;
+                    await api.updateRepair(id, { ...form, [item.key]: yeni });
+                    setRepair(r => ({ ...r, [item.key]: yeni }));
+                  }}
+                  style={{
+                    width: 22, height: 22, borderRadius: 6, flexShrink: 0, cursor: "pointer",
+                    border: `2px solid ${repair[item.key] ? "var(--accent)" : "var(--border)"}`,
+                    background: repair[item.key] ? "var(--accent)" : "transparent",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#fff", fontSize: 13,
+                  }}>
+                  {repair[item.key] ? "✓" : ""}
+                </div>
+                <span style={{ fontSize: 13, color: repair[item.key] ? "var(--text)" : "var(--hint)" }}>
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Tarihler */}
           <div className="card">
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: "var(--hint)" }}>📅 TARİHLER</div>
             <DateRow icon="📝" label="Kayıt Açıldı" val={repair.created_at} done />
             <DateRow icon="🔧" label="Tamire Alındı" val={repair.tamirde_at} done={!!repair.tamirde_at} />
             <DateRow icon="✅" label="Hazır Oldu" val={repair.completed_at} done={!!repair.completed_at} />
             <DateRow icon="🏠" label="Teslim Edildi" val={repair.delivered_at} done={!!repair.delivered_at} />
+          </div>
+
+          {/* Aksiyonlar */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+            {(isHazir || isTeslim) && repair.customer_phone && (
+              <button className="btn btn-ghost btn-sm"
+                style={{ background: "#25D366", color: "#fff", border: "none" }}
+                onClick={() => openWhatsApp(
+                  isHazir
+                    ? `Merhaba ${repair.customer_name || ""},\n\n${repair.device_model} cihazınızın tamiri tamamlandı. Servisimizden teslim alabilirsiniz. 🔧✅`
+                    : `Merhaba ${repair.customer_name || ""},\n\nTamiriniz (#${repair.repair_no}) ile ilgili bilgi almak ister misiniz?`
+                )}>
+                💬 WhatsApp{isHazir ? " - Hazır" : ""}
+              </button>
+            )}
+            <button className="btn btn-ghost btn-sm" onClick={() => setFisModal(true)}>
+              🧾 Fiş
+            </button>
+          </div>
+
+          {/* Kullanılan Parçalar */}
+          <div className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hint)" }}>🔩 KULLANILAN PARÇALAR</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setParcaEkleOpen(!parcaEkleOpen)}>
+                {parcaEkleOpen ? "İptal" : "+ Ekle"}
+              </button>
+            </div>
+
+            {parcaEkleOpen && (
+              <div style={{ background: "var(--bg2)", borderRadius: 8, padding: 10, marginBottom: 10 }}>
+                <div className="form-group" style={{ marginBottom: 8 }}>
+                  <select className="form-select"
+                    value={parcaForm.part_id}
+                    onChange={e => setParcaForm(f => ({ ...f, part_id: e.target.value }))}>
+                    <option value="">— Parça Seç —</option>
+                    {partsList.filter(p => p.quantity > 0).map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.quantity} stok) — {fmt(p.sale_price)}₺
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input className="form-input" type="number" min="1"
+                    style={{ width: 80, flex: "none" }}
+                    value={parcaForm.quantity}
+                    onChange={e => setParcaForm(f => ({ ...f, quantity: e.target.value }))}
+                    placeholder="Adet" />
+                  <button className="btn btn-primary btn-sm" onClick={addParca} disabled={parcaSaving || !parcaForm.part_id}>
+                    {parcaSaving ? "..." : "Ekle"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {parcalar.length === 0 ? (
+              <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "8px 0" }}>
+                Henüz parça eklenmedi
+              </div>
+            ) : (
+              <>
+                {parcalar.map(p => (
+                  <div key={p.id} className="card-row" style={{ padding: "6px 0" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--hint)" }}>{p.quantity} adet × {fmt(p.unit_price)}₺</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontWeight: 700, color: "var(--accent)" }}>{fmt(p.quantity * p.unit_price)}₺</span>
+                      <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)", padding: "2px 6px" }}
+                        onClick={() => removeParca(p.id)}>✕</button>
+                    </div>
+                  </div>
+                ))}
+                <div className="divider" />
+                <div className="card-row" style={{ padding: "6px 0" }}>
+                  <span style={{ fontSize: 12, color: "var(--hint)" }}>Toplam parça maliyeti</span>
+                  <span style={{ fontWeight: 700 }}>{fmt(parcaToplamTutar)}₺</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Fotoğraflar */}
+          <div className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hint)" }}>📷 FOTOĞRAFLAR</div>
+              <button className="btn btn-ghost btn-sm"
+                onClick={() => fotoInputRef.current?.click()}
+                disabled={uploadingFoto}>
+                {uploadingFoto ? "Yükleniyor..." : "+ Fotoğraf"}
+              </button>
+            </div>
+            <input ref={fotoInputRef} type="file" accept="image/*" capture="environment"
+              style={{ display: "none" }}
+              onChange={e => { if (e.target.files[0]) resizeAndUpload(e.target.files[0]); e.target.value = ""; }} />
+
+            {fotolar.length === 0 ? (
+              <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "8px 0" }}>
+                Henüz fotoğraf eklenmedi
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {fotolar.map(f => (
+                  <div key={f.id} style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", cursor: "pointer" }}
+                    onClick={() => setFotoView(f)}>
+                    <img src={f.foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {repair.notes && (
@@ -272,17 +605,8 @@ function Row({ label, value }) {
 }
 
 function DateRow({ icon, label, val, done }) {
-  const fmt = (d) => {
-    if (!d) return null;
-    const dt = new Date(d);
-    return dt.toLocaleDateString("tr-TR") + " " + dt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-  };
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 10,
-      padding: "6px 0",
-      opacity: done ? 1 : 0.35,
-    }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", opacity: done ? 1 : 0.35 }}>
       <div style={{
         width: 32, height: 32, borderRadius: "50%",
         background: done ? "var(--accent)" : "var(--bg2)",
@@ -292,7 +616,7 @@ function DateRow({ icon, label, val, done }) {
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
         <div style={{ fontSize: 12, color: done ? "var(--text)" : "var(--hint)" }}>
-          {val ? fmt(val) : "—"}
+          {val ? fmtDate(val) : "—"}
         </div>
       </div>
     </div>

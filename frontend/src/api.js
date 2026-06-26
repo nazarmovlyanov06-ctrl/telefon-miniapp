@@ -168,6 +168,33 @@ export const api = {
   createParcaIade: (data) => post("/parca-iade/", data),
   updateParcaIadeDurum: (id, durum) => put(`/parca-iade/${id}/durum`, { durum }),
 
+  // Evrensel Arama
+  ara: (q) => get(`/arama/?q=${encodeURIComponent(q)}`),
+
+  // Şablonlar
+  sablonlar: () => get("/sablonlar/"),
+  createSablon: (data) => post("/sablonlar/", data),
+  updateSablon: (id, data) => put(`/sablonlar/${id}`, data),
+  deleteSablon: (id) => del(`/sablonlar/${id}`),
+  sablon_kullan: (id) => post(`/sablonlar/${id}/kullan`, {}),
+
+  // Model/Arıza Önerileri
+  repairModeller: () => get("/repairs/modeller"),
+  repairArizaOneri: () => get("/repairs/ariza-onceriler"),
+
+  // Tamir Parçaları
+  repairParcalar: (id) => get(`/repairs/${id}/parcalar`),
+  addRepairParca: (id, data) => post(`/repairs/${id}/parcalar`, data),
+  deleteRepairParca: (id, rpId) => del(`/repairs/${id}/parcalar/${rpId}`),
+
+  // Tamir Fotoğrafları
+  repairFotolar: (id) => get(`/repairs/${id}/fotolar`),
+  addRepairFoto: (id, data) => post(`/repairs/${id}/fotolar`, data),
+  deleteRepairFoto: (id, fotoId) => del(`/repairs/${id}/fotolar/${fotoId}`),
+
+  // İstatistik
+  stats: () => get("/reports/genel"),
+
   // AI
   aiSor: (soru) => post("/ai/sor", { soru }),
 };

@@ -73,12 +73,10 @@ async def create_repair(
 ):
     user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
 
-    # Mevcut max id
     cur = await db.execute("SELECT COALESCE(MAX(id), 0) as m FROM repairs")
     row = await cur.fetchone()
     repair_no = make_repair_no(row["m"])
 
-    # Musteri yok ise oluştur
     customer_id = body.get("customer_id")
     if not customer_id and body.get("customer_name"):
         cur = await db.execute(
@@ -154,7 +152,6 @@ async def update_repair(
         ),
     )
 
-    # Teslim edildiginde kasaya yaz
     if body.get("status") == "teslim" and body.get("kasa_yazilsin"):
         final = float(body.get("final_price") or 0)
         if final > 0:
@@ -172,6 +169,34 @@ async def update_repair(
     return {"ok": True}
 
 
+@router.get("/modeller")
+async def get_modeller(
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        """SELECT device_model, COUNT(*) as c FROM repairs
+           WHERE device_model IS NOT NULL AND device_model != ''
+           GROUP BY LOWER(TRIM(device_model)) ORDER BY c DESC LIMIT 30"""
+    )
+    return [r["device_model"] for r in await cur.fetchall()]
+
+
+@router.get("/ariza-onceriler")
+async def get_ariza_onceriler(
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        """SELECT fault_desc, COUNT(*) as c FROM repairs
+           WHERE fault_desc IS NOT NULL AND fault_desc != ''
+           GROUP BY LOWER(TRIM(fault_desc)) ORDER BY c DESC LIMIT 20"""
+    )
+    return [r["fault_desc"] for r in await cur.fetchall()]
+
+
 @router.delete("/{repair_id}")
 async def delete_repair(
     repair_id: int,
@@ -182,5 +207,135 @@ async def delete_repair(
     if user["role"] != "patron":
         raise HTTPException(403, "Sadece patron silebilir")
     await db.execute("DELETE FROM repairs WHERE id = ?", (repair_id,))
+    await db.commit()
+    return {"ok": True}
+
+
+# ── KULLANILAN PARÇALAR ─────────────────────────────────────────────────
+
+@router.get("/{repair_id}/parcalar")
+async def get_repair_parcalar(
+    repair_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        """SELECT rp.id, rp.part_id, rp.quantity, rp.unit_price,
+                  p.name, p.category
+           FROM repair_parts rp
+           JOIN parts p ON rp.part_id = p.id
+           WHERE rp.repair_id = ?
+           ORDER BY rp.id""",
+        (repair_id,),
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
+@router.post("/{repair_id}/parcalar")
+async def add_repair_parca(
+    repair_id: int,
+    body: dict,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    part_id = body.get("part_id")
+    adet = int(body.get("quantity", 1))
+    if not part_id or adet < 1:
+        raise HTTPException(400, "Geçersiz parça veya adet")
+
+    cur = await db.execute("SELECT quantity, sale_price, name FROM parts WHERE id=?", (part_id,))
+    part = await cur.fetchone()
+    if not part:
+        raise HTTPException(404, "Parça bulunamadı")
+    if part["quantity"] < adet:
+        raise HTTPException(400, f"Stok yetersiz (mevcut: {part['quantity']})")
+
+    birim_fiyat = float(body.get("unit_price") or part["sale_price"] or 0)
+    await db.execute(
+        "INSERT INTO repair_parts (repair_id, part_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
+        (repair_id, part_id, adet, birim_fiyat),
+    )
+    await db.execute("UPDATE parts SET quantity = quantity - ? WHERE id=?", (adet, part_id))
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/{repair_id}/parcalar/{rp_id}")
+async def remove_repair_parca(
+    repair_id: int,
+    rp_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        "SELECT part_id, quantity FROM repair_parts WHERE id=? AND repair_id=?",
+        (rp_id, repair_id),
+    )
+    row = await cur.fetchone()
+    if not row:
+        raise HTTPException(404)
+    await db.execute("UPDATE parts SET quantity = quantity + ? WHERE id=?", (row["quantity"], row["part_id"]))
+    await db.execute("DELETE FROM repair_parts WHERE id=?", (rp_id,))
+    await db.commit()
+    return {"ok": True}
+
+
+# ── TAMİR FOTOĞRAFLARI ─────────────────────────────────────────────────
+
+@router.get("/{repair_id}/fotolar")
+async def get_repair_fotolar(
+    repair_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        "SELECT id, aciklama, created_at FROM tamir_fotograflari WHERE repair_id=? ORDER BY created_at",
+        (repair_id,),
+    )
+    rows = [dict(r) for r in await cur.fetchall()]
+    # Load foto data separately to avoid huge row in listing
+    result = []
+    for r in rows:
+        cur2 = await db.execute("SELECT foto FROM tamir_fotograflari WHERE id=?", (r["id"],))
+        frow = await cur2.fetchone()
+        result.append({**r, "foto": frow["foto"] if frow else ""})
+    return result
+
+
+@router.post("/{repair_id}/fotolar")
+async def add_repair_foto(
+    repair_id: int,
+    body: dict,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    foto = body.get("foto", "")
+    if not foto:
+        raise HTTPException(400, "Fotoğraf verisi gerekli")
+    await db.execute(
+        "INSERT INTO tamir_fotograflari (repair_id, foto, aciklama) VALUES (?, ?, ?)",
+        (repair_id, foto, body.get("aciklama")),
+    )
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/{repair_id}/fotolar/{foto_id}")
+async def delete_repair_foto(
+    repair_id: int,
+    foto_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    await db.execute(
+        "DELETE FROM tamir_fotograflari WHERE id=? AND repair_id=?",
+        (foto_id, repair_id),
+    )
     await db.commit()
     return {"ok": True}

@@ -4,16 +4,19 @@ import { api } from "../api";
 
 const ONERILER = [
   "Bugün kaç tamir var?",
-  "Bu ay ne kadar kazandık?",
-  "Dışarıda yedek telefon var mı?",
+  "Bu ay kasa özeti nedir?",
+  "Stokta hangi 2.el cihaz var?",
+  "Bekleyen borçlar ne kadar?",
   "Hangi parçaların stoğu düşük?",
   "Süresi dolan garanti var mı?",
+  "Dışarıda yedek telefon var mı?",
+  "Genel durum nasıl?",
 ];
 
 export default function AiChat() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState([
-    { role: "ai", text: "Merhaba! Ben servis asistanınım 🤖 Servis durumu, gelir, stok veya garanti hakkında sorabilirsin." }
+    { role: "ai", text: "Merhaba! Ben servis asistanınım 🤖\n\nTamirler, kasa, 2.el cihazlar, stok, borçlar, garanti, müşteriler, aksesuar ve daha fazlası hakkında sorabilirsin." }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,7 +46,7 @@ export default function AiChat() {
     <div className="page" style={{ display: "flex", flexDirection: "column", height: "100dvh", padding: 0, overflow: "hidden" }}>
       <div className="card-row" style={{ margin: "12px 16px 8px", flexShrink: 0 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
-        <div style={{ fontWeight: 700, fontSize: 17 }}>🤖 AI Asistan</div>
+        <div style={{ fontWeight: 700, fontSize: 17 }}>✨ Yardımcı</div>
         <div />
       </div>
 
