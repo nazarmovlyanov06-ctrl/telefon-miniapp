@@ -49,9 +49,9 @@ export default function RepairDetail({ user }) {
   useEffect(() => {
     Promise.all([
       api.repair(id),
-      api.repairParcalar(id),
-      api.repairFotolar(id),
-      api.parts(),
+      api.repairParcalar(id).catch(() => []),
+      api.repairFotolar(id).catch(() => []),
+      api.parts().catch(() => []),
     ]).then(([r, p, f, parts]) => {
       setRepair(r);
       setParcalar(p);

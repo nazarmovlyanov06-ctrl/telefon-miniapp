@@ -45,6 +45,34 @@ async def list_repairs(
     return [dict(r) for r in await cur.fetchall()]
 
 
+@router.get("/modeller")
+async def get_modeller(
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        """SELECT device_model, COUNT(*) as c FROM repairs
+           WHERE device_model IS NOT NULL AND device_model != ''
+           GROUP BY LOWER(TRIM(device_model)) ORDER BY c DESC LIMIT 30"""
+    )
+    return [r["device_model"] for r in await cur.fetchall()]
+
+
+@router.get("/ariza-onceriler")
+async def get_ariza_onceriler(
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        """SELECT fault_desc, COUNT(*) as c FROM repairs
+           WHERE fault_desc IS NOT NULL AND fault_desc != ''
+           GROUP BY LOWER(TRIM(fault_desc)) ORDER BY c DESC LIMIT 20"""
+    )
+    return [r["fault_desc"] for r in await cur.fetchall()]
+
+
 @router.get("/{repair_id}")
 async def get_repair(
     repair_id: int,
@@ -167,34 +195,6 @@ async def update_repair(
 
     await db.commit()
     return {"ok": True}
-
-
-@router.get("/modeller")
-async def get_modeller(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
-):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        """SELECT device_model, COUNT(*) as c FROM repairs
-           WHERE device_model IS NOT NULL AND device_model != ''
-           GROUP BY LOWER(TRIM(device_model)) ORDER BY c DESC LIMIT 30"""
-    )
-    return [r["device_model"] for r in await cur.fetchall()]
-
-
-@router.get("/ariza-onceriler")
-async def get_ariza_onceriler(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
-):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        """SELECT fault_desc, COUNT(*) as c FROM repairs
-           WHERE fault_desc IS NOT NULL AND fault_desc != ''
-           GROUP BY LOWER(TRIM(fault_desc)) ORDER BY c DESC LIMIT 20"""
-    )
-    return [r["fault_desc"] for r in await cur.fetchall()]
 
 
 @router.delete("/{repair_id}")

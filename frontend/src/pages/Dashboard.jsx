@@ -6,7 +6,7 @@ const QUICK = [
   { icon: "📱", label: "2. El",     path: "/ikinciel",    bg: "#8b5cf6", shadow: "#8b5cf620" },
   { icon: "📦", label: "Sıfır",    path: "/sifir-cihaz", bg: "#3b82f6", shadow: "#3b82f620" },
   { icon: "🛡️", label: "Garanti",  path: "/garanti",     bg: "#10b981", shadow: "#10b98120" },
-  { icon: "🏭", label: "Toptancı", path: "/toptanci",    bg: "#f59e0b", shadow: "#f59e0b20" },
+  { icon: "📋", label: "Siparişler",path: "/parts",       bg: "#f59e0b", shadow: "#f59e0b20" },
   { icon: "🎧", label: "Aksesuar", path: "/aksesuar",    bg: "#ec4899", shadow: "#ec489920" },
   { icon: "💳", label: "Borçlar",  path: "/debts",       bg: "#ef4444", shadow: "#ef444420" },
   { icon: "📊", label: "Rapor",    path: "/stats",       bg: "#06b6d4", shadow: "#06b6d420" },
@@ -145,20 +145,20 @@ export default function Dashboard({ user }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
           {(uyarilar.stok || []).map((u, i) => (
             <div key={"s"+i} onClick={() => navigate("/parts")}
-              style={{ background: "#fff7ed", borderRadius: 10, padding: "8px 12px", cursor: "pointer", borderLeft: "3px solid #f59e0b" }}>
-              <div style={{ fontSize: 12, fontWeight: 600 }}>📦 {u.name} — stok kritik ({u.quantity} kaldı)</div>
+              style={{ background: "rgba(245,158,11,0.12)", borderRadius: 10, padding: "8px 12px", cursor: "pointer", borderLeft: "3px solid #f59e0b" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#f59e0b" }}>📦 {u.name} — stok kritik ({u.quantity} kaldı)</div>
             </div>
           ))}
           {(uyarilar.borc || []).map((u, i) => (
             <div key={"b"+i} onClick={() => navigate("/debts")}
-              style={{ background: "#fef2f2", borderRadius: 10, padding: "8px 12px", cursor: "pointer", borderLeft: "3px solid #ef4444" }}>
-              <div style={{ fontSize: 12, fontWeight: 600 }}>💳 {u.musteri_adi} — {(u.kalan || 0).toLocaleString("tr-TR")}₺ gecikmiş borç</div>
+              style={{ background: "rgba(239,68,68,0.12)", borderRadius: 10, padding: "8px 12px", cursor: "pointer", borderLeft: "3px solid #ef4444" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#ef4444" }}>💳 {u.musteri_adi} — {(u.kalan || 0).toLocaleString("tr-TR")}₺ gecikmiş borç</div>
             </div>
           ))}
           {(uyarilar.garanti || []).map((u, i) => (
             <div key={"g"+i} onClick={() => navigate("/garanti")}
-              style={{ background: "#eff6ff", borderRadius: 10, padding: "8px 12px", cursor: "pointer", borderLeft: "3px solid #3b82f6" }}>
-              <div style={{ fontSize: 12, fontWeight: 600 }}>🛡️ {u.musteri_adi} — {u.cihaz} garanti bitiyor ({u.bitis_tarihi})</div>
+              style={{ background: "rgba(59,130,246,0.12)", borderRadius: 10, padding: "8px 12px", cursor: "pointer", borderLeft: "3px solid #3b82f6" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#3b82f6" }}>🛡️ {u.musteri_adi} — {u.cihaz} garanti bitiyor ({u.bitis_tarihi})</div>
             </div>
           ))}
         </div>
@@ -231,10 +231,10 @@ export default function Dashboard({ user }) {
       </div>
 
       {stok_uyari > 0 && (
-        <div className="card" style={{ background: "#fff7ed", cursor: "pointer", marginBottom: 14 }}
+        <div style={{ background: "rgba(245,158,11,0.12)", borderRadius: 10, padding: "10px 14px", cursor: "pointer", marginBottom: 14, borderLeft: "3px solid #f59e0b" }}
           onClick={() => navigate("/parts")}>
           <div className="card-row">
-            <span>⚠️ Azalan Stok</span>
+            <span style={{ color: "#f59e0b", fontWeight: 600 }}>⚠️ Azalan Stok</span>
             <span style={{ fontWeight: 700, color: "#f59e0b" }}>{stok_uyari} ürün</span>
           </div>
         </div>
