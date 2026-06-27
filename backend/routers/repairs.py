@@ -117,8 +117,9 @@ async def create_repair(
     cur = await db.execute(
         """INSERT INTO repairs
            (repair_no, customer_id, device_model, imei, fault_desc,
-            estimated_price, status, assigned_to, notes, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, 'bekliyor', ?, ?, ?)""",
+            estimated_price, status, assigned_to, notes, created_by,
+            screen_lock_type, screen_lock_value)
+           VALUES (?, ?, ?, ?, ?, ?, 'bekliyor', ?, ?, ?, ?, ?)""",
         (
             repair_no,
             customer_id,
@@ -129,6 +130,8 @@ async def create_repair(
             body.get("assigned_to"),
             body.get("notes"),
             user["id"],
+            body.get("screen_lock_type"),
+            body.get("screen_lock_value"),
         ),
     )
     await db.commit()
@@ -158,6 +161,8 @@ async def update_repair(
            device_model=?, fault_desc=?, status=?, estimated_price=?,
            final_price=?, payment_type=?, paid_amount=?,
            warranty_days=?, assigned_to=?, notes=?,
+           screen_lock_type=COALESCE(?, screen_lock_type),
+           screen_lock_value=COALESCE(?, screen_lock_value),
            tamirde_at=COALESCE(tamirde_at, ?),
            completed_at=COALESCE(completed_at, ?),
            delivered_at=COALESCE(?, delivered_at)
@@ -173,6 +178,8 @@ async def update_repair(
             body.get("warranty_days", 0),
             body.get("assigned_to"),
             body.get("notes"),
+            body.get("screen_lock_type"),
+            body.get("screen_lock_value"),
             tamirde_at,
             completed_at,
             delivered_at,

@@ -3,6 +3,51 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import VoiceInput from "../components/VoiceInput";
 import ImeiInput from "../components/ImeiInput";
+import PatternLock from "../components/PatternLock";
+
+// PIN pad bileşeni
+function PinPad({ value, onChange }) {
+  function press(d) {
+    if (d === "⌫") { onChange(value.slice(0, -1)); return; }
+    if (value.length >= 8) return;
+    onChange(value + d);
+  }
+  const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+      {/* PIN göstergesi */}
+      <div style={{ display: "flex", gap: 14, justifyContent: "center", minHeight: 28, alignItems: "center" }}>
+        {value.length === 0
+          ? <span style={{ color: "var(--hint)", fontSize: 14 }}>PIN gir</span>
+          : Array.from({ length: value.length }, (_, i) => (
+            <div key={i} style={{ width: 16, height: 16, borderRadius: "50%", background: "var(--accent)" }} />
+          ))
+        }
+      </div>
+      {/* Numpad */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, width: 220 }}>
+        {keys.map((k, i) => k === "" ? <div key={i} /> : (
+          <button key={i} type="button" onClick={() => press(k)}
+            style={{
+              height: 56, borderRadius: 14, border: "1.5px solid var(--border)",
+              background: k === "⌫" ? "var(--bg2)" : "var(--card)",
+              color: "var(--text)", fontSize: k === "⌫" ? 20 : 22, fontWeight: 700,
+              cursor: "pointer", transition: "background 0.1s",
+            }}
+            onTouchStart={e => e.currentTarget.style.background = "var(--accent)"}
+            onTouchEnd={e => e.currentTarget.style.background = k === "⌫" ? "var(--bg2)" : "var(--card)"}
+          >{k}</button>
+        ))}
+      </div>
+      {value.length > 0 && (
+        <button type="button" onClick={() => onChange("")}
+          style={{ fontSize: 13, color: "var(--hint)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+          Temizle
+        </button>
+      )}
+    </div>
+  );
+}
 
 const ARIZA_CHIPS = [
   "Ekran kırık", "Batarya", "Şarj sorunu", "Hoparlör",
@@ -20,6 +65,12 @@ export default function NewRepair() {
     device_model: "", imei: "", fault_desc: "",
     estimated_price: "", notes: "",
   });
+
+  // Ekran kilidi
+  const [lockEnabled, setLockEnabled] = useState(false);
+  const [lockType, setLockType] = useState("pin"); // "pin" | "pattern"
+  const [lockPin, setLockPin] = useState("");
+  const [lockPattern, setLockPattern] = useState("");
 
   // Şablonlar
   const [sablonlar, setSablonlar] = useState([]);
@@ -76,9 +127,14 @@ export default function NewRepair() {
     setSaving(true);
     setError("");
     try {
+      const lockValue = lockEnabled
+        ? (lockType === "pin" ? lockPin : lockPattern)
+        : null;
       const res = await api.createRepair({
         ...form,
         estimated_price: form.estimated_price ? parseFloat(form.estimated_price) : null,
+        screen_lock_type: lockEnabled ? lockType : null,
+        screen_lock_value: lockValue || null,
       });
       navigate(`/repairs/${res.id}`);
     } catch (e) {
@@ -125,6 +181,65 @@ export default function NewRepair() {
       {error && <div className="error-msg">{error}</div>}
 
       <form onSubmit={submit}>
+        <div className="section-title">🔒 Ekran Kilidi</div>
+        <div className="card" style={{ marginBottom: 8 }}>
+          {/* Açma/kapama */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: lockEnabled ? 16 : 0 }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>Ekran kilidi var mı?</div>
+              <div style={{ fontSize: 13, color: "var(--hint)" }}>PIN, şifre veya desen</div>
+            </div>
+            <div
+              onClick={() => setLockEnabled(v => !v)}
+              style={{
+                width: 48, height: 28, borderRadius: 14, cursor: "pointer", transition: "background 0.2s",
+                background: lockEnabled ? "var(--accent)" : "var(--border)",
+                position: "relative",
+              }}
+            >
+              <div style={{
+                position: "absolute", top: 3, left: lockEnabled ? 23 : 3,
+                width: 22, height: 22, borderRadius: "50%", background: "#fff",
+                transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+              }} />
+            </div>
+          </div>
+
+          {lockEnabled && (
+            <div>
+              {/* Tip seçimi */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+                {[{ k: "pin", l: "🔢 PIN / Şifre" }, { k: "pattern", l: "🔷 Desen" }].map(t => (
+                  <button key={t.k} type="button"
+                    onClick={() => { setLockType(t.k); setLockPin(""); setLockPattern(""); }}
+                    style={{
+                      flex: 1, padding: "10px 0", borderRadius: 12, border: "1.5px solid",
+                      borderColor: lockType === t.k ? "var(--accent)" : "var(--border)",
+                      background: lockType === t.k ? "rgba(var(--accent-rgb,99,102,241),0.12)" : "var(--bg2)",
+                      color: lockType === t.k ? "var(--accent)" : "var(--text)",
+                      fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    }}>
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+
+              {lockType === "pin" ? (
+                <PinPad value={lockPin} onChange={setLockPin} />
+              ) : (
+                <div>
+                  <div style={{ textAlign: "center", color: "var(--hint)", fontSize: 13, marginBottom: 12 }}>
+                    Müşterinin deseni ile aynı şekilde çiz
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "center" }}>
+                    <PatternLock value={lockPattern} onChange={setLockPattern} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="section-title">Müşteri</div>
         <div className="card">
           <div className="form-group">

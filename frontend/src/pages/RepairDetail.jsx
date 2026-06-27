@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { PatternPreview } from "../components/PatternLock";
 
 const STATUSES = [
   { key: "bekliyor", label: "⏳ Bekliyor" },
@@ -45,6 +46,9 @@ export default function RepairDetail({ user }) {
   // Fiş modal
   const [fisModal, setFisModal] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Ekran kilidi göster/gizle
+  const [showLock, setShowLock] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -401,6 +405,54 @@ export default function RepairDetail({ user }) {
             <div className="divider" />
             <Row label="Arıza" value={repair.fault_desc || "—"} />
           </div>
+
+          {/* Ekran kilidi */}
+          {repair.screen_lock_type && (
+            <div className="card" style={{ background: "rgba(99,102,241,0.08)", borderLeft: "3px solid var(--accent)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 24 }}>🔒</span>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>Ekran Kilidi</div>
+                    <div style={{ fontSize: 13, color: "var(--hint)" }}>
+                      {repair.screen_lock_type === "pin" ? "PIN / Şifre" : "Desen"}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowLock(v => !v)}
+                  style={{
+                    padding: "7px 14px", borderRadius: 20, border: "1.5px solid var(--accent)",
+                    background: showLock ? "var(--accent)" : "transparent",
+                    color: showLock ? "#fff" : "var(--accent)",
+                    fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  }}
+                >
+                  {showLock ? "🙈 Gizle" : "👁 Göster"}
+                </button>
+              </div>
+
+              {showLock && (
+                <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+                  {repair.screen_lock_type === "pin" ? (
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: 8, color: "var(--accent)", fontFamily: "monospace" }}>
+                        {repair.screen_lock_value}
+                      </div>
+                      <div style={{ fontSize: 13, color: "var(--hint)", marginTop: 4 }}>PIN Kodu</div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: "center" }}>
+                      <PatternPreview value={repair.screen_lock_value} size={120} />
+                      <div style={{ fontSize: 13, color: "var(--hint)", marginTop: 8 }}>
+                        Desen: {repair.screen_lock_value?.split("-").map(n => parseInt(n) + 1).join(" → ")}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="card">
             <Row label="Tahmini Ücret" value={repair.estimated_price ? `₺${fmt(repair.estimated_price)}` : "—"} />
