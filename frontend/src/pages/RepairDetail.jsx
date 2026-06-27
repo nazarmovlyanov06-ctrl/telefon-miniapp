@@ -36,6 +36,7 @@ export default function RepairDetail({ user }) {
   const [parcaForm, setParcaForm] = useState({ part_id: "", quantity: 1 });
   const [parcaEkleOpen, setParcaEkleOpen] = useState(false);
   const [parcaSaving, setParcaSaving] = useState(false);
+  const [parcaHata, setParcaHata] = useState("");
 
   // Fotoğraflar
   const [fotolar, setFotolar] = useState([]);
@@ -114,23 +115,46 @@ export default function RepairDetail({ user }) {
 
   // ── PARÇA işlemleri ──────────────────────────────────────────
 
+  async function openParcaEkle() {
+    const open = !parcaEkleOpen;
+    setParcaEkleOpen(open);
+    setParcaHata("");
+    setParcaForm({ part_id: "", quantity: 1 });
+    if (open) {
+      try {
+        const fresh = await api.parts();
+        setPartsList(fresh);
+      } catch (_) {}
+    }
+  }
+
   async function addParca() {
-    if (!parcaForm.part_id) return;
+    const partId = parseInt(parcaForm.part_id);
+    if (!partId) return;
     setParcaSaving(true);
+    setParcaHata("");
     try {
-      const sel = partsList.find(p => p.id === parseInt(parcaForm.part_id));
+      const sel = partsList.find(p => p.id === partId);
       await api.addRepairParca(id, {
-        part_id: parseInt(parcaForm.part_id),
+        part_id: partId,
         quantity: parseInt(parcaForm.quantity) || 1,
         unit_price: sel?.sale_price || 0,
       });
-      const [p, parts] = await Promise.all([api.repairParcalar(id), api.parts()]);
-      setParcalar(p);
-      setPartsList(parts);
+      // Ekleme başarılı — formu kapat
       setParcaForm({ part_id: "", quantity: 1 });
       setParcaEkleOpen(false);
+      // Listeyi yenile (ayrı try — yenileme hatası eklemeyi iptal etmesin)
+      try {
+        const [p, parts] = await Promise.all([api.repairParcalar(id), api.parts()]);
+        setParcalar(p);
+        setPartsList(parts);
+      } catch (_) {
+        // Yenileme başarısız ama parça eklendi — sayfayı yenileyince görünür
+      }
     } catch (e) {
-      alert(e.message);
+      setParcaHata(e.message === "Failed to fetch"
+        ? "Sunucuya ulaşılamıyor. İnternet bağlantınızı kontrol edin ve tekrar deneyin."
+        : e.message || "Bir hata oluştu");
     } finally { setParcaSaving(false); }
   }
 
@@ -529,37 +553,50 @@ export default function RepairDetail({ user }) {
           <div className="card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hint)" }}>🔩 KULLANILAN PARÇALAR</div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setParcaEkleOpen(!parcaEkleOpen)}>
+              <button className="btn btn-ghost btn-sm" onClick={openParcaEkle}>
                 {parcaEkleOpen ? "İptal" : "+ Ekle"}
               </button>
             </div>
 
-            {parcaEkleOpen && (
-              <div style={{ background: "var(--bg2)", borderRadius: 8, padding: 10, marginBottom: 10 }}>
-                <div className="form-group" style={{ marginBottom: 8 }}>
-                  <select className="form-select"
-                    value={parcaForm.part_id}
-                    onChange={e => setParcaForm(f => ({ ...f, part_id: e.target.value }))}>
-                    <option value="">— Parça Seç —</option>
-                    {partsList.filter(p => p.quantity > 0).map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.quantity} stok) — {fmt(p.sale_price)}₺
-                      </option>
-                    ))}
-                  </select>
+            {parcaEkleOpen && (() => {
+              const seciliParca = partsList.find(p => p.id === parseInt(parcaForm.part_id));
+              const maxAdet = seciliParca?.quantity ?? 99;
+              return (
+                <div style={{ background: "var(--bg2)", borderRadius: 8, padding: 10, marginBottom: 10 }}>
+                  <div className="form-group" style={{ marginBottom: 8 }}>
+                    <select className="form-select"
+                      value={parcaForm.part_id}
+                      onChange={e => { setParcaForm(f => ({ ...f, part_id: e.target.value, quantity: 1 })); setParcaHata(""); }}>
+                      <option value="">— Parça Seç —</option>
+                      {partsList.filter(p => p.quantity > 0).sort((a, b) => a.name.localeCompare(b.name, "tr")).map(p => (
+                        <option key={p.id} value={String(p.id)}>
+                          {p.name} ({p.quantity} stok){p.device_model ? ` · ${p.device_model}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input className="form-input" type="number" min="1" max={maxAdet}
+                      style={{ width: 80, flex: "none" }}
+                      value={parcaForm.quantity}
+                      onChange={e => setParcaForm(f => ({ ...f, quantity: e.target.value }))}
+                      placeholder="Adet" />
+                    {seciliParca && (
+                      <span style={{ fontSize: 12, color: "var(--hint)" }}>/ {seciliParca.quantity} stok</span>
+                    )}
+                    <button className="btn btn-primary btn-sm" onClick={addParca}
+                      disabled={parcaSaving || !parcaForm.part_id || parseInt(parcaForm.quantity) < 1}>
+                      {parcaSaving ? "Ekleniyor..." : "Ekle"}
+                    </button>
+                  </div>
+                  {parcaHata && (
+                    <div style={{ color: "#ef4444", fontSize: 13, marginTop: 8, fontWeight: 600 }}>
+                      ❌ {parcaHata}
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input className="form-input" type="number" min="1"
-                    style={{ width: 80, flex: "none" }}
-                    value={parcaForm.quantity}
-                    onChange={e => setParcaForm(f => ({ ...f, quantity: e.target.value }))}
-                    placeholder="Adet" />
-                  <button className="btn btn-primary btn-sm" onClick={addParca} disabled={parcaSaving || !parcaForm.part_id}>
-                    {parcaSaving ? "..." : "Ekle"}
-                  </button>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {parcalar.length === 0 ? (
               <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "8px 0" }}>

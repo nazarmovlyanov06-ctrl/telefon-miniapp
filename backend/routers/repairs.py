@@ -256,8 +256,9 @@ async def add_repair_parca(
     part = await cur.fetchone()
     if not part:
         raise HTTPException(404, "Parça bulunamadı")
-    if part["quantity"] < adet:
-        raise HTTPException(400, f"Stok yetersiz (mevcut: {part['quantity']})")
+    stok = part["quantity"] or 0
+    if stok < adet:
+        raise HTTPException(400, f"Stok yetersiz (mevcut: {stok})")
 
     birim_fiyat = float(body.get("unit_price") or part["sale_price"] or 0)
     await db.execute(
