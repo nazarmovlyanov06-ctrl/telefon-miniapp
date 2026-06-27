@@ -8,7 +8,37 @@ const TABS = [
   { key: "gecmis", label: "✅ Geçmiş" },
 ];
 
-const PARCA_TURLERI = ["Ekran", "Batarya", "Entegre", "Şarj Soketi", "Arka Kapak", "Kamera", "Hoparlör", "Mikrofon", "Diğer"];
+const MARKALAR = [
+  "iPhone", "Samsung", "Xiaomi", "Redmi", "Realme", "Infinix", "Tecno",
+  "Oppo", "OnePlus", "Vivo", "Huawei", "Honor", "General Mobile",
+  "Motorola", "Nokia", "Casper", "Vestel", "Lenovo", "Asus", "Sony",
+  "LG", "ZTE", "TCL", "Alcatel", "HTC", "Google Pixel", "Tablet / Diğer",
+];
+
+const PARCA_TURLERI_VARSAYILAN = [
+  "Ekran", "Batarya", "Entegre", "Şarj Soketi", "Arka Kapak",
+  "Kamera", "Hoparlör", "Mikrofon", "Diğer",
+];
+
+function loadParcaTurleri() {
+  try {
+    const s = localStorage.getItem("parca_turleri");
+    if (s) return JSON.parse(s);
+  } catch (_) {}
+  return PARCA_TURLERI_VARSAYILAN;
+}
+
+function saveParcaTurleri(list) {
+  try { localStorage.setItem("parca_turleri", JSON.stringify(list)); } catch (_) {}
+}
+
+function relativeGun(dateStr) {
+  if (!dateStr) return "—";
+  const diff = Math.floor((Date.now() - new Date(dateStr)) / 86400000);
+  if (diff === 0) return "Bugün";
+  if (diff === 1) return "Dün";
+  return `${diff} gün önce`;
+}
 
 export default function Parts() {
   const [searchParams] = useSearchParams();
@@ -49,8 +79,15 @@ export default function Parts() {
   const [ekleErr, setEkleErr] = useState("");
 
   // Yeni parça form — mevcut parça önerisi
-  const [addEklePart, setAddEklePart] = useState(null); // null = yeni kayıt, object = mevcut parça üstüne ekle
+  const [addEklePart, setAddEklePart] = useState(null);
   const [showOner, setShowOner] = useState(false);
+  const [addBrand, setAddBrand] = useState(""); // marka chip seçimi
+  const [shopBrand, setShopBrand] = useState(""); // sipariş formu marka
+
+  // Parça türü yönetimi
+  const [parcaTurleri, setParcaTurleri] = useState(loadParcaTurleri);
+  const [turDuzenle, setTurDuzenle] = useState(false);
+  const [yeniTur, setYeniTur] = useState("");
 
   const [err, setErr] = useState("");
 
@@ -130,15 +167,17 @@ export default function Parts() {
   async function submitShopItem(e) {
     e.preventDefault(); setErr("");
     try {
+      const combinedShopModel = [shopBrand, shopForm.device_model].filter(Boolean).join(" ").trim();
       await api.addShoppingItem({
         part_name: shopForm.part_name,
-        device_model: shopForm.device_model || null,
+        device_model: combinedShopModel || null,
         quantity: parseInt(shopForm.quantity) || 1,
         estimated_price: shopForm.estimated_price ? parseFloat(shopForm.estimated_price) : null,
         supplier_hint: shopForm.supplier_hint || null,
       });
       setShowShopForm(false);
       setShopForm({ part_name: "", device_model: "", quantity: "1", estimated_price: "", supplier_hint: "" });
+      setShopBrand("");
       api.shopping().then(setShopping);
     } catch (e) { setErr(e.message); }
   }
@@ -174,6 +213,21 @@ export default function Parts() {
     } catch (e) { setKullanErr(e.message); }
   }
 
+  function turEkle() {
+    const t = yeniTur.trim();
+    if (!t || parcaTurleri.includes(t)) return;
+    const updated = [...parcaTurleri, t];
+    setParcaTurleri(updated);
+    saveParcaTurleri(updated);
+    setYeniTur("");
+  }
+
+  function turSil(tur) {
+    const updated = parcaTurleri.filter(t => t !== tur);
+    setParcaTurleri(updated);
+    saveParcaTurleri(updated);
+  }
+
   async function submitEkle(e) {
     e.preventDefault(); setEkleErr("");
     try {
@@ -191,8 +245,8 @@ export default function Parts() {
   async function submitAddPart(e) {
     e.preventDefault(); setAddErr("");
     try {
+      const combinedModel = [addBrand, addForm.device_model].filter(Boolean).join(" ").trim();
       if (addEklePart) {
-        // Mevcut parçaya stok ekle
         await api.stokEkle(addEklePart.id, {
           miktar: parseInt(addForm.quantity) || 1,
           fiyat: addForm.purchase_price ? parseFloat(addForm.purchase_price) : null,
@@ -201,7 +255,7 @@ export default function Parts() {
       } else {
         await api.createPart({
           name: addForm.name,
-          device_model: addForm.device_model || null,
+          device_model: combinedModel || null,
           part_type: addForm.part_type || null,
           quantity: parseInt(addForm.quantity) || 0,
           min_quantity: parseInt(addForm.min_quantity) || 2,
@@ -212,6 +266,7 @@ export default function Parts() {
       setShowAddForm(false);
       setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" });
       setAddEklePart(null);
+      setAddBrand("");
       api.parts(q ? { q } : {}).then(setParts);
     } catch (e) { setAddErr(e.message); }
   }
@@ -336,21 +391,67 @@ export default function Parts() {
                           </div>
                         )}
                       </div>
+                      {/* Marka seç */}
+                      <div className="form-group" style={{ margin: "0 0 8px" }}>
+                        <label className="form-label">Marka</label>
+                        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" }}>
+                          {MARKALAR.map(m => (
+                            <button key={m} type="button"
+                              onClick={() => setAddBrand(addBrand === m ? "" : m)}
+                              style={{ flexShrink: 0, padding: "5px 11px", borderRadius: 20, border: "2px solid",
+                                borderColor: addBrand === m ? "var(--accent)" : "var(--border)",
+                                background: addBrand === m ? "var(--accent)" : "transparent",
+                                color: addBrand === m ? "#fff" : "var(--text)",
+                                fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                              {m}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                         <div className="form-group" style={{ margin: 0 }}>
-                          <label className="form-label">Cihaz Modeli</label>
+                          <label className="form-label">Model</label>
                           <input className="form-input" value={addForm.device_model}
                             onChange={e => setAddForm(f => ({ ...f, device_model: e.target.value }))}
-                            placeholder="iPhone 13..." />
+                            placeholder={addBrand ? `${addBrand} sonrası model...` : "13 Pro Max, A54..."} />
                         </div>
                         <div className="form-group" style={{ margin: 0 }}>
                           <label className="form-label">Parça Türü</label>
                           <select className="form-select" value={addForm.part_type}
                             onChange={e => setAddForm(f => ({ ...f, part_type: e.target.value }))}>
                             <option value="">— Seç —</option>
-                            {PARCA_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
+                            {parcaTurleri.map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
                         </div>
+                      </div>
+                      {/* Tür yönetimi */}
+                      <div style={{ marginTop: 4 }}>
+                        <button type="button" onClick={() => setTurDuzenle(v => !v)}
+                          style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                          {turDuzenle ? "▲ Tür listesini kapat" : "✏️ Parça türü ekle/çıkar"}
+                        </button>
+                        {turDuzenle && (
+                          <div style={{ marginTop: 8, background: "var(--bg)", borderRadius: 8, padding: 10, border: "1px solid var(--border)" }}>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                              {parcaTurleri.map(t => (
+                                <span key={t} style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--bg2)",
+                                  padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
+                                  {t}
+                                  <button type="button" onClick={() => turSil(t)}
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", fontSize: 14, lineHeight: 1, padding: 0 }}>
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <input className="form-input" value={yeniTur} onChange={e => setYeniTur(e.target.value)}
+                                onKeyDown={e => e.key === "Enter" && (e.preventDefault(), turEkle())}
+                                placeholder="Yeni tür ekle..." style={{ flex: 1 }} />
+                              <button type="button" className="btn btn-primary btn-sm" onClick={turEkle}>+</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
                         <div className="form-group" style={{ margin: 0 }}>
@@ -606,8 +707,26 @@ export default function Parts() {
                   <input className="form-input" required value={shopForm.part_name} onChange={e => setShopForm({ ...shopForm, part_name: e.target.value })} placeholder="Ekran, batarya, entegre..." />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Cihaz Modeli</label>
-                  <input className="form-input" value={shopForm.device_model} onChange={e => setShopForm({ ...shopForm, device_model: e.target.value })} placeholder="iPhone 13, Samsung A54..." />
+                  <label className="form-label">Marka</label>
+                  <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" }}>
+                    {MARKALAR.map(m => (
+                      <button key={m} type="button"
+                        onClick={() => setShopBrand(shopBrand === m ? "" : m)}
+                        style={{ flexShrink: 0, padding: "5px 11px", borderRadius: 20, border: "2px solid",
+                          borderColor: shopBrand === m ? "var(--accent)" : "var(--border)",
+                          background: shopBrand === m ? "var(--accent)" : "transparent",
+                          color: shopBrand === m ? "#fff" : "var(--text)",
+                          fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Model</label>
+                  <input className="form-input" value={shopForm.device_model}
+                    onChange={e => setShopForm({ ...shopForm, device_model: e.target.value })}
+                    placeholder={shopBrand ? `${shopBrand} sonrası model...` : "13 Pro Max, A54..."} />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   <div className="form-group">
@@ -757,7 +876,7 @@ export default function Parts() {
                         <select className="form-select" value={boughtData.partType}
                           onChange={e => setBoughtData(d => ({ ...d, partType: e.target.value }))}>
                           <option value="">— Seç (opsiyonel) —</option>
-                          {PARCA_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
+                          {parcaTurleri.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </div>
                     )}
@@ -781,7 +900,7 @@ export default function Parts() {
             shopping.alindi.length === 0 ? (
               <div className="empty"><div className="empty-icon">✅</div>Henüz alınan parça yok</div>
             ) : shopping.alindi.map((item) => (
-              <div key={item.id} className="list-item" style={{ opacity: 0.85 }}>
+              <div key={item.id} className="list-item" style={{ opacity: 0.9 }}>
                 <div className="list-item-body">
                   <div className="list-item-title">✅ {item.part_name}</div>
                   <div className="list-item-sub">
@@ -790,7 +909,10 @@ export default function Parts() {
                     {item.bought_price ? ` · ₺${item.bought_price}` : ""}
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: "var(--hint)", flexShrink: 0 }}>×{item.quantity}</div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>×{item.quantity}</div>
+                  <div style={{ fontSize: 11, color: "var(--hint)" }}>{relativeGun(item.bought_at)}</div>
+                </div>
               </div>
             ))
           }
