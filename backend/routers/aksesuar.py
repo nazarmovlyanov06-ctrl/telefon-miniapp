@@ -50,6 +50,20 @@ async def update_aksesuar(
     return {"ok": True}
 
 
+@router.delete("/{aksesuar_id}")
+async def delete_aksesuar(
+    aksesuar_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    if user["role"] != "patron":
+        raise HTTPException(403, "Sadece patron silebilir")
+    await db.execute("DELETE FROM aksesuarlar WHERE id = ?", (aksesuar_id,))
+    await db.commit()
+    return {"ok": True}
+
+
 @router.post("/{aksesuar_id}/sat")
 async def sat_aksesuar(
     aksesuar_id: int,

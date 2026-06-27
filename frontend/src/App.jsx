@@ -103,25 +103,25 @@ function AppRoutes({ user }) {
         <Route path="/repairs/new" element={<NewRepair />} />
         <Route path="/repairs/:id" element={<RepairDetail user={user} />} />
         <Route path="/customers" element={<Customers />} />
-        <Route path="/parts" element={<Parts />} />
+        <Route path="/parts" element={<Parts user={user} />} />
         <Route path="/more" element={<More user={user} />} />
         <Route path="/imei" element={<IMEI />} />
         <Route path="/debts" element={<Debts />} />
         <Route path="/settings" element={<Settings user={user} />} />
         <Route path="/toptanci" element={<Toptanci />} />
-        <Route path="/ikinciel" element={<IkinciEl />} />
+        <Route path="/ikinciel" element={<IkinciEl user={user} />} />
         <Route path="/garanti" element={<Garanti />} />
         <Route path="/kasa" element={<Kasa />} />
         <Route path="/gider" element={<Gider />} />
         <Route path="/loaner" element={<Loaner />} />
-        <Route path="/aksesuar" element={<Aksesuar />} />
+        <Route path="/aksesuar" element={<Aksesuar user={user} />} />
         <Route path="/hedef" element={<Hedef />} />
         <Route path="/maas" element={<Maas />} />
         <Route path="/karalist" element={<KaraListe />} />
         <Route path="/parca-iade" element={<ParcaIade />} />
         <Route path="/ai" element={<AiChat />} />
         <Route path="/customers/:id" element={<CustomerDetail />} />
-        <Route path="/sifir-cihaz" element={<SifirCihaz />} />
+        <Route path="/sifir-cihaz" element={<SifirCihaz user={user} />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/search" element={<Search />} />
       </Routes>

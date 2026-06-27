@@ -40,7 +40,7 @@ function relativeGun(dateStr) {
   return `${diff} gün önce`;
 }
 
-export default function Parts() {
+export default function Parts({ user }) {
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") || "stok");
   const [parts, setParts] = useState([]);
@@ -49,6 +49,8 @@ export default function Parts() {
   const [loading, setLoading] = useState(true);
   const [brandFilter, setBrandFilter] = useState("Tümü");
   const [typeFilter, setTypeFilter] = useState("Tümü");
+  const [deletePartId, setDeletePartId] = useState(null);
+  const [deleteOrderId, setDeleteOrderId] = useState(null);
 
   // Sipariş Ver
   const [showShopForm, setShowShopForm] = useState(false);
@@ -240,6 +242,23 @@ export default function Parts() {
       setEkleForm({ miktar: "1", fiyat: "", aciklama: "" });
       api.parts(q ? { q } : {}).then(setParts);
     } catch (e) { setEkleErr(e.message); }
+  }
+
+  async function deletePart(id) {
+    try {
+      await api.deletePart(id);
+      setDeletePartId(null);
+      setSelectedPart(null);
+      api.parts(q ? { q } : {}).then(setParts);
+    } catch (e) { setErr(e.message); }
+  }
+
+  async function deleteOrder(id) {
+    try {
+      await api.deleteShoppingItem(id);
+      setDeleteOrderId(null);
+      api.shopping().then(setShopping);
+    } catch (e) { setErr(e.message); }
   }
 
   async function submitAddPart(e) {
@@ -529,18 +548,30 @@ export default function Parts() {
                       <div className="list-item-title">{p.name}</div>
                       <div className="list-item-sub">{p.device_model} · {p.part_type}</div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontWeight: 700, fontSize: 18, color: p.quantity <= p.min_quantity ? "var(--danger)" : "var(--text)" }}>{p.quantity}</div>
                         <div style={{ fontSize: 11, color: "var(--hint)" }}>adet</div>
                       </div>
-                      {/* Geçmiş butonu */}
                       <button
                         className="btn btn-ghost btn-sm"
                         style={{ padding: "4px 8px", fontSize: 16 }}
                         onClick={e => { e.stopPropagation(); openPanel(p, "gecmis"); }}
                         title="Stok geçmişi"
                       >📋</button>
+                      {user?.role === "patron" && (
+                        deletePartId === p.id ? (
+                          <div style={{ display: "flex", gap: 3 }} onClick={e => e.stopPropagation()}>
+                            <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 8px", fontSize: 12 }}
+                              onClick={() => deletePart(p.id)}>Sil</button>
+                            <button className="btn btn-ghost btn-sm" style={{ padding: "4px 8px", fontSize: 12 }}
+                              onClick={() => setDeletePartId(null)}>✕</button>
+                          </div>
+                        ) : (
+                          <button className="btn btn-ghost btn-sm" style={{ padding: "4px 7px", fontSize: 14, color: "var(--danger)", opacity: 0.7 }}
+                            onClick={e => { e.stopPropagation(); setDeletePartId(p.id); }}>🗑</button>
+                        )
+                      )}
                     </div>
                   </div>
 
@@ -673,7 +704,10 @@ export default function Parts() {
                                 {SEBEP_LABEL[h.sebep] || "📦 Diğer"}
                                 {h.aciklama ? ` — ${h.aciklama}` : ""}
                               </div>
-                              <div style={{ fontSize: 12, color: "var(--hint)" }}>{h.tarih}</div>
+                              <div style={{ fontSize: 12, color: "var(--hint)" }}>
+                                {h.tarih}
+                                {h.yapan_adi ? <span style={{ marginLeft: 6, background: "var(--bg)", borderRadius: 6, padding: "1px 6px", fontWeight: 600 }}>👤 {h.yapan_adi}</span> : ""}
+                              </div>
                             </div>
                             <div style={{ fontWeight: 700, color: h.hareket === "giris" ? "var(--success)" : "var(--danger)", fontSize: 15, flexShrink: 0 }}>
                               {h.hareket === "giris" ? "+" : "-"}{h.miktar} adet
@@ -756,17 +790,33 @@ export default function Parts() {
             ) : shopping.bekliyor.map((item) => (
               <div key={item.id} className="card">
                 <div className="card-row">
-                  <div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600 }}>{item.part_name}</div>
                     <div style={{ fontSize: 13, color: "var(--hint)" }}>
                       {item.device_model || "—"} · ×{item.quantity}
                       {item.estimated_price ? ` · ~₺${item.estimated_price}` : ""}
                       {item.supplier_hint ? ` · ${item.supplier_hint}` : ""}
                     </div>
+                    {item.ekleyen && <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>👤 {item.ekleyen}</div>}
                   </div>
-                  <button className="btn btn-primary btn-sm" onClick={() => { setBoughtItem(item); setBoughtData(d => ({ ...d, stokMiktar: String(item.quantity || 1) })); }}>
-                    ✅ Aldım
-                  </button>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                    {user?.role === "patron" && (
+                      deleteOrderId === item.id ? (
+                        <div style={{ display: "flex", gap: 3 }}>
+                          <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 8px", fontSize: 12 }}
+                            onClick={() => deleteOrder(item.id)}>Sil</button>
+                          <button className="btn btn-ghost btn-sm" style={{ padding: "4px 8px", fontSize: 12 }}
+                            onClick={() => setDeleteOrderId(null)}>✕</button>
+                        </div>
+                      ) : (
+                        <button className="btn btn-ghost btn-sm" style={{ padding: "4px 7px", fontSize: 14, color: "var(--danger)", opacity: 0.7 }}
+                          onClick={() => setDeleteOrderId(item.id)}>🗑</button>
+                      )
+                    )}
+                    <button className="btn btn-primary btn-sm" onClick={() => { setBoughtItem(item); setBoughtData(d => ({ ...d, stokMiktar: String(item.quantity || 1) })); }}>
+                      ✅ Aldım
+                    </button>
+                  </div>
                 </div>
               </div>
             ))

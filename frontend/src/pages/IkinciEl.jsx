@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import ImeiInput from "../components/ImeiInput";
 
-export default function IkinciEl() {
+export default function IkinciEl({ user }) {
   const navigate = useNavigate();
   const [tab, setTab] = useState("stok");
   const [kaynak, setKaynak] = useState("hepsi");
@@ -15,6 +15,7 @@ export default function IkinciEl() {
   const [showForm, setShowForm] = useState(false);
   const [showMasraf, setShowMasraf] = useState(false);
   const [showSat, setShowSat] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
   const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit" });
@@ -93,6 +94,15 @@ export default function IkinciEl() {
       // Seçili cihazı güncelle (yeni masraflarla)
       const updated = l.find(x => x.id === selected.id);
       if (updated) setSelected(updated);
+    } catch (e) { setErr(e.message); }
+  }
+
+  async function deleteCihaz(id) {
+    try {
+      await api.deleteIkinciEl(id);
+      setDeleteId(null);
+      setSelected(null);
+      load();
     } catch (e) { setErr(e.message); }
   }
 
@@ -309,9 +319,22 @@ export default function IkinciEl() {
                         ))}
                       </div>
                     )}
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button className="btn btn-ghost btn-sm" onClick={() => { setShowMasraf(true); setShowSat(false); }}>+ Masraf</button>
                       <button className="btn btn-primary btn-sm" onClick={() => { setShowSat(true); setShowMasraf(false); }}>💰 Sat</button>
+                      {user?.role === "patron" && (
+                        deleteId === c.id ? (
+                          <>
+                            <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 12px", fontSize: 13 }}
+                              onClick={() => deleteCihaz(c.id)}>Sil</button>
+                            <button className="btn btn-ghost btn-sm"
+                              onClick={() => setDeleteId(null)}>İptal</button>
+                          </>
+                        ) : (
+                          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}
+                            onClick={() => setDeleteId(c.id)}>🗑 Sil</button>
+                        )
+                      )}
                     </div>
                     {showMasraf && (
                       <form onSubmit={submitMasraf} style={{ marginTop: 10 }}>

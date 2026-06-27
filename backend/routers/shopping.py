@@ -109,9 +109,9 @@ async def mark_bought(
 
             if part_id_log:
                 await db.execute(
-                    """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih)
-                       VALUES (?, 'giris', ?, 'satin_alma', ?, ?)""",
-                    (part_id_log, miktar, body.get("bought_from"), date.today().isoformat())
+                    """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
+                       VALUES (?, 'giris', ?, 'satin_alma', ?, ?, ?)""",
+                    (part_id_log, miktar, body.get("bought_from"), date.today().isoformat(), user["id"])
                 )
         except Exception as e:
             stok_mesaj = f"hata:{str(e)}"

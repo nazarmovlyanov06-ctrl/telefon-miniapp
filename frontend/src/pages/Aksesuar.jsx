@@ -9,7 +9,7 @@ function loadKats() {
   catch { return DEFAULT_CATS; }
 }
 
-export default function Aksesuar() {
+export default function Aksesuar({ user }) {
   const navigate = useNavigate();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +22,7 @@ export default function Aksesuar() {
   const [form, setForm] = useState({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer" });
   const [satData, setSatData] = useState({ miktar: "1", musteri_adi: "" });
   const [err, setErr] = useState("");
+  const [deleteId, setDeleteId] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -69,6 +70,14 @@ export default function Aksesuar() {
       await api.satAksesuar(satForm.id, { miktar: parseInt(satData.miktar), musteri_adi: satData.musteri_adi, tarih: today() });
       setSatForm(null);
       setSatData({ miktar: "1", musteri_adi: "" });
+      load();
+    } catch (e) { setErr(e.message); }
+  }
+
+  async function deleteAksesuar(id) {
+    try {
+      await api.deleteAksesuar(id);
+      setDeleteId(null);
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -202,13 +211,26 @@ export default function Aksesuar() {
                 Alış: {a.alis_fiyati} ₺ · Satış: {a.satis_fiyati} ₺
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontWeight: 700, color: a.stok <= 5 ? "var(--danger)" : "var(--text)" }}>{a.stok} adet</div>
                 {a.stok <= 5 && <div style={{ fontSize: 11, color: "var(--danger)" }}>⚠ Düşük</div>}
               </div>
               {a.stok > 0 && (
                 <button className="btn btn-primary btn-sm" onClick={() => setSatForm(a)}>Sat</button>
+              )}
+              {user?.role === "patron" && (
+                deleteId === a.id ? (
+                  <div style={{ display: "flex", gap: 3 }}>
+                    <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 8px", fontSize: 12 }}
+                      onClick={() => deleteAksesuar(a.id)}>Sil</button>
+                    <button className="btn btn-ghost btn-sm" style={{ padding: "4px 8px", fontSize: 12 }}
+                      onClick={() => setDeleteId(null)}>✕</button>
+                  </div>
+                ) : (
+                  <button className="btn btn-ghost btn-sm" style={{ padding: "4px 7px", fontSize: 14, color: "var(--danger)", opacity: 0.7 }}
+                    onClick={() => setDeleteId(a.id)}>🗑</button>
+                )
               )}
             </div>
           </div>

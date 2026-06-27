@@ -368,6 +368,7 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE repairs ADD COLUMN veri_yedegi INTEGER DEFAULT 0",
             "ALTER TABLE repairs ADD COLUMN screen_lock_type TEXT",
             "ALTER TABLE repairs ADD COLUMN screen_lock_value TEXT",
+            "ALTER TABLE stok_hareketleri ADD COLUMN created_by INTEGER",
         ]:
             try:
                 await db.execute(m)

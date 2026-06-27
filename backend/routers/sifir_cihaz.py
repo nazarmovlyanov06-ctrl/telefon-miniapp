@@ -90,6 +90,20 @@ async def create_cihaz(
     return {"id": cur.lastrowid}
 
 
+@router.delete("/{cihaz_id}")
+async def delete_cihaz(
+    cihaz_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    if user["role"] != "patron":
+        raise HTTPException(403, "Sadece patron silebilir")
+    await db.execute("DELETE FROM sifir_cihazlar WHERE id = ?", (cihaz_id,))
+    await db.commit()
+    return {"ok": True}
+
+
 @router.post("/{cihaz_id}/sat")
 async def sat_cihaz(
     cihaz_id: int,

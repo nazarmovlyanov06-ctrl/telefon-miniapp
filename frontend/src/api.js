@@ -102,6 +102,7 @@ export const api = {
   },
   ikinciElOzet: () => get("/ikinciel/ozet"),
   createIkinciEl: (data) => post("/ikinciel/", data),
+  deleteIkinciEl: (id) => del(`/ikinciel/${id}`),
   ikinciElMasraf: (id, data) => post(`/ikinciel/${id}/masraf`, data),
   ikinciElMasraflar: (id) => get(`/ikinciel/${id}/masraflar`),
   ikinciElSat: (id, data) => post(`/ikinciel/${id}/sat`, data),
@@ -115,6 +116,7 @@ export const api = {
   },
   sifirOzet: () => get("/sifir-cihaz/ozet"),
   createSifir: (data) => post("/sifir-cihaz/", data),
+  deleteSifir: (id) => del(`/sifir-cihaz/${id}`),
   sifirSat: (id, data) => post(`/sifir-cihaz/${id}/sat`, data),
   sifirSatilanlar: () => get("/sifir-cihaz/satilanlar"),
 
@@ -147,6 +149,7 @@ export const api = {
   aksesuarList: () => get("/aksesuarlar/"),
   createAksesuar: (data) => post("/aksesuarlar/", data),
   updateAksesuar: (id, data) => put(`/aksesuarlar/${id}`, data),
+  deleteAksesuar: (id) => del(`/aksesuarlar/${id}`),
   satAksesuar: (id, data) => post(`/aksesuarlar/${id}/sat`, data),
 
   // Hedef

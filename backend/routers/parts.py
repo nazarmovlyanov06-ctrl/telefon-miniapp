@@ -104,7 +104,7 @@ async def stok_ekle(
     tg_user=Depends(get_current_user),
     db: Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     cur = await db.execute("SELECT id, name, quantity FROM parts WHERE id=?", (part_id,))
     part = await cur.fetchone()
     if not part:
@@ -121,9 +121,9 @@ async def stok_ekle(
     else:
         await db.execute("UPDATE parts SET quantity = quantity + ? WHERE id = ?", (miktar, part_id))
     await db.execute(
-        """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih)
-           VALUES (?, 'giris', ?, 'satin_alma', ?, ?)""",
-        (part_id, miktar, body.get("aciklama"), date.today().isoformat()),
+        """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
+           VALUES (?, 'giris', ?, 'satin_alma', ?, ?, ?)""",
+        (part_id, miktar, body.get("aciklama"), date.today().isoformat(), user["id"]),
     )
     await db.commit()
     return {"ok": True}
@@ -136,7 +136,7 @@ async def kullan_part(
     tg_user=Depends(get_current_user),
     db: Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     cur = await db.execute("SELECT id, name, quantity FROM parts WHERE id=?", (part_id,))
     part = await cur.fetchone()
     if not part:
@@ -147,9 +147,9 @@ async def kullan_part(
         raise HTTPException(400, f"Yetersiz stok (mevcut: {part['quantity']})")
     await db.execute("UPDATE parts SET quantity = quantity - ? WHERE id = ?", (miktar, part_id))
     await db.execute(
-        """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih)
-           VALUES (?, 'cikis', ?, ?, ?, ?)""",
-        (part_id, miktar, body.get("sebep", "diger"), body.get("aciklama"), date.today().isoformat())
+        """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
+           VALUES (?, 'cikis', ?, ?, ?, ?, ?)""",
+        (part_id, miktar, body.get("sebep", "diger"), body.get("aciklama"), date.today().isoformat(), user["id"])
     )
     await db.commit()
     return {"ok": True, "kalan": part["quantity"] - miktar}
@@ -163,7 +163,10 @@ async def part_hareketler(
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     cur = await db.execute(
-        "SELECT * FROM stok_hareketleri WHERE part_id=? ORDER BY created_at DESC LIMIT 20",
+        """SELECT h.*, u.name as yapan_adi
+           FROM stok_hareketleri h
+           LEFT JOIN users u ON u.id = h.created_by
+           WHERE h.part_id=? ORDER BY h.created_at DESC LIMIT 20""",
         (part_id,)
     )
     return [dict(r) for r in await cur.fetchall()]

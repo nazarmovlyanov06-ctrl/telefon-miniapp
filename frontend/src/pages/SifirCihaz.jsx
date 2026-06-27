@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import ImeiInput from "../components/ImeiInput";
 
-export default function SifirCihaz() {
+export default function SifirCihaz({ user }) {
   const navigate = useNavigate();
   const [kaynak, setKaynak] = useState("hepsi");
   const [tab, setTab] = useState("stok");
@@ -15,6 +15,7 @@ export default function SifirCihaz() {
   const [showForm, setShowForm] = useState(false);
   const [showSat, setShowSat] = useState(false);
   const [err, setErr] = useState("");
+  const [deleteId, setDeleteId] = useState(null);
   const [musteriler, setMusteriler] = useState([]);
   const [satMusteriOner, setSatMusteriOner] = useState([]);
   const [showSatMusteriOner, setShowSatMusteriOner] = useState(false);
@@ -59,6 +60,15 @@ export default function SifirCihaz() {
       await api.createSifir({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
       setShowForm(false);
       setForm({ model: "", imei: "", renk: "", depolama: "", kimden: "", kimden_telefon: "", kaynak: "dukkan", alis_fiyati: "", alis_tarihi: today(), notlar: "" });
+      load();
+    } catch (e) { setErr(e.message); }
+  }
+
+  async function deleteCihaz(id) {
+    try {
+      await api.deleteSifir(id);
+      setDeleteId(null);
+      setSelected(null);
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -236,7 +246,22 @@ export default function SifirCihaz() {
 
                 {isSelected && (
                   <div className="card" style={{ marginTop: -8, borderRadius: "0 0 12px 12px", background: "var(--bg2)" }}>
-                    <button className="btn btn-primary btn-sm" onClick={() => setShowSat(true)}>💰 Sat</button>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                      <button className="btn btn-primary btn-sm" onClick={() => setShowSat(true)}>💰 Sat</button>
+                      {user?.role === "patron" && (
+                        deleteId === c.id ? (
+                          <>
+                            <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 12px", fontSize: 13 }}
+                              onClick={() => deleteCihaz(c.id)}>Sil</button>
+                            <button className="btn btn-ghost btn-sm"
+                              onClick={() => setDeleteId(null)}>İptal</button>
+                          </>
+                        ) : (
+                          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}
+                            onClick={() => setDeleteId(c.id)}>🗑 Sil</button>
+                        )
+                      )}
+                    </div>
 
                     {showSat && (
                       <form onSubmit={submitSat} style={{ marginTop: 10 }}>
