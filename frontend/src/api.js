@@ -61,6 +61,7 @@ export const api = {
   updatePart: (id, data) => put(`/parts/${id}`, data),
   deletePart: (id) => del(`/parts/${id}`),
   kullanPart: (id, data) => post(`/parts/${id}/kullan`, data),
+  stokEkle: (id, data) => post(`/parts/${id}/stok-ekle`, data),
   partHareketler: (id) => get(`/parts/${id}/hareketler`),
   orders: () => get("/parts/orders/"),
   createOrder: (data) => post("/parts/orders/", data),

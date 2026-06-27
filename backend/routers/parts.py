@@ -97,6 +97,38 @@ async def delete_part(
     return {"ok": True}
 
 
+@router.post("/{part_id}/stok-ekle")
+async def stok_ekle(
+    part_id: int,
+    body: dict,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute("SELECT id, name, quantity FROM parts WHERE id=?", (part_id,))
+    part = await cur.fetchone()
+    if not part:
+        raise HTTPException(404, "Parça bulunamadı")
+    miktar = int(body.get("miktar", 1))
+    if miktar < 1:
+        raise HTTPException(400, "Geçersiz miktar")
+    fiyat = body.get("fiyat")
+    if fiyat:
+        await db.execute(
+            "UPDATE parts SET quantity = quantity + ?, purchase_price = ? WHERE id = ?",
+            (miktar, float(fiyat), part_id),
+        )
+    else:
+        await db.execute("UPDATE parts SET quantity = quantity + ? WHERE id = ?", (miktar, part_id))
+    await db.execute(
+        """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih)
+           VALUES (?, 'giris', ?, 'satin_alma', ?, ?)""",
+        (part_id, miktar, body.get("aciklama"), date.today().isoformat()),
+    )
+    await db.commit()
+    return {"ok": True}
+
+
 @router.post("/{part_id}/kullan")
 async def kullan_part(
     part_id: int,

@@ -38,13 +38,19 @@ export default function Parts() {
   const [addForm, setAddForm] = useState({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" });
   const [addErr, setAddErr] = useState("");
 
-  // Stok düş panel
+  // Stok düş / ekle panel
   const [selectedPart, setSelectedPart] = useState(null);
-  const [panelTab, setPanelTab] = useState("dus"); // "dus" | "gecmis"
+  const [panelTab, setPanelTab] = useState("ekle"); // "ekle" | "dus" | "gecmis"
   const [hareketler, setHareketler] = useState([]);
   const [hareketLoading, setHareketLoading] = useState(false);
   const [kullanForm, setKullanForm] = useState({ sebep: "tamir", aciklama: "", miktar: "1" });
   const [kullanErr, setKullanErr] = useState("");
+  const [ekleForm, setEkleForm] = useState({ miktar: "1", fiyat: "", aciklama: "" });
+  const [ekleErr, setEkleErr] = useState("");
+
+  // Yeni parça form — mevcut parça önerisi
+  const [addEklePart, setAddEklePart] = useState(null); // null = yeni kayıt, object = mevcut parça üstüne ekle
+  const [showOner, setShowOner] = useState(false);
 
   const [err, setErr] = useState("");
 
@@ -137,7 +143,7 @@ export default function Parts() {
     } catch (e) { setErr(e.message); }
   }
 
-  async function openPanel(p, tab = "dus") {
+  async function openPanel(p, tab = "ekle") {
     if (selectedPart?.id === p.id && panelTab === tab) {
       setSelectedPart(null); return;
     }
@@ -145,6 +151,8 @@ export default function Parts() {
     setPanelTab(tab);
     setKullanForm({ sebep: "tamir", aciklama: "", miktar: "1" });
     setKullanErr("");
+    setEkleForm({ miktar: "1", fiyat: "", aciklama: "" });
+    setEkleErr("");
     if (tab === "gecmis") {
       setHareketLoading(true);
       try { setHareketler(await api.partHareketler(p.id)); }
@@ -166,20 +174,44 @@ export default function Parts() {
     } catch (e) { setKullanErr(e.message); }
   }
 
+  async function submitEkle(e) {
+    e.preventDefault(); setEkleErr("");
+    try {
+      await api.stokEkle(selectedPart.id, {
+        miktar: parseInt(ekleForm.miktar) || 1,
+        fiyat: ekleForm.fiyat ? parseFloat(ekleForm.fiyat) : null,
+        aciklama: ekleForm.aciklama || null,
+      });
+      setSelectedPart(null);
+      setEkleForm({ miktar: "1", fiyat: "", aciklama: "" });
+      api.parts(q ? { q } : {}).then(setParts);
+    } catch (e) { setEkleErr(e.message); }
+  }
+
   async function submitAddPart(e) {
     e.preventDefault(); setAddErr("");
     try {
-      await api.createPart({
-        name: addForm.name,
-        device_model: addForm.device_model || null,
-        part_type: addForm.part_type || null,
-        quantity: parseInt(addForm.quantity) || 0,
-        min_quantity: parseInt(addForm.min_quantity) || 2,
-        purchase_price: addForm.purchase_price ? parseFloat(addForm.purchase_price) : 0,
-        sale_price: 0,
-      });
+      if (addEklePart) {
+        // Mevcut parçaya stok ekle
+        await api.stokEkle(addEklePart.id, {
+          miktar: parseInt(addForm.quantity) || 1,
+          fiyat: addForm.purchase_price ? parseFloat(addForm.purchase_price) : null,
+          aciklama: null,
+        });
+      } else {
+        await api.createPart({
+          name: addForm.name,
+          device_model: addForm.device_model || null,
+          part_type: addForm.part_type || null,
+          quantity: parseInt(addForm.quantity) || 0,
+          min_quantity: parseInt(addForm.min_quantity) || 2,
+          purchase_price: addForm.purchase_price ? parseFloat(addForm.purchase_price) : 0,
+          sale_price: 0,
+        });
+      }
       setShowAddForm(false);
       setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" });
+      setAddEklePart(null);
       api.parts(q ? { q } : {}).then(setParts);
     } catch (e) { setAddErr(e.message); }
   }
@@ -214,58 +246,143 @@ export default function Parts() {
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(v => !v)}>+ Ekle</button>
           </div>
 
-          {showAddForm && (
-            <div className="card" style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 600, marginBottom: 10 }}>Yeni Parça</div>
-              <form onSubmit={submitAddPart}>
-                {addErr && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>❌ {addErr}</div>}
-                <div className="form-group">
-                  <label className="form-label">Parça Adı *</label>
-                  <input className="form-input" required value={addForm.name}
-                    onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder="Ekran, batarya, entegre..." />
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Cihaz Modeli</label>
-                    <input className="form-input" value={addForm.device_model}
-                      onChange={e => setAddForm(f => ({ ...f, device_model: e.target.value }))}
-                      placeholder="iPhone 13..." />
+          {showAddForm && (() => {
+            const oner = addForm.name.length >= 2 && !addEklePart
+              ? parts.filter(p => p.name.toLowerCase().includes(addForm.name.toLowerCase())).slice(0, 5)
+              : [];
+            return (
+              <div className="card" style={{ marginBottom: 12 }}>
+                {addEklePart ? (
+                  // ── Mevcut parçaya stok ekle modu ──
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                      <div style={{ background: "rgba(99,102,241,0.12)", borderRadius: 8, padding: "6px 10px", flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>{addEklePart.name}</div>
+                        <div style={{ fontSize: 12, color: "var(--hint)" }}>
+                          {addEklePart.device_model}{addEklePart.part_type ? ` · ${addEklePart.part_type}` : ""} · Mevcut: {addEklePart.quantity} adet
+                        </div>
+                      </div>
+                      <button type="button" className="btn btn-ghost btn-sm"
+                        onClick={() => { setAddEklePart(null); setAddForm(f => ({ ...f, name: "" })); }}>
+                        ✕
+                      </button>
+                    </div>
+                    <form onSubmit={submitAddPart}>
+                      {addErr && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>❌ {addErr}</div>}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Eklenecek Adet</label>
+                          <input className="form-input" type="number" min="1" required value={addForm.quantity}
+                            onChange={e => setAddForm(f => ({ ...f, quantity: e.target.value }))} />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Alış Fiyatı (₺)</label>
+                          <input className="form-input" type="number" step="0.01" value={addForm.purchase_price}
+                            onChange={e => setAddForm(f => ({ ...f, purchase_price: e.target.value }))}
+                            placeholder="Opsiyonel" />
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                        <button type="submit" className="btn btn-primary btn-sm">➕ Stok Ekle</button>
+                        <button type="button" className="btn btn-ghost btn-sm"
+                          onClick={() => { setShowAddForm(false); setAddEklePart(null); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" }); }}>
+                          İptal
+                        </button>
+                      </div>
+                    </form>
                   </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Parça Türü</label>
-                    <select className="form-select" value={addForm.part_type}
-                      onChange={e => setAddForm(f => ({ ...f, part_type: e.target.value }))}>
-                      <option value="">— Seç —</option>
-                      {PARCA_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
+                ) : (
+                  // ── Yeni parça kayıt modu ──
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 10 }}>Yeni Parça</div>
+                    <form onSubmit={submitAddPart}>
+                      {addErr && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>❌ {addErr}</div>}
+                      <div className="form-group" style={{ position: "relative" }}>
+                        <label className="form-label">Parça Adı *</label>
+                        <input className="form-input" required value={addForm.name}
+                          onChange={e => { setAddForm(f => ({ ...f, name: e.target.value })); setShowOner(true); }}
+                          onBlur={() => setTimeout(() => setShowOner(false), 200)}
+                          placeholder="Ekran, batarya, entegre..." autoComplete="off" />
+                        {showOner && oner.length > 0 && (
+                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50,
+                            background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10,
+                            boxShadow: "0 4px 16px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+                            <div style={{ padding: "6px 12px", fontSize: 11, color: "var(--hint)", borderBottom: "1px solid var(--border)", fontWeight: 600 }}>
+                              MEVCUT PARÇALAR — seçerek stok ekle
+                            </div>
+                            {oner.map(p => (
+                              <div key={p.id}
+                                onMouseDown={() => {
+                                  setAddEklePart(p);
+                                  setAddForm(f => ({ ...f, name: p.name, quantity: "1", purchase_price: "" }));
+                                  setShowOner(false);
+                                }}
+                                style={{ padding: "10px 12px", cursor: "pointer", borderBottom: "1px solid var(--border)",
+                                  display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                  <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
+                                  <div style={{ fontSize: 11, color: "var(--hint)" }}>
+                                    {p.device_model}{p.part_type ? ` · ${p.part_type}` : ""}
+                                  </div>
+                                </div>
+                                <div style={{ fontWeight: 700, color: p.quantity <= p.min_quantity ? "var(--danger)" : "var(--success)", fontSize: 14 }}>
+                                  {p.quantity} adet
+                                </div>
+                              </div>
+                            ))}
+                            <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--hint)", fontStyle: "italic" }}>
+                              Yeni kayıt için yukarıda seçim yapma, direkt kaydet
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Cihaz Modeli</label>
+                          <input className="form-input" value={addForm.device_model}
+                            onChange={e => setAddForm(f => ({ ...f, device_model: e.target.value }))}
+                            placeholder="iPhone 13..." />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Parça Türü</label>
+                          <select className="form-select" value={addForm.part_type}
+                            onChange={e => setAddForm(f => ({ ...f, part_type: e.target.value }))}>
+                            <option value="">— Seç —</option>
+                            {PARCA_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Adet</label>
+                          <input className="form-input" type="number" min="0" value={addForm.quantity}
+                            onChange={e => setAddForm(f => ({ ...f, quantity: e.target.value }))} />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Min. Stok</label>
+                          <input className="form-input" type="number" min="0" value={addForm.min_quantity}
+                            onChange={e => setAddForm(f => ({ ...f, min_quantity: e.target.value }))} />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Alış (₺)</label>
+                          <input className="form-input" type="number" value={addForm.purchase_price}
+                            onChange={e => setAddForm(f => ({ ...f, purchase_price: e.target.value }))}
+                            placeholder="0" />
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                        <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
+                        <button type="button" className="btn btn-ghost btn-sm"
+                          onClick={() => { setShowAddForm(false); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" }); }}>
+                          İptal
+                        </button>
+                      </div>
+                    </form>
                   </div>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Adet</label>
-                    <input className="form-input" type="number" min="0" value={addForm.quantity}
-                      onChange={e => setAddForm(f => ({ ...f, quantity: e.target.value }))} />
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Min. Stok</label>
-                    <input className="form-input" type="number" min="0" value={addForm.min_quantity}
-                      onChange={e => setAddForm(f => ({ ...f, min_quantity: e.target.value }))} />
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Alış (₺)</label>
-                    <input className="form-input" type="number" value={addForm.purchase_price}
-                      onChange={e => setAddForm(f => ({ ...f, purchase_price: e.target.value }))}
-                      placeholder="0" />
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                  <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowAddForm(false)}>İptal</button>
-                </div>
-              </form>
-            </div>
-          )}
+                )}
+              </div>
+            );
+          })()}
           {brands.length > 1 && (
             <div style={{ marginBottom: 8 }}>
               <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 4, fontWeight: 600 }}>MARKA</div>
@@ -307,7 +424,7 @@ export default function Parts() {
                 <div key={p.id}>
                   {/* Parça satırı */}
                   <div className="list-item" style={{ background: isSelected ? "var(--bg2)" : undefined }}>
-                    <div className="list-item-body" style={{ cursor: "pointer" }} onClick={() => openPanel(p, "dus")}>
+                    <div className="list-item-body" style={{ cursor: "pointer" }} onClick={() => openPanel(p, "ekle")}>
                       <div className="list-item-title">{p.name}</div>
                       <div className="list-item-sub">{p.device_model} · {p.part_type}</div>
                     </div>
@@ -330,26 +447,58 @@ export default function Parts() {
                   {isSelected && (
                     <div className="card" style={{ marginTop: -4, borderRadius: "0 0 12px 12px", background: "var(--bg2)", marginBottom: 8 }}>
                       {/* Panel sekme */}
-                      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                        <button onClick={() => setPanelTab("dus")}
-                          style={{ padding: "5px 14px", borderRadius: 20, border: "none", cursor: "pointer",
-                            background: panelTab === "dus" ? "var(--accent)" : "var(--bg)",
-                            color: panelTab === "dus" ? "#fff" : "var(--text)", fontWeight: 600, fontSize: 13 }}>
-                          ➖ Stok Düş
-                        </button>
-                        <button onClick={() => {
-                          setPanelTab("gecmis");
-                          if (!hareketler.length || selectedPart?.id !== p.id) {
-                            setHareketLoading(true);
-                            api.partHareketler(p.id).then(setHareketler).finally(() => setHareketLoading(false));
-                          }
-                        }}
-                          style={{ padding: "5px 14px", borderRadius: 20, border: "none", cursor: "pointer",
-                            background: panelTab === "gecmis" ? "var(--accent)" : "var(--bg)",
-                            color: panelTab === "gecmis" ? "#fff" : "var(--text)", fontWeight: 600, fontSize: 13 }}>
-                          📋 Geçmiş
-                        </button>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                        {[
+                          { key: "ekle", label: "➕ Stok Ekle" },
+                          { key: "dus", label: "➖ Stok Düş" },
+                          { key: "gecmis", label: "📋 Geçmiş" },
+                        ].map(s => (
+                          <button key={s.key} onClick={() => {
+                            setPanelTab(s.key);
+                            if (s.key === "gecmis" && (!hareketler.length || selectedPart?.id !== p.id)) {
+                              setHareketLoading(true);
+                              api.partHareketler(p.id).then(setHareketler).finally(() => setHareketLoading(false));
+                            }
+                          }}
+                            style={{ padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer",
+                              background: panelTab === s.key ? "var(--accent)" : "var(--bg)",
+                              color: panelTab === s.key ? "#fff" : "var(--text)", fontWeight: 600, fontSize: 12 }}>
+                            {s.label}
+                          </button>
+                        ))}
                       </div>
+
+                      {/* Stok Ekle formu */}
+                      {panelTab === "ekle" && (
+                        <form onSubmit={submitEkle} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {ekleErr && <div style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600 }}>❌ {ekleErr}</div>}
+                          <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8 }}>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label">Adet</label>
+                              <input className="form-input" type="number" min="1" required
+                                value={ekleForm.miktar}
+                                onChange={e => setEkleForm(f => ({ ...f, miktar: e.target.value }))} />
+                            </div>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label">Alış Fiyatı (₺)</label>
+                              <input className="form-input" type="number" step="0.01"
+                                value={ekleForm.fiyat}
+                                onChange={e => setEkleForm(f => ({ ...f, fiyat: e.target.value }))}
+                                placeholder="Opsiyonel" />
+                            </div>
+                          </div>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Açıklama / Toptancı</label>
+                            <input className="form-input" value={ekleForm.aciklama}
+                              onChange={e => setEkleForm(f => ({ ...f, aciklama: e.target.value }))}
+                              placeholder="Nereden alındı, not..." />
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button type="submit" className="btn btn-primary btn-sm">➕ Ekle</button>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedPart(null)}>İptal</button>
+                          </div>
+                        </form>
+                      )}
 
                       {/* Stok Düş formu */}
                       {panelTab === "dus" && (
