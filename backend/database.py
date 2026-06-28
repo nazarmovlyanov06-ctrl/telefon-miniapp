@@ -1,5 +1,5 @@
 import aiosqlite
-from config import DB_PATH, DEV_TELEGRAM_ID
+from config import DB_PATH
 
 
 async def get_db():
@@ -17,18 +17,14 @@ async def get_or_create_user(db: aiosqlite.Connection, tg_id: int, name: str) ->
     )
     row = await cur.fetchone()
     if row:
-        user = dict(row)
-        if DEV_TELEGRAM_ID and tg_id == DEV_TELEGRAM_ID and user.get("role") != "patron":
-            await db.execute(
-                "UPDATE users SET role='patron', durum='aktif' WHERE telegram_id=?", (tg_id,)
-            )
-            await db.commit()
-            user["role"] = "patron"
-            user["durum"] = "aktif"
-        return user
-    is_patron = DEV_TELEGRAM_ID and tg_id == DEV_TELEGRAM_ID
-    role = "patron" if is_patron else "cirak"
-    durum = "aktif" if is_patron else "bekliyor"
+        return dict(row)
+
+    # First user ever = auto patron (single-tenant app)
+    cur2 = await db.execute("SELECT COUNT(*) FROM users")
+    total = (await cur2.fetchone())[0]
+    is_first = total == 0
+    role = "patron" if is_first else "cirak"
+    durum = "aktif" if is_first else "bekliyor"
     await db.execute(
         "INSERT INTO users (telegram_id, name, role, durum) VALUES (?, ?, ?, ?)",
         (tg_id, name, role, durum),
