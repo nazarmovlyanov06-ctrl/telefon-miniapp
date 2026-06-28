@@ -22,6 +22,7 @@ export default function GeriBildirim({ user }) {
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
+    api.geriBildirimCalisanlar().then(setKullanicilar).catch(() => {});
     load();
     return () => { api.geriBildirimGoruldu().catch(() => {}); };
   }, []);
@@ -29,16 +30,14 @@ export default function GeriBildirim({ user }) {
   async function load() {
     setLoading(true);
     try {
-      const [l, s, b, u] = await Promise.all([
-        api.geriBildirimList(),
-        api.geriBildirimSkor(),
-        api.geriBildirimBekleyen(),
-        api.geriBildirimCalisanlar(),
+      const [l, s, b] = await Promise.all([
+        api.geriBildirimList().catch(() => []),
+        api.geriBildirimSkor().catch(() => []),
+        api.geriBildirimBekleyen().catch(() => ({ bekleyen: 0 })),
       ]);
       setList(l);
       setSkor(s);
       setBekleyen(b.bekleyen || 0);
-      setKullanicilar(u);
     } finally {
       setLoading(false);
     }
