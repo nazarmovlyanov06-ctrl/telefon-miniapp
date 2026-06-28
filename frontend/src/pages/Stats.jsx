@@ -29,10 +29,12 @@ const AY_KISA = ["", "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "
 export default function Stats() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [skor, setSkor] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.stats().then(setData).catch(() => {}).finally(() => setLoading(false));
+    api.geriBildirimSkor().then(setSkor).catch(() => {});
   }, []);
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
@@ -161,6 +163,37 @@ export default function Stats() {
                 </div>
               </div>
             ))}
+          </div>
+        </>
+      )}
+
+      {/* Çalışan Skoru */}
+      {skor.length > 0 && (
+        <>
+          <div className="section-title">Çalışan Skoru</div>
+          <div className="card">
+            {skor.map((s, i) => {
+              const top = Math.max((s.ovgu_sayisi || 0) + (s.sikayet_sayisi || 0), 1);
+              return (
+                <div key={s.id} style={{ marginBottom: i < skor.length - 1 ? 12 : 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 13 }}>
+                    <span style={{ fontWeight: 600 }}>{s.name}</span>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <span style={{ color: "var(--success)", fontWeight: 700 }}>⭐ {s.ovgu_sayisi || 0}</span>
+                      <span style={{ color: "var(--danger)", fontWeight: 700 }}>😤 {s.sikayet_sayisi || 0}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", height: 6, borderRadius: 4, overflow: "hidden", background: "var(--bg2)" }}>
+                    {(s.ovgu_sayisi || 0) > 0 && (
+                      <div style={{ width: `${(s.ovgu_sayisi / top) * 100}%`, background: "var(--success)" }} />
+                    )}
+                    {(s.sikayet_sayisi || 0) > 0 && (
+                      <div style={{ width: `${(s.sikayet_sayisi / top) * 100}%`, background: "var(--danger)" }} />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>
       )}
