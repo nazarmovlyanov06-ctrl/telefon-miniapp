@@ -163,7 +163,15 @@ export default function Maas() {
             <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Çalışan eklenmedi</div>
           ) : calisanlar.map(c => (
             <div key={c.id} className="card">
-              <div className="card-row">
+              <div className="card-row" style={{ cursor: "pointer" }}
+                onClick={async () => {
+                  if (expandedCalisan === c.id) { setExpandedCalisan(null); return; }
+                  setExpandedCalisan(c.id);
+                  if (!avansDetay[c.id]) {
+                    const a = await api.calisanAvanslar(c.id).catch(() => []);
+                    setAvansDetay(d => ({ ...d, [c.id]: a }));
+                  }
+                }}>
                 <div>
                   <div style={{ fontWeight: 600 }}>👤 {c.ad}</div>
                   {c.telefon && <div style={{ fontSize: 13, color: "var(--hint)" }}>📞 {c.telefon}</div>}
@@ -173,6 +181,22 @@ export default function Maas() {
                   <div style={{ fontSize: 12, color: "var(--hint)" }}>aylık maaş</div>
                 </div>
               </div>
+              {expandedCalisan === c.id && (
+                <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--hint)", marginBottom: 6 }}>Avans Geçmişi</div>
+                  {!(avansDetay[c.id]?.length) ? (
+                    <div style={{ fontSize: 12, color: "var(--hint)" }}>Avans kaydı yok</div>
+                  ) : avansDetay[c.id].map(a => (
+                    <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, padding: "5px 0", borderBottom: "1px solid var(--border)" }}>
+                      <div>
+                        <span style={{ color: "var(--hint)" }}>📅 {a.tarih}</span>
+                        {a.notlar && <span style={{ fontSize: 11, color: "var(--hint)", marginLeft: 8 }}>{a.notlar}</span>}
+                      </div>
+                      <span style={{ fontWeight: 700, color: "var(--danger)" }}>-{(a.tutar || 0).toLocaleString("tr-TR")} ₺</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </>
