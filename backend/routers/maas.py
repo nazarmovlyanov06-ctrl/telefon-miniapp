@@ -67,6 +67,46 @@ async def calisan_avanslar(
     return [dict(r) for r in await cur.fetchall()]
 
 
+@router.post("/ode/{calisan_id}")
+async def maas_ode(
+    calisan_id: int,
+    body: dict,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    yil = int(body.get("yil", date.today().year))
+    ay = int(body.get("ay", date.today().month))
+    tarih = body.get("tarih", date.today().isoformat())
+    tutar = float(body.get("tutar", 0))
+    cur = await db.execute(
+        "SELECT * FROM calisanlar WHERE id = ?", (calisan_id,)
+    )
+    calisan = dict(await cur.fetchone())
+    mevcut = await db.execute(
+        "SELECT id FROM maas_odemeleri WHERE calisan_id=? AND yil=? AND ay=?",
+        (calisan_id, yil, ay)
+    )
+    row = await mevcut.fetchone()
+    if row:
+        await db.execute(
+            "UPDATE maas_odemeleri SET odendi=1, odeme_tarihi=?, maas=? WHERE id=?",
+            (tarih, tutar, row["id"])
+        )
+    else:
+        await db.execute(
+            "INSERT INTO maas_odemeleri (calisan_id, yil, ay, maas, odendi, odeme_tarihi) VALUES (?,?,?,?,1,?)",
+            (calisan_id, yil, ay, tutar, tarih)
+        )
+    await db.execute(
+        """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+           VALUES (?, 'cikis', 'nakit', ?, ?, 'maas')""",
+        (tarih, tutar, f"Maaş: {calisan['ad']}"),
+    )
+    await db.commit()
+    return {"ok": True}
+
+
 @router.get("/ozet/{yil}/{ay}")
 async def ozet(
     yil: int,
@@ -95,13 +135,14 @@ async def ozet(
         )
         mrow = await cur.fetchone()
         odendi = bool(dict(mrow)["odendi"]) if mrow else False
+        odeme_tarihi = dict(mrow)["odeme_tarihi"] if mrow else None
         kalan = c["aylik_maas"] - avans
         toplam_maas += c["aylik_maas"]
         toplam_avans += avans
         sonuc.append({
             "calisan_id": c["id"], "ad": c["ad"],
             "aylik_maas": c["aylik_maas"], "alinan_avans": avans,
-            "kalan": kalan, "odendi": odendi,
+            "kalan": kalan, "odendi": odendi, "odeme_tarihi": odeme_tarihi,
         })
     return {
         "yil": yil, "ay": ay,

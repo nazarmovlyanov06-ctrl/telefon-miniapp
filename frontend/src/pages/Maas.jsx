@@ -234,7 +234,23 @@ export default function Maas() {
                 <span style={{ fontWeight: 700 }}>Net Ödeme</span>
                 <span style={{ fontWeight: 700, color: "var(--success)" }}>{(o.kalan || 0).toLocaleString("tr-TR")} ₺</span>
               </div>
-              {o.odendi && <div style={{ fontSize: 12, color: "var(--success)", marginTop: 4 }}>✓ Ödendi</div>}
+              {o.odendi
+                ? <div style={{ fontSize: 12, color: "var(--success)", marginTop: 4 }}>
+                    ✅ Ödendi {o.odeme_tarihi ? `· 📅 ${new Date(o.odeme_tarihi).toLocaleDateString("tr-TR")}` : ""}
+                  </div>
+                : <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }}
+                    onClick={async () => {
+                      const tarih = prompt("Ödeme tarihi (YYYY-MM-DD)", new Date().toISOString().slice(0,10));
+                      if (!tarih) return;
+                      await api.maasOde(o.calisan_id, {
+                        yil: now.getFullYear(), ay: now.getMonth() + 1,
+                        tutar: o.kalan, tarih,
+                      });
+                      load();
+                    }}>
+                    💵 Maaş Öde
+                  </button>
+              }
               {o.alinan_avans > 0 && (
                 <button className="btn btn-ghost btn-sm" style={{ marginTop: 6, fontSize: 11 }}
                   onClick={async () => {

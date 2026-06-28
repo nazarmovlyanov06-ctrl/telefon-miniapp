@@ -172,6 +172,7 @@ export const api = {
   createAvans: (data) => post("/maas/avans", data),
   maasOzet: (yil, ay) => get(`/maas/ozet/${yil}/${ay}`),
   calisanAvanslar: (id) => get(`/maas/avanslar/${id}`),
+  maasOde: (id, data) => post(`/maas/ode/${id}`, data),
 
   // Kara Liste
   karaListe: (q) => get(`/kara-liste/${q ? "?q=" + encodeURIComponent(q) : ""}`),
