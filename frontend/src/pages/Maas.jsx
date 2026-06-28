@@ -16,8 +16,9 @@ export default function Maas() {
   const [err, setErr] = useState("");
   const [botUsers, setBotUsers] = useState([]);
   const [showBotPicker, setShowBotPicker] = useState(false);
-  const [avansDetay, setAvansDetay] = useState({}); // calisan_id → avanslar
+  const [avansDetay, setAvansDetay] = useState({});
   const [expandedCalisan, setExpandedCalisan] = useState(null);
+  const [maasOdeTarih, setMaasOdeTarih] = useState({}); // calisan_id → tarih input visible
 
   useEffect(() => {
     load();
@@ -238,16 +239,27 @@ export default function Maas() {
                 ? <div style={{ fontSize: 12, color: "var(--success)", marginTop: 4 }}>
                     ✅ Ödendi {o.odeme_tarihi ? `· 📅 ${new Date(o.odeme_tarihi).toLocaleDateString("tr-TR")}` : ""}
                   </div>
-                : <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }}
-                    onClick={async () => {
-                      await api.maasOde(o.calisan_id, {
-                        yil: now.getFullYear(), ay: now.getMonth() + 1,
-                        tutar: o.kalan, tarih: new Date().toISOString().slice(0, 10),
-                      });
-                      load();
-                    }}>
-                    💵 Maaş Öde
-                  </button>
+                : maasOdeTarih[o.calisan_id]
+                  ? <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        className="form-input"
+                        type="date"
+                        style={{ flex: 1 }}
+                        defaultValue={new Date().toISOString().slice(0, 10)}
+                        id={`maas-tarih-${o.calisan_id}`}
+                      />
+                      <button className="btn btn-primary btn-sm" onClick={async () => {
+                        const tarih = document.getElementById(`maas-tarih-${o.calisan_id}`).value;
+                        await api.maasOde(o.calisan_id, { yil: now.getFullYear(), ay: now.getMonth() + 1, tutar: o.kalan, tarih });
+                        setMaasOdeTarih(s => ({ ...s, [o.calisan_id]: false }));
+                        load();
+                      }}>Kaydet</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setMaasOdeTarih(s => ({ ...s, [o.calisan_id]: false }))}>İptal</button>
+                    </div>
+                  : <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }}
+                      onClick={() => setMaasOdeTarih(s => ({ ...s, [o.calisan_id]: true }))}>
+                      💵 Maaş Öde
+                    </button>
               }
               {o.alinan_avans > 0 && (
                 <button className="btn btn-ghost btn-sm" style={{ marginTop: 6, fontSize: 11 }}
