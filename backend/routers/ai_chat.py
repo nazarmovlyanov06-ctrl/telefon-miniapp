@@ -134,8 +134,8 @@ async def _servis_verisi(db: Connection) -> str:
     bekleyen_siparis = (await cur.fetchone())["c"]
 
     cur = await db.execute(
-        """SELECT po.*, t.ad as toptanci_adi
-           FROM part_orders po LEFT JOIN toptancilar t ON po.toptanci_id = t.id
+        """SELECT po.*, u.name as ordered_by_name
+           FROM part_orders po LEFT JOIN users u ON po.ordered_by = u.id
            WHERE po.status = 'siparis_verildi'
            ORDER BY po.ordered_at DESC LIMIT 10"""
     )
@@ -153,7 +153,7 @@ async def _servis_verisi(db: Connection) -> str:
         satirlar.append(f"  {p['name']} | {p['category'] or '-'} | {p['quantity']} adet | Alış: {p['cost_price']:.0f}₺ | Satış: {p['sale_price']:.0f}₺ | {p['supplier'] or '-'}")
     satirlar.append(f"Bekleyen sipariş: {bekleyen_siparis} adet")
     for s in bekleyen_siparisler:
-        satirlar.append(f"  {s['toptanci_adi'] or s.get('supplier','-')} | {s.get('part_id','?')} | {s['quantity']} adet | {s['unit_cost']:.0f}₺ | {str(s['ordered_at'])[:10]}")
+        satirlar.append(f"  {s.get('ordered_by_name') or s.get('supplier','-')} | {s.get('part_name','?')} | {s['quantity']} adet | {(s.get('estimated_price') or 0):.0f}₺ | {str(s['ordered_at'])[:10]}")
 
     # ── 2. EL CİHAZLAR ────────────────────────────────────────
     cur = await db.execute(
