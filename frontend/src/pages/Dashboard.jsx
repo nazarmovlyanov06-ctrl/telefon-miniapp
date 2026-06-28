@@ -232,10 +232,10 @@ export default function Dashboard({ user }) {
 
       {stok_uyari > 0 && (
         <div style={{ background: "rgba(245,158,11,0.12)", borderRadius: 10, padding: "10px 14px", cursor: "pointer", marginBottom: 14, borderLeft: "3px solid #f59e0b" }}
-          onClick={() => navigate("/parts")}>
+          onClick={() => navigate("/parts?low_stock=true")}>
           <div className="card-row">
             <span style={{ color: "#f59e0b", fontWeight: 600 }}>⚠️ Azalan Stok</span>
-            <span style={{ fontWeight: 700, color: "#f59e0b" }}>{stok_uyari} ürün</span>
+            <span style={{ fontWeight: 700, color: "#f59e0b" }}>{stok_uyari} ürün →</span>
           </div>
         </div>
       )}

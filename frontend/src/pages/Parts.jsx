@@ -51,6 +51,7 @@ export default function Parts({ user }) {
   const [typeFilter, setTypeFilter] = useState("Tümü");
   const [deletePartId, setDeletePartId] = useState(null);
   const [deleteOrderId, setDeleteOrderId] = useState(null);
+  const [lowStock, setLowStock] = useState(searchParams.get("low_stock") === "true");
 
   // Sipariş Ver
   const [showShopForm, setShowShopForm] = useState(false);
@@ -100,11 +101,14 @@ export default function Parts({ user }) {
   useEffect(() => {
     setLoading(true);
     if (tab === "stok") {
-      api.parts(q ? { q } : {}).then(setParts).finally(() => setLoading(false));
+      const params = {};
+      if (q) params.q = q;
+      if (lowStock) params.low_stock = true;
+      api.parts(params).then(setParts).finally(() => setLoading(false));
     } else {
       api.shopping().then(setShopping).finally(() => setLoading(false));
     }
-  }, [tab, q]);
+  }, [tab, q, lowStock]);
 
   function handleToptanciChange(val) {
     setBoughtData(d => ({ ...d, toptanci: val }));
@@ -313,12 +317,18 @@ export default function Parts({ user }) {
       {/* STOK TAB */}
       {tab === "stok" && (
         <>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: lowStock ? 6 : 10 }}>
             <div className="search-bar" style={{ flex: 1, margin: 0 }}>
               <input className="search-input" placeholder="🔍 Parça ara..." value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(v => !v)}>+ Ekle</button>
           </div>
+          {lowStock && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, background: "rgba(245,158,11,0.12)", borderRadius: 8, padding: "7px 12px", border: "1px solid rgba(245,158,11,0.3)" }}>
+              <span style={{ color: "#f59e0b", fontWeight: 600, fontSize: 13, flex: 1 }}>⚠️ Azalan stok filtresi aktif</span>
+              <button onClick={() => setLowStock(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", fontSize: 18, lineHeight: 1, padding: 0 }}>✕</button>
+            </div>
+          )}
 
           {showAddForm && (() => {
             const oner = addForm.name.length >= 2 && !addEklePart
