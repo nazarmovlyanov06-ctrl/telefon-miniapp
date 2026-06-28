@@ -97,6 +97,7 @@ export default function Parts({ user }) {
   const [turDuzenle, setTurDuzenle] = useState(false);
   const [yeniTur, setYeniTur] = useState("");
 
+  const [sortBy, setSortBy] = useState("yeni"); // "yeni" | "stok" | "isim"
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -311,11 +312,17 @@ export default function Parts({ user }) {
 
   const brands = ["Tümü", ...new Set(parts.map(p => (p.device_model || "").split(" ")[0]).filter(Boolean).sort())];
   const types = ["Tümü", ...new Set(parts.map(p => p.part_type).filter(Boolean).sort())];
-  const filteredParts = parts.filter(p => {
-    const bm = brandFilter === "Tümü" || (p.device_model || "").toLowerCase().startsWith(brandFilter.toLowerCase());
-    const tm = typeFilter === "Tümü" || p.part_type === typeFilter;
-    return bm && tm;
-  });
+  const filteredParts = parts
+    .filter(p => {
+      const bm = brandFilter === "Tümü" || (p.device_model || "").toLowerCase().startsWith(brandFilter.toLowerCase());
+      const tm = typeFilter === "Tümü" || p.part_type === typeFilter;
+      return bm && tm;
+    })
+    .sort((a, b) => {
+      if (sortBy === "stok") return b.quantity - a.quantity;
+      if (sortBy === "isim") return (a.name || "").localeCompare(b.name || "", "tr");
+      return b.id - a.id; // yeni (default)
+    });
 
   return (
     <div className="page">
@@ -528,6 +535,25 @@ export default function Parts({ user }) {
               </div>
             );
           })()}
+          {/* Sıralama */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: "var(--hint)", fontWeight: 600, flexShrink: 0 }}>SIRALA:</span>
+            {[
+              { key: "yeni", label: "🕐 Yeni" },
+              { key: "stok", label: "📦 Stok" },
+              { key: "isim", label: "🔤 İsim" },
+            ].map(s => (
+              <button key={s.key} onClick={() => setSortBy(s.key)}
+                style={{
+                  padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer",
+                  background: sortBy === s.key ? "var(--accent)" : "var(--bg2)",
+                  color: sortBy === s.key ? "#fff" : "var(--text)",
+                  fontWeight: sortBy === s.key ? 700 : 400, fontSize: 12,
+                }}>
+                {s.label}
+              </button>
+            ))}
+          </div>
           {brands.length > 1 && (
             <div style={{ marginBottom: 8 }}>
               <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 4, fontWeight: 600 }}>MARKA</div>
