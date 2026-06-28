@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import aiosqlite
+import os
 from config import FRONTEND_URL, DB_PATH
 from routers import users, customers, repairs, parts, shopping, imei, debts, reports
 from routers import (
@@ -471,6 +474,16 @@ app.include_router(geri_bildirim.router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+# Serve React SPA — must be after all API routes
+_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.exists(_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(_dist, "assets")), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):
+        return FileResponse(os.path.join(_dist, "index.html"))
 
 
 @app.get("/health/db")
