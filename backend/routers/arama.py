@@ -106,21 +106,24 @@ async def evrensel_arama(
     except Exception:
         pass
 
-    # Borçlar — debts tablosu: amount, paid (total_amount/paid_amount değil)
+    # Borçlar
     try:
         cur = await db.execute(
-            """SELECT d.id, c.name as musteri_adi, d.amount, d.paid, d.description
+            """SELECT d.id, c.name as musteri_adi,
+                      COALESCE(d.total_amount, d.amount, 0) as toplam,
+                      COALESCE(d.paid_amount, d.paid, 0) as odenen,
+                      d.description
                FROM debts d LEFT JOIN customers c ON d.customer_id = c.id
                WHERE (c.name LIKE ? OR d.description LIKE ?)
-                 AND d.amount > COALESCE(d.paid, 0)
                ORDER BY d.created_at DESC LIMIT 4""",
             (like, like),
         )
         for r in await cur.fetchall():
             r = dict(r)
-            kalan = (r["amount"] or 0) - (r["paid"] or 0)
-            if kalan > 0:
-                sonuclar.append({
+            kalan = (r["toplam"] or 0) - (r["odenen"] or 0)
+            if kalan <= 0:
+                continue
+            sonuclar.append({
                     "tur": "borc",
                     "ikon": "💳",
                     "baslik": r["musteri_adi"] or "Borç",
