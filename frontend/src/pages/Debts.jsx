@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 
 export default function Debts() {
-  const [tab, setTab] = useState("alacak");
+  const [tab, setTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("tab") || "alacak";
+  });
   const [alacaklar, setAlacaklar] = useState([]);
   const [dukkanBorclari, setDukkanBorclari] = useState([]);
   const [loading, setLoading] = useState(true);
