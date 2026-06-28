@@ -38,7 +38,7 @@ export default function GeriBildirim({ user }) {
       setList(l);
       setSkor(s);
       setBekleyen(b.bekleyen || 0);
-      setKullanicilar(u.filter(u2 => u2.tg_id !== user?.tg_id));
+      setKullanicilar(u);
     } finally {
       setLoading(false);
     }
