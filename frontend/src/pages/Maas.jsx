@@ -240,11 +240,9 @@ export default function Maas() {
                   </div>
                 : <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }}
                     onClick={async () => {
-                      const tarih = prompt("Ödeme tarihi (YYYY-MM-DD)", new Date().toISOString().slice(0,10));
-                      if (!tarih) return;
                       await api.maasOde(o.calisan_id, {
                         yil: now.getFullYear(), ay: now.getMonth() + 1,
-                        tutar: o.kalan, tarih,
+                        tutar: o.kalan, tarih: new Date().toISOString().slice(0, 10),
                       });
                       load();
                     }}>
