@@ -1,4 +1,6 @@
 import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { api } from "../api";
 
 const ITEMS = [
   // Finans
@@ -16,7 +18,7 @@ const ITEMS = [
   { icon: "🛡️", label: "Garanti",   path: "/garanti",    color: "#f0fdf4", iconBg: "#16a34a" },
   { icon: "📲", label: "Yedek Tel", path: "/loaner",     color: "#eff6ff", iconBg: "#3b82f6" },
   { icon: "🚫", label: "Kara Liste",path: "/karalist",   color: "#fef2f2", iconBg: "#dc2626" },
-  { icon: "💬", label: "Şikayet/Övgü", path: "/geri-bildirim", color: "#fff7ed", iconBg: "#f97316" },
+  { icon: "💬", label: "Şikayet/Övgü", path: "/geri-bildirim", color: "#fff7ed", iconBg: "#f97316", badge: true },
   // Çalışan
   { icon: "💵", label: "Maaş",      path: "/maas",       color: "#fdf4ff", iconBg: "#7c3aed" },
   // Araçlar
@@ -28,6 +30,11 @@ const ITEMS = [
 
 export default function More({ user }) {
   const navigate = useNavigate();
+  const [bildirimSayisi, setBildirimSayisi] = useState(0);
+
+  useEffect(() => {
+    api.geriBildirimBekleyen().then(r => setBildirimSayisi(r.bekleyen || 0)).catch(() => {});
+  }, []);
 
   return (
     <div className="page" style={{ paddingBottom: 90 }}>
@@ -47,20 +54,14 @@ export default function More({ user }) {
         </div>
       )}
 
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        gap: 10,
-      }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
         {ITEMS.map(item => (
-          <div
-            key={item.path}
-            onClick={() => navigate(item.path)}
+          <div key={item.path} onClick={() => navigate(item.path)}
             style={{
               display: "flex", flexDirection: "column", alignItems: "center",
               gap: 6, padding: "12px 4px", borderRadius: 12, cursor: "pointer",
               background: "var(--bg)", userSelect: "none",
-              WebkitTapHighlightColor: "transparent",
+              WebkitTapHighlightColor: "transparent", position: "relative",
             }}
             onTouchStart={e => e.currentTarget.style.opacity = "0.7"}
             onTouchEnd={e => e.currentTarget.style.opacity = "1"}
@@ -68,9 +69,20 @@ export default function More({ user }) {
             <div style={{
               width: 48, height: 48, borderRadius: 14, background: item.color,
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 24,
+              fontSize: 24, position: "relative",
             }}>
               {item.icon}
+              {item.badge && bildirimSayisi > 0 && (
+                <div style={{
+                  position: "absolute", top: -4, right: -4,
+                  background: "var(--danger)", color: "#fff",
+                  borderRadius: "50%", width: 18, height: 18,
+                  fontSize: 10, fontWeight: 800,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {bildirimSayisi}
+                </div>
+              )}
             </div>
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", textAlign: "center", lineHeight: 1.2 }}>
               {item.label}

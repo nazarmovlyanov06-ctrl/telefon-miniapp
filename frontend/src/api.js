@@ -174,11 +174,12 @@ export const api = {
   createParcaIade: (data) => post("/parca-iade/", data),
   updateParcaIadeDurum: (id, durum, alinan_tutar) => put(`/parca-iade/${id}/durum`, { durum, alinan_tutar }),
 
-  // Geri Bildirim
-  geriBildirimList: (tur) => get(`/geri-bildirim/${tur ? "?tur=" + tur : ""}`),
+  // Çalışan Bildirim (Şikayet/Övgü)
+  geriBildirimList: () => get("/geri-bildirim/"),
+  geriBildirimSkor: () => get("/geri-bildirim/skor"),
+  geriBildirimBekleyen: () => get("/geri-bildirim/bildirim"),
   createGeriBildirim: (data) => post("/geri-bildirim/", data),
-  geriBildirimDurum: (id, durum) => put(`/geri-bildirim/${id}/durum`, { durum }),
-  deleteGeriBildirim: (id) => del(`/geri-bildirim/${id}`),
+  geriBildirimGoruldu: () => post("/geri-bildirim/goruldu", {}),
 
   // Evrensel Arama
   ara: (q) => get(`/arama/?q=${encodeURIComponent(q)}`),

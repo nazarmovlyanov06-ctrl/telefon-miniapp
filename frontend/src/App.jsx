@@ -124,7 +124,7 @@ function AppRoutes({ user }) {
         <Route path="/sifir-cihaz" element={<SifirCihaz user={user} />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/search" element={<Search />} />
-        <Route path="/geri-bildirim" element={<GeriBildirim />} />
+        <Route path="/geri-bildirim" element={<GeriBildirim user={user} />} />
       </Routes>
       <BottomNav />
     </NavShell>

@@ -302,16 +302,13 @@ CREATE TABLE IF NOT EXISTS tamir_fotograflari (
     aciklama TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS geri_bildirimler (
+CREATE TABLE IF NOT EXISTS calisan_geri_bildirim (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    gonderen_id INTEGER REFERENCES users(id),
+    hedef_id INTEGER NOT NULL REFERENCES users(id),
     tur TEXT NOT NULL,
-    musteri_adi TEXT,
-    telefon TEXT,
-    repair_id INTEGER REFERENCES repairs(id),
-    puan INTEGER,
     mesaj TEXT NOT NULL,
-    durum TEXT DEFAULT 'bekliyor',
-    created_by INTEGER REFERENCES users(id),
+    goruldu INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 """
