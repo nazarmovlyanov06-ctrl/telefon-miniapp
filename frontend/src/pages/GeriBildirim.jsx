@@ -206,7 +206,9 @@ export default function GeriBildirim({ user }) {
                   </div>
                 ) : (
                   <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 6 }}>
-                    <span style={{ fontWeight: 600, color: "var(--text)" }}>Anonim</span> → Siz
+                    <span style={{ fontWeight: 600, color: "var(--text)" }}>Anonim</span>
+                    {" → "}
+                    <span style={{ fontWeight: 600, color: "var(--text)" }}>{item.hedef_adi || "?"}</span>
                   </div>
                 )}
                 <div style={{ fontSize: 14, lineHeight: 1.5 }}>{item.mesaj}</div>

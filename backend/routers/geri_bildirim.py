@@ -42,8 +42,8 @@ async def list_bildirimler(
     if user["role"] == "patron":
         cur = await db.execute(
             """SELECT cb.*,
-                      ug.first_name as gonderen_adi,
-                      uh.first_name as hedef_adi
+                      ug.name as gonderen_adi,
+                      uh.name as hedef_adi
                FROM calisan_geri_bildirim cb
                LEFT JOIN users ug ON cb.gonderen_id = ug.id
                LEFT JOIN users uh ON cb.hedef_id = uh.id
@@ -53,12 +53,10 @@ async def list_bildirimler(
         cur = await db.execute(
             """SELECT cb.id, cb.tur, cb.mesaj, cb.goruldu, cb.created_at,
                       NULL as gonderen_adi,
-                      uh.first_name as hedef_adi
+                      uh.name as hedef_adi
                FROM calisan_geri_bildirim cb
                LEFT JOIN users uh ON cb.hedef_id = uh.id
-               WHERE cb.hedef_id = ?
-               ORDER BY cb.created_at DESC LIMIT 100""",
-            (user["id"],),
+               ORDER BY cb.created_at DESC LIMIT 200"""
         )
     return [dict(r) for r in await cur.fetchall()]
 
