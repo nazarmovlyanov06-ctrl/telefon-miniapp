@@ -18,6 +18,8 @@ export default function Debts() {
   const [showOneriler, setShowOneriler] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [odemeler, setOdemeler] = useState({});
+  const [payModal, setPayModal] = useState(null); // { debt, defaultAmount }
+  const [payForm, setPayForm] = useState({ amount: "", payment_type: "nakit" });
   const [form, setForm] = useState({
     customer_id: null, customer_name_display: "",
     alacakli_adi: "",
@@ -101,13 +103,21 @@ export default function Debts() {
     setShowOneriler(false);
   }
 
-  async function pay(debt) {
-    const label = tab === "alacak" ? "Ödeme miktarı (₺)?" : "Ödediğimiz miktar (₺)?";
-    const amount = prompt(`${debt.customer_name} - ${label}`);
-    if (!amount) return;
-    await api.payDebt(debt.id, { amount: parseFloat(amount) });
+  function pay(debt) {
+    const taksitTutari = debt.payment_type === "taksit" && debt.installment_count > 1
+      ? Math.round((debt.total_amount || 0) / (debt.installment_count || 1))
+      : "";
+    setPayModal(debt);
+    setPayForm({ amount: taksitTutari ? String(taksitTutari) : "", payment_type: "nakit" });
+  }
+
+  async function submitPay(e) {
+    e.preventDefault();
+    if (!payModal || !payForm.amount) return;
+    await api.payDebt(payModal.id, { amount: parseFloat(payForm.amount), payment_type: payForm.payment_type });
+    setPayModal(null);
     load();
-    if (expandedId === debt.id) loadOdemeler(debt.id);
+    if (expandedId === payModal.id) loadOdemeler(payModal.id);
   }
 
   async function loadOdemeler(id) {
@@ -401,6 +411,67 @@ export default function Debts() {
             )}
           </div>
         ))
+      )}
+      {/* Ödeme modalı */}
+      {payModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end" }}
+          onClick={() => setPayModal(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: "var(--card)", borderRadius: "18px 18px 0 0",
+            width: "100%", padding: "20px 16px 40px",
+          }}>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+              {tab === "alacak" ? "💵 Ödeme Al" : "✅ Ödeme Yap"}
+            </div>
+            <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 16 }}>
+              {payModal.customer_name}
+              {payModal.payment_type === "taksit" && payModal.installment_count > 1 && (() => {
+                const taksitTutari = Math.round((payModal.total_amount || 0) / (payModal.installment_count || 1));
+                const odenenTaksit = Math.floor((payModal.paid_amount || 0) / taksitTutari);
+                return <span style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600 }}>
+                  · {odenenTaksit}/{payModal.installment_count}. taksit
+                </span>;
+              })()}
+            </div>
+            <form onSubmit={submitPay}>
+              <div className="form-group">
+                <label className="form-label">Tutar (₺)</label>
+                <input className="form-input" type="number" required autoFocus
+                  inputMode="numeric"
+                  value={payForm.amount}
+                  onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))}
+                  placeholder="0" />
+                {payModal.payment_type === "taksit" && payModal.installment_count > 1 && (
+                  <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>
+                    Aylık taksit: ₺{Math.round((payModal.total_amount || 0) / (payModal.installment_count || 1)).toLocaleString("tr-TR")}
+                  </div>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Ödeme Yöntemi</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {["nakit", "kart"].map(t => (
+                    <button key={t} type="button"
+                      onClick={() => setPayForm(f => ({ ...f, payment_type: t }))}
+                      style={{
+                        flex: 1, padding: "10px", borderRadius: 10, border: "2px solid",
+                        borderColor: payForm.payment_type === t ? "var(--primary)" : "var(--border)",
+                        background: payForm.payment_type === t ? "rgba(0,122,255,0.08)" : "var(--bg2)",
+                        fontWeight: 600, fontSize: 14, cursor: "pointer",
+                        color: payForm.payment_type === t ? "var(--primary)" : "var(--text)",
+                      }}>
+                      {t === "nakit" ? "💵 Nakit" : "💳 Kart"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Kaydet</button>
+                <button type="button" className="btn btn-ghost" onClick={() => setPayModal(null)}>İptal</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
