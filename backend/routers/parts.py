@@ -180,9 +180,8 @@ async def list_orders(
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     cur = await db.execute(
-        """SELECT po.*, s.name as supplier_name, u.name as ordered_by_name
+        """SELECT po.*, u.name as ordered_by_name
            FROM part_orders po
-           LEFT JOIN suppliers s ON po.supplier_id = s.id
            LEFT JOIN users u ON po.ordered_by = u.id
            ORDER BY po.ordered_at DESC LIMIT 50"""
     )

@@ -84,6 +84,22 @@ CREATE TABLE IF NOT EXISTS shopping_list (
     bought_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS alisveris_listesi (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    part_name TEXT NOT NULL,
+    device_model TEXT,
+    quantity INTEGER DEFAULT 1,
+    supplier_hint TEXT,
+    estimated_price REAL,
+    priority INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'bekliyor',
+    added_by INTEGER REFERENCES users(id),
+    bought_from TEXT,
+    bought_by INTEGER REFERENCES users(id),
+    bought_price REAL,
+    bought_at TIMESTAMP,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS imei_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     imei TEXT NOT NULL,
@@ -392,6 +408,13 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE parca_iadeler ADD COLUMN beklenen_tutar REAL DEFAULT 0",
             "ALTER TABLE users ADD COLUMN durum TEXT DEFAULT 'aktif'",
             "ALTER TABLE repairs ADD COLUMN son_guncelleyen_id INTEGER REFERENCES users(id)",
+            "ALTER TABLE customers ADD COLUMN is_vip INTEGER DEFAULT 0",
+            "ALTER TABLE customers ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE ikinci_el ADD COLUMN alis_tarihi TEXT",
+            "ALTER TABLE sifir_cihazlar ADD COLUMN satis_tarihi TEXT",
+            "ALTER TABLE sifir_cihazlar ADD COLUMN satis_kanali TEXT DEFAULT 'Dükkan'",
+            "ALTER TABLE aksesuar_satislar ADD COLUMN musteri_adi TEXT",
+            "ALTER TABLE aksesuar_satislar ADD COLUMN odeme_yontemi TEXT DEFAULT 'nakit'",
         ]:
             try:
                 await db.execute(m)
