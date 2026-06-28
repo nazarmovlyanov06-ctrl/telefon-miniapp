@@ -29,6 +29,9 @@ export default function IkinciEl({ user }) {
   const [imeiSon4, setImeiSon4] = useState("");
   const [imeiGecmis, setImeiGecmis] = useState(null);
   const [imeiLoading, setImeiLoading] = useState(false);
+  const [imeiModal, setImeiModal] = useState(null); // { imei, model }
+  const [imeiModalData, setImeiModalData] = useState([]);
+  const [imeiModalLoading, setImeiModalLoading] = useState(false);
 
   useEffect(() => {
     load();
@@ -120,6 +123,17 @@ export default function IkinciEl({ user }) {
       setSatForm({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit", pesinat: "", taksit_sayi: "3" });
       load();
     } catch (e) { setErr(e.message); }
+  }
+
+  async function openImeiModal(imei, model) {
+    setImeiModal({ imei, model });
+    setImeiModalLoading(true);
+    setImeiModalData([]);
+    try {
+      const data = await api.ikinciElIMEITam(imei);
+      setImeiModalData(data);
+    } catch { setImeiModalData([]); }
+    finally { setImeiModalLoading(false); }
   }
 
   async function searchIMEI() {
@@ -506,7 +520,12 @@ export default function IkinciEl({ user }) {
                 {c.musteri_telefon && <span>📞 {c.musteri_telefon}</span>}
                 <span>📡 {c.satis_kanali || "Dükkan"}</span>
                 <span>📅 {c.satis_tarihi || "—"}</span>
-                {c.imei && <span>IMEI: {c.imei}</span>}
+                {c.imei && (
+                  <span
+                    onClick={e => { e.stopPropagation(); openImeiModal(c.imei, c.model); }}
+                    style={{ cursor: "pointer", color: "var(--primary)", fontWeight: 600, textDecoration: "underline" }}
+                  >📋 IMEI Geçmişi</span>
+                )}
               </div>
               {/* Masraflar */}
               {satMasraflar.length > 0 && (
@@ -532,6 +551,124 @@ export default function IkinciEl({ user }) {
             </div>
           )})}
         </>
+      )}
+
+      {/* IMEI Geçmiş Modalı */}
+      {imeiModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end",
+        }} onClick={() => setImeiModal(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: "var(--card)", borderRadius: "18px 18px 0 0",
+            width: "100%", maxHeight: "85vh", overflowY: "auto",
+            padding: "20px 16px 32px",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>📱 {imeiModal.model}</div>
+                <div style={{ fontSize: 12, color: "var(--hint)" }}>IMEI: {imeiModal.imei}</div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setImeiModal(null)}>✕</button>
+            </div>
+
+            {imeiModalLoading ? (
+              <div style={{ textAlign: "center", padding: 20, color: "var(--hint)" }}>Yükleniyor...</div>
+            ) : imeiModalData.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 20, color: "var(--hint)" }}>Kayıt bulunamadı</div>
+            ) : (() => {
+              const toplam_kar = imeiModalData
+                .filter(r => r.durum === "satildi")
+                .reduce((s, r) => s + (r.satis_fiyati || 0) - (r.alis_fiyati || 0) - (r.toplam_masraf || 0), 0);
+              return (
+                <>
+                  {/* Toplam kâr kutusu */}
+                  {imeiModalData.length > 1 && (
+                    <div style={{
+                      background: toplam_kar >= 0 ? "rgba(52,199,89,0.12)" : "rgba(255,59,48,0.1)",
+                      borderRadius: 10, padding: "10px 14px", marginBottom: 14,
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                    }}>
+                      <span style={{ fontWeight: 600 }}>{imeiModalData.filter(r => r.durum === "satildi").length} kez satıldı</span>
+                      <span style={{ fontWeight: 700, color: toplam_kar >= 0 ? "var(--success)" : "var(--danger)" }}>
+                        Toplam Kâr: ₺{toplam_kar.toLocaleString("tr-TR")}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Her döngü */}
+                  {imeiModalData.map((r, i) => {
+                    const kar = (r.satis_fiyati || 0) - (r.alis_fiyati || 0) - (r.toplam_masraf || 0);
+                    return (
+                      <div key={r.id} style={{
+                        border: "1px solid var(--border)", borderRadius: 12,
+                        marginBottom: 10, overflow: "hidden",
+                      }}>
+                        {/* Başlık */}
+                        <div style={{ background: "var(--bg2)", padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "var(--hint)" }}>
+                          {i + 1}. Döngü
+                        </div>
+                        {/* Alış satırı */}
+                        <div style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>📥 Alındı</div>
+                            <div style={{ fontSize: 12, color: "var(--hint)" }}>
+                              {r.kimden || "—"} {r.kimden_telefon ? `· ${r.kimden_telefon}` : ""}
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--hint)" }}>📅 {r.alis_tarihi || r.created_at?.slice(0,10) || "—"}</div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontWeight: 700 }}>₺{(r.alis_fiyati || 0).toLocaleString("tr-TR")}</div>
+                            {(r.toplam_masraf || 0) > 0 && (
+                              <div style={{ fontSize: 11, color: "var(--danger)" }}>+₺{r.toplam_masraf.toLocaleString("tr-TR")} masraf</div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Masraflar */}
+                        {r.masraflar?.length > 0 && (
+                          <div style={{ padding: "0 12px 8px", borderTop: "1px dashed var(--border)" }}>
+                            {r.masraflar.map(m => (
+                              <div key={m.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0", color: "var(--hint)" }}>
+                                <span>🔧 {m.aciklama}</span>
+                                <span>₺{(m.tutar||0).toLocaleString("tr-TR")}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Satış satırı */}
+                        {r.durum === "satildi" ? (
+                          <div style={{
+                            padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center",
+                            borderTop: "1px solid var(--border)",
+                            background: kar >= 0 ? "rgba(52,199,89,0.05)" : "rgba(255,59,48,0.05)",
+                          }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>📤 Satıldı</div>
+                              <div style={{ fontSize: 12, color: "var(--hint)" }}>
+                                {r.musteri_adi || "—"} {r.musteri_telefon ? `· ${r.musteri_telefon}` : ""}
+                              </div>
+                              <div style={{ fontSize: 11, color: "var(--hint)" }}>📅 {r.satis_tarihi || "—"} · {r.satis_kanali || "Dükkan"}</div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontWeight: 700 }}>₺{(r.satis_fiyati || 0).toLocaleString("tr-TR")}</div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: kar >= 0 ? "var(--success)" : "var(--danger)" }}>
+                                {kar >= 0 ? "+" : ""}₺{kar.toLocaleString("tr-TR")} kâr
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ padding: "10px 12px", borderTop: "1px solid var(--border)", color: "var(--hint)", fontSize: 13 }}>
+                            ⏳ Hâlâ stokta
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
+          </div>
+        </div>
       )}
 
       {tab === "imei" && (

@@ -112,6 +112,7 @@ export const api = {
   ikinciElSat: (id, data) => post(`/ikinciel/${id}/sat`, data),
   ikinciElSatilanlar: () => get("/ikinciel/satilanlar"),
   ikinciElIMEI: (son4) => get(`/ikinciel/imei-gecmis/${son4}`),
+  ikinciElIMEITam: (imei) => get(`/ikinciel/imei-tam/${encodeURIComponent(imei)}`),
 
   // Sıfır Cihaz
   sifirList: (params = {}) => {

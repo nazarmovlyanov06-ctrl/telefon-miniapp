@@ -7,6 +7,32 @@ from datetime import date
 router = APIRouter(prefix="/ikinciel", tags=["ikinciel"])
 
 
+@router.get("/imei-tam/{imei}")
+async def imei_tam_gecmis(
+    imei: str,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        """SELECT c.*,
+                  COALESCE((SELECT SUM(m.tutar) FROM ikinci_el_masraflar m
+                            WHERE m.cihaz_id = c.id), 0) as toplam_masraf
+           FROM ikinci_el c
+           WHERE c.imei = ?
+           ORDER BY c.created_at ASC""",
+        (imei,)
+    )
+    rows = [dict(r) for r in await cur.fetchall()]
+    for r in rows:
+        cur2 = await db.execute(
+            "SELECT * FROM ikinci_el_masraflar WHERE cihaz_id=? ORDER BY tarih",
+            (r["id"],)
+        )
+        r["masraflar"] = [dict(m) for m in await cur2.fetchall()]
+    return rows
+
+
 @router.get("/imei-gecmis/{son4}")
 async def imei_gecmis(
     son4: str,
