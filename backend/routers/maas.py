@@ -130,7 +130,7 @@ async def ozet(
         )
         avans = dict(await cur.fetchone())["a"]
         cur = await db.execute(
-            "SELECT odendi FROM maas_odemeleri WHERE calisan_id = ? AND yil = ? AND ay = ?",
+            "SELECT odendi, odeme_tarihi FROM maas_odemeleri WHERE calisan_id = ? AND yil = ? AND ay = ?",
             (c["id"], yil, ay),
         )
         mrow = await cur.fetchone()
