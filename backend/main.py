@@ -430,6 +430,7 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE part_orders ADD COLUMN estimated_price REAL",
             "ALTER TABLE part_orders ADD COLUMN repair_id INTEGER",
             "ALTER TABLE part_orders ADD COLUMN ordered_by INTEGER",
+            "ALTER TABLE maas_odemeleri ADD COLUMN odeme_tarihi TEXT",
         ]:
             try:
                 await db.execute(m)
