@@ -486,6 +486,46 @@ async def health():
     return {"status": "ok"}
 
 
+@app.post("/api/admin/reset-all-data")
+async def reset_all_data(secret: str = ""):
+    """Tüm kullanıcı verilerini sıfırlar. Teslim öncesi kullan, sonra bu endpoint'i sil."""
+    if secret != "SIFIRLA2024":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Geçersiz şifre")
+
+    import aiosqlite as _aio
+
+    TABLOLAR = [
+        "repair_parts", "debt_payments", "debts", "part_orders",
+        "repairs", "customers", "parts", "shopping_list", "alisveris_listesi",
+        "imei_history", "toptanci_alislar", "parca_iadeler",
+        "ikinci_el_masraflar", "ikinci_el", "garantiler",
+        "kasa_hareketleri", "giderler", "loaner_fotograflari", "loaner_cihazlar",
+        "aksesuar_satislar", "aksesuarlar", "aylik_hedefler",
+        "avanslar", "maas_odemeleri", "calisanlar",
+        "kara_liste", "geri_bildirimler", "activity_log",
+        "sifir_cihazlar", "toptancilar", "users",
+    ]
+
+    sonuclar = {}
+    async with _aio.connect(os.path.abspath(DB_PATH)) as db:
+        await db.execute("PRAGMA foreign_keys = OFF")
+        for tablo in TABLOLAR:
+            try:
+                cur = await db.execute(f"SELECT COUNT(*) FROM {tablo}")
+                sayi = (await cur.fetchone())[0]
+                await db.execute(f"DELETE FROM {tablo}")
+                await db.execute(f"DELETE FROM sqlite_sequence WHERE name='{tablo}'")
+                sonuclar[tablo] = sayi
+            except Exception as e:
+                sonuclar[tablo] = f"atlandı: {str(e)[:40]}"
+        await db.execute("PRAGMA foreign_keys = ON")
+        await db.commit()
+
+    toplam = sum(v for v in sonuclar.values() if isinstance(v, int))
+    return {"mesaj": f"Temizlendi — {toplam} kayıt silindi", "detay": sonuclar}
+
+
 # Serve React SPA — must be after all API routes
 _dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 if os.path.exists(_dist):
