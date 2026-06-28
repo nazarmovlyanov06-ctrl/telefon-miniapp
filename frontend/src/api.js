@@ -146,6 +146,8 @@ export const api = {
   createLoaner: (data) => post("/loaner/", data),
   iadeLoaner: (id, data = {}) => put(`/loaner/${id}/iade`, data),
   loanerHasar: (id, data) => post(`/loaner/${id}/hasar`, data),
+  loanerFotolar: (id) => get(`/loaner/${id}/fotolar`),
+  addLoanerFoto: (id, data) => post(`/loaner/${id}/fotolar`, data),
 
   // Aksesuar
   aksesuarList: () => get("/aksesuarlar/"),

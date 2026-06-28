@@ -42,6 +42,14 @@ function ServisGun({ gun, status }) {
   );
 }
 
+function openWA(phone, model) {
+  const raw = (phone || "").replace(/\D/g, "");
+  if (!raw) { alert("Müşteri telefon numarası kayıtlı değil"); return; }
+  const num = raw.startsWith("90") ? raw : raw.startsWith("0") ? "9" + raw : "90" + raw;
+  const text = encodeURIComponent(`Merhaba, ${model || "cihazınız"} tamiri tamamlandı, teslim alabilirsiniz. ✅`);
+  window.open(`https://wa.me/${num}?text=${text}`, "_blank");
+}
+
 export default function Repairs() {
   const [repairs, setRepairs] = useState([]);
   const [tab, setTab] = useState("");
@@ -109,6 +117,17 @@ export default function Repairs() {
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
                 <span className={`badge badge-${r.status}`}>{STATUS_LABEL[r.status]}</span>
                 <ServisGun gun={gun} status={r.status} />
+                {r.status === "hazir" && (
+                  <button
+                    onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model); }}
+                    style={{
+                      background: "#25D366", color: "#fff", border: "none",
+                      borderRadius: 8, padding: "3px 7px", fontSize: 13,
+                      cursor: "pointer", fontWeight: 700, lineHeight: 1.4,
+                    }}
+                    title="WhatsApp ile bildir"
+                  >📲 WA</button>
+                )}
               </div>
             </div>
           );

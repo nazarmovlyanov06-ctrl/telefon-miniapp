@@ -25,6 +25,25 @@
   animation: back-btn-pulse 2s ease-in-out infinite;
 }
 
+.ac-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 99;
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ac-dropdown { background: rgba(30,30,30,0.88); }
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {

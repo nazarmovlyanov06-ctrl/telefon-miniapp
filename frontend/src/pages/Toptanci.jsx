@@ -69,6 +69,8 @@ export default function Toptanci() {
 
   if (selected) {
     const topToplam = alislar.reduce((s, a) => s + (a.toplam || 0), 0);
+    const dolarKuru = parseFloat(localStorage.getItem("son_dolar_kuru") || "0");
+    const topDolar = dolarKuru > 0 ? (topToplam / dolarKuru) : null;
     return (
       <div className="page">
         <div className="card-row" style={{ marginBottom: 14 }}>
@@ -85,7 +87,12 @@ export default function Toptanci() {
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="card-row">
             <span style={{ color: "var(--hint)", fontSize: 13 }}>Toplam Harcama</span>
-            <span style={{ fontWeight: 700, color: "var(--accent)" }}>{topToplam.toLocaleString("tr-TR")} ₺</span>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontWeight: 700, color: "var(--accent)" }}>{topToplam.toLocaleString("tr-TR")} ₺</div>
+              {topDolar !== null && (
+                <div style={{ fontSize: 12, color: "var(--hint)" }}>≈ ${topDolar.toFixed(0)}</div>
+              )}
+            </div>
           </div>
         </div>
         <div className="card-row" style={{ marginBottom: 10 }}>

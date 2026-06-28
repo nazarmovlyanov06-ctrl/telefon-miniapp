@@ -11,6 +11,10 @@ export default function Loaner() {
   const [showForm, setShowForm] = useState(false);
   const [hasarModal, setHasarModal] = useState(null);
   const [hasarForm, setHasarForm] = useState({ notu: "", tutar: "" });
+  const [fotoModal, setFotoModal] = useState(null);
+  const [fotolar, setFotolar] = useState([]);
+  const [fotoLoading, setFotoLoading] = useState(false);
+  const fileInputRef = useRef(null);
   const [err, setErr] = useState("");
   const [form, setForm] = useState({ musteri_adi: "", cihaz: "", teslim_tarihi: today(), notlar: "" });
   const [musteriler, setMusteriler] = useState([]);
@@ -32,6 +36,28 @@ export default function Loaner() {
       const [aktif, iade] = await Promise.all([api.loanerList(), api.loanerGecmis()]);
       setList(aktif); setGecmis(iade);
     } finally { setLoading(false); }
+  }
+
+  async function openFotolar(loaner) {
+    setFotoModal(loaner);
+    setFotolar([]);
+    setFotoLoading(true);
+    try { setFotolar(await api.loanerFotolar(loaner.id)); } catch (_) {}
+    finally { setFotoLoading(false); }
+  }
+
+  async function addFoto(e) {
+    const file = e.target.files?.[0];
+    if (!file || !fotoModal) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        await api.addLoanerFoto(fotoModal.id, { foto: ev.target.result, aciklama: "" });
+        setFotolar(await api.loanerFotolar(fotoModal.id));
+      } catch (_) {}
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
   }
 
   function handleMusteriChange(val) {
@@ -140,8 +166,8 @@ export default function Loaner() {
               />
               {showOneriler && (
                 <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
-                  background: "var(--card)", border: "1px solid var(--border)",
-                  borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                  background: "rgba(var(--card-rgb, 255,255,255), 0.85)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+                  border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
                   {oneriler.map(m => (
                     <div key={m.id} onMouseDown={() => { setForm(f => ({ ...f, musteri_adi: m.name })); setShowOneriler(false); }}
                       style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
@@ -161,8 +187,8 @@ export default function Loaner() {
                 placeholder="Samsung A12, Huawei P20..." />
               {showCihazOneri && (
                 <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
-                  background: "var(--card)", border: "1px solid var(--border)",
-                  borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                  background: "rgba(var(--card-rgb, 255,255,255), 0.85)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+                  border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
                   {cihazOneri.map(c => (
                     <div key={c.id} onMouseDown={() => {
                       setForm(f => ({ ...f, cihaz: c.model || "" }));
@@ -191,6 +217,44 @@ export default function Loaner() {
               <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>İptal</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Fotoğraf modalı */}
+      {fotoModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 210,
+          background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "flex-end", padding: 0
+        }} onClick={() => setFotoModal(null)}>
+          <div className="card" style={{ width: "100%", borderRadius: "20px 20px 0 0", maxHeight: "80vh", overflowY: "auto" }}
+            onClick={e => e.stopPropagation()}>
+            <div className="card-row" style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>📷 {fotoModal.cihaz} Fotoğrafları</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setFotoModal(null)}>✕</button>
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
+              style={{ display: "none" }} onChange={addFoto} />
+            <button className="btn btn-primary btn-sm" style={{ marginBottom: 12 }}
+              onClick={() => fileInputRef.current?.click()}>
+              📷 Fotoğraf Çek / Ekle
+            </button>
+            {fotoLoading ? (
+              <div style={{ textAlign: "center", color: "var(--hint)", padding: 20 }}>Yükleniyor...</div>
+            ) : fotolar.length === 0 ? (
+              <div style={{ textAlign: "center", color: "var(--hint)", padding: 20 }}>Henüz fotoğraf yok</div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {fotolar.map(f => (
+                  <div key={f.id}>
+                    <img src={f.foto} alt={f.aciklama || "foto"} style={{ width: "100%", borderRadius: 10, objectFit: "cover", aspectRatio: "1" }} />
+                    {f.created_at && <div style={{ fontSize: 10, color: "var(--hint)", textAlign: "center", marginTop: 3 }}>
+                      {new Date(f.created_at).toLocaleDateString("tr-TR")}
+                    </div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -247,7 +311,10 @@ export default function Loaner() {
                     </div>
                   )}
                 </div>
-                <button className="btn btn-primary btn-sm" onClick={() => iade(l)}>İade Al</button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <button className="btn btn-primary btn-sm" onClick={() => iade(l)}>İade Al</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => openFotolar(l)}>📷</button>
+                </div>
               </div>
             </div>
           );
@@ -273,11 +340,15 @@ export default function Loaner() {
                   </div>
                 )}
               </div>
-              {l.teslim_tarihi && l.iade_tarihi && (
-                <div style={{ fontSize: 13, color: "var(--hint)", textAlign: "right" }}>
-                  {Math.floor((new Date(l.iade_tarihi) - new Date(l.teslim_tarihi)) / 86400000)} gün
-                </div>
-              )}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                {l.teslim_tarihi && l.iade_tarihi && (
+                  <div style={{ fontSize: 13, color: "var(--hint)" }}>
+                    {Math.floor((new Date(l.iade_tarihi) - new Date(l.teslim_tarihi)) / 86400000)} gün
+                  </div>
+                )}
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}
+                  onClick={() => openFotolar(l)}>📷 Resimler</button>
+              </div>
             </div>
             {l.notlar && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>{l.notlar}</div>}
           </div>

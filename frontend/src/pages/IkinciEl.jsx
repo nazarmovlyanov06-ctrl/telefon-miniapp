@@ -5,6 +5,7 @@ import ImeiInput from "../components/ImeiInput";
 
 export default function IkinciEl({ user }) {
   const navigate = useNavigate();
+  const [priceHidden, setPriceHidden] = useState(() => localStorage.getItem("priceHidden") === "1");
   const [tab, setTab] = useState("stok");
   const [kaynak, setKaynak] = useState("hepsi");
   const [list, setList] = useState([]);
@@ -221,7 +222,8 @@ export default function IkinciEl({ user }) {
                     placeholder="Kişi/firma adı" autoComplete="off" />
                   {showKimdenOner && (
                     <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
-                      background: "var(--card)", border: "1px solid var(--border)",
+                      background: "rgba(255,255,255,0.88)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+                      border: "1px solid var(--border)",
                       borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
                       {kimdenOner.map(m => (
                         <div key={m.id}
@@ -278,7 +280,9 @@ export default function IkinciEl({ user }) {
                   <div className="card-row" style={{ marginBottom: 6 }}>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>📱 {c.model}</div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontWeight: 700 }}>{((c.alis_fiyati || 0) + (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺</div>
+                      <div style={{ fontWeight: 700 }}>
+                        {priceHidden ? "••••" : ((c.alis_fiyati || 0) + (c.toplam_masraf || 0)).toLocaleString("tr-TR") + " ₺"}
+                      </div>
                       <div style={{ fontSize: 11, color: "var(--hint)" }}>maliyet</div>
                     </div>
                   </div>
@@ -443,7 +447,9 @@ export default function IkinciEl({ user }) {
               <div className="card-row" style={{ marginBottom: 6 }}>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>📱 {c.model}</div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 700, color: "var(--success)" }}>{(c.satis_fiyati || 0).toLocaleString("tr-TR")} ₺</div>
+                  <div style={{ fontWeight: 700, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)) >= 0 ? "var(--success)" : "var(--danger)" }}>
+                    {priceHidden ? "••••" : (c.satis_fiyati || 0).toLocaleString("tr-TR") + " ₺"}
+                  </div>
                   <div style={{ fontSize: 12, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)) >= 0 ? "var(--success)" : "var(--danger)" }}>
                     Kâr: {((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺
                   </div>

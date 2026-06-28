@@ -5,6 +5,7 @@ import ImeiInput from "../components/ImeiInput";
 
 export default function SifirCihaz({ user }) {
   const navigate = useNavigate();
+  const [priceHidden, setPriceHidden] = useState(() => localStorage.getItem("priceHidden") === "1");
   const [kaynak, setKaynak] = useState("hepsi");
   const [tab, setTab] = useState("stok");
   const [list, setList] = useState([]);
@@ -238,7 +239,9 @@ export default function SifirCihaz({ user }) {
                       {c.kaynak === "getmobile" && <div style={{ fontSize: 11, color: "var(--hint)" }}>📦 Getmobil</div>}
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontWeight: 700 }}>{(c.alis_fiyati || 0).toLocaleString("tr-TR")} ₺</div>
+                      <div style={{ fontWeight: 700 }}>
+                        {priceHidden ? "••••" : (c.alis_fiyati || 0).toLocaleString("tr-TR") + " ₺"}
+                      </div>
                       <div style={{ fontSize: 11, color: "var(--hint)" }}>{c.alis_tarihi || "—"}</div>
                     </div>
                   </div>
@@ -275,9 +278,7 @@ export default function SifirCihaz({ user }) {
                             onBlur={() => setTimeout(() => setShowSatMusteriOner(false), 150)}
                             placeholder="Ad Soyad" autoComplete="off" />
                           {showSatMusteriOner && (
-                            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
-                              background: "var(--card)", border: "1px solid var(--border)",
-                              borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                            <div className="ac-dropdown" style={{ zIndex: 99 }}>
                               {satMusteriOner.map(m => (
                                 <div key={m.id}
                                   onMouseDown={() => {
@@ -368,9 +369,11 @@ export default function SifirCihaz({ user }) {
                 <div style={{ fontSize: 12, color: "var(--hint)" }}>📡 {c.satis_kanali || "Dükkan"}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontWeight: 700, color: "var(--success)" }}>{(c.satis_fiyati || 0).toLocaleString("tr-TR")} ₺</div>
+                <div style={{ fontWeight: 700, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0)) >= 0 ? "var(--success)" : "var(--danger)" }}>
+                  {priceHidden ? "••••" : (c.satis_fiyati || 0).toLocaleString("tr-TR") + " ₺"}
+                </div>
                 <div style={{ fontSize: 12, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0)) >= 0 ? "var(--success)" : "var(--danger)" }}>
-                  Kâr: {((c.satis_fiyati || 0) - (c.alis_fiyati || 0)).toLocaleString("tr-TR")} ₺
+                  Kâr: {priceHidden ? "••••" : ((c.satis_fiyati || 0) - (c.alis_fiyati || 0)).toLocaleString("tr-TR") + " ₺"}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--hint)" }}>{c.satis_tarihi || "—"}</div>
               </div>

@@ -298,11 +298,7 @@ export default function NewRepair() {
                   onBlur={() => setTimeout(() => setModelFocus(false), 150)}
                   autoComplete="off" />
                 {modelFocus && modelOneri.length > 0 && (
-                  <div style={{
-                    position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50,
-                    background: "var(--card)", border: "1px solid var(--border)",
-                    borderRadius: 10, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-                  }}>
+                  <div className="ac-dropdown" style={{ zIndex: 50 }}>
                     {modelOneri.map((m, i) => (
                       <div key={i} onMouseDown={() => { set("device_model", m); setModelOneri([]); }}
                         style={{ padding: "10px 14px", fontSize: 14, cursor: "pointer", borderBottom: i < modelOneri.length - 1 ? "1px solid var(--border)" : "none" }}>

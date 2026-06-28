@@ -151,6 +151,9 @@ export default function CustomerDetail() {
         <button className={`tab ${tab === "borclar" ? "active" : ""}`} onClick={() => setTab("borclar")}>
           💰 Borçlar ({debts.length})
         </button>
+        <button className={`tab ${tab === "notlar" ? "active" : ""}`} onClick={() => setTab("notlar")}>
+          📝 Notlar
+        </button>
       </div>
 
       {/* Ziyaretler - tüm geçmiş */}
@@ -256,6 +259,26 @@ export default function CustomerDetail() {
             <span className={`badge badge-${r.status}`}>{STATUS_LABEL[r.status] || r.status}</span>
           </div>
         ))
+      )}
+
+      {/* Notlar */}
+      {tab === "notlar" && (
+        <div className="card">
+          {customer.notes ? (
+            <div style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{customer.notes}</div>
+          ) : (
+            <div style={{ color: "var(--hint)", textAlign: "center", padding: "20px 0" }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📝</div>
+              Not yok
+            </div>
+          )}
+          {!edit && (
+            <button className="btn btn-ghost btn-sm" style={{ marginTop: 12 }}
+              onClick={() => { setEdit(true); setTab("ziyaretler"); }}>
+              ✏️ Not Düzenle
+            </button>
+          )}
+        </div>
       )}
 
       {/* Borçlar */}

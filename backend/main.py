@@ -188,7 +188,16 @@ CREATE TABLE IF NOT EXISTS loaner_cihazlar (
     teslim_tarihi TEXT NOT NULL,
     iade_tarihi TEXT,
     notlar TEXT,
+    hasar_notu TEXT,
+    hasar_tutar REAL,
     aktif INTEGER DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS loaner_fotograflari (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    loaner_id INTEGER REFERENCES loaner_cihazlar(id),
+    foto TEXT NOT NULL,
+    aciklama TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS aksesuarlar (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

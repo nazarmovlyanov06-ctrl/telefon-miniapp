@@ -600,10 +600,7 @@ export default function RepairDetail({ user }) {
                             onBlur={() => setTimeout(() => setShowParcaOner(false), 150)}
                             autoComplete="off" />
                           {showParcaOner && (
-                            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50,
-                              background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10,
-                              boxShadow: "0 4px 16px rgba(0,0,0,0.18)", overflow: "hidden",
-                              maxHeight: 200, overflowY: "auto" }}>
+                            <div className="ac-dropdown" style={{ zIndex: 50, maxHeight: 200, overflowY: "auto" }}>
                               {filtered.length === 0 ? (
                                 <div style={{ padding: "10px 14px", fontSize: 13, color: "var(--hint)" }}>
                                   {parcaQ ? "Parça bulunamadı" : "Aramak için yazın..."}
