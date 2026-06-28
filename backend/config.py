@@ -10,6 +10,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 DAVET_KODU = os.getenv("DAVET_KODU", "")
+DEV_TELEGRAM_ID = int(os.getenv("DEV_TELEGRAM_ID", "0"))
 
 ROLE_PATRON = "patron"
 ROLE_SATIS = "satis"
