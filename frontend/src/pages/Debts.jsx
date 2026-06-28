@@ -308,9 +308,21 @@ export default function Debts() {
                 <div style={{ fontWeight: 700, color: tab === "gecmis" ? "var(--hint)" : tab === "alacak" ? "var(--success)" : "var(--danger)", fontSize: 17 }}>
                   ₺{(d.total_amount || 0).toLocaleString("tr-TR")}
                 </div>
-                {tab !== "gecmis" && (
+                {tab !== "gecmis" && d.payment_type === "taksit" && d.installment_count > 1 ? (() => {
+                  const taksitTutari = (d.total_amount || 0) / (d.installment_count || 1);
+                  const odenenTaksit = Math.floor((d.paid_amount || 0) / taksitTutari);
+                  const kalanTaksit = (d.installment_count || 1) - odenenTaksit;
+                  return (
+                    <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>
+                      <div>{odenenTaksit}/{d.installment_count} taksit ödendi</div>
+                      <div style={{ color: kalanTaksit > 0 ? "var(--danger)" : "var(--success)" }}>
+                        {kalanTaksit > 0 ? `${kalanTaksit} taksit kaldı` : "✅ Tamamlandı"}
+                      </div>
+                    </div>
+                  );
+                })() : tab !== "gecmis" && (
                   <div style={{ fontSize: 12, color: "var(--hint)" }}>
-                    kalan: {(d.remaining || 0).toLocaleString("tr-TR")}
+                    kalan: ₺{(d.remaining || 0).toLocaleString("tr-TR")}
                   </div>
                 )}
               </div>
@@ -321,17 +333,64 @@ export default function Debts() {
                 {tab === "alacak" ? "💵 Ödeme Al" : "✅ Ödedik"}
               </button>
               <button className="btn btn-ghost btn-sm" onClick={() => toggleExpand(d.id)}>
-                {expandedId === d.id ? "▲ Gizle" : "▼ Geçmiş"}
+                {expandedId === d.id ? "▲ Gizle" : "▼ Taksit/Geçmiş"}
               </button>
             </div>
             )}
             {expandedId === d.id && (
               <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  {tab === "alacak" ? "Ödeme Geçmişi" : "Ödeme Geçmişi"}
-                </div>
+                {/* Taksit planı */}
+                {d.payment_type === "taksit" && d.installment_count > 1 && (() => {
+                  const taksitTutari = (d.total_amount || 0) / (d.installment_count || 1);
+                  const odenenTaksit = Math.floor((d.paid_amount || 0) / taksitTutari);
+                  return (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "var(--text)" }}>
+                        📅 Taksit Planı
+                      </div>
+                      {/* Özet */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
+                        <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "8px", textAlign: "center" }}>
+                          <div style={{ fontWeight: 700, fontSize: 15 }}>₺{taksitTutari.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}</div>
+                          <div style={{ fontSize: 10, color: "var(--hint)" }}>Aylık Taksit</div>
+                        </div>
+                        <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "8px", textAlign: "center" }}>
+                          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--success)" }}>{odenenTaksit}</div>
+                          <div style={{ fontSize: 10, color: "var(--hint)" }}>Ödenen</div>
+                        </div>
+                        <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "8px", textAlign: "center" }}>
+                          <div style={{ fontWeight: 700, fontSize: 15, color: (d.installment_count - odenenTaksit) > 0 ? "var(--danger)" : "var(--success)" }}>
+                            {d.installment_count - odenenTaksit}
+                          </div>
+                          <div style={{ fontSize: 10, color: "var(--hint)" }}>Kalan</div>
+                        </div>
+                      </div>
+                      {/* Taksit satırları */}
+                      {Array.from({ length: d.installment_count }, (_, i) => {
+                        const paid = i < odenenTaksit;
+                        const current = i === odenenTaksit;
+                        return (
+                          <div key={i} style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            fontSize: 13, padding: "6px 8px", borderRadius: 6, marginBottom: 3,
+                            background: paid ? "rgba(52,199,89,0.08)" : current ? "rgba(255,149,0,0.1)" : "var(--bg2)",
+                          }}>
+                            <span style={{ color: paid ? "var(--success)" : current ? "orange" : "var(--hint)" }}>
+                              {paid ? "✅" : current ? "⏳" : "○"} {i + 1}. taksit
+                            </span>
+                            <span style={{ fontWeight: 600, color: paid ? "var(--success)" : "var(--text)" }}>
+                              ₺{taksitTutari.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+                {/* Ödeme geçmişi */}
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Ödeme Geçmişi</div>
                 {!(odemeler[d.id]?.length) ? (
-                  <div style={{ fontSize: 12, color: "var(--hint)" }}>Kayıt yok</div>
+                  <div style={{ fontSize: 12, color: "var(--hint)" }}>Henüz ödeme yok</div>
                 ) : odemeler[d.id].map(o => (
                   <div key={o.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
                     <span style={{ color: "var(--hint)" }}>{o.paid_at ? new Date(o.paid_at).toLocaleDateString("tr-TR") : "—"} {o.payment_type === "kart" ? "💳" : "💵"}</span>
