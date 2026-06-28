@@ -113,6 +113,7 @@ export const api = {
   ikinciElSatilanlar: () => get("/ikinciel/satilanlar"),
   ikinciElIMEI: (son4) => get(`/ikinciel/imei-gecmis/${son4}`),
   ikinciElIMEITam: (imei) => get(`/ikinciel/imei-tam/${encodeURIComponent(imei)}`),
+  sifirIMEITam: (imei) => get(`/sifir-cihaz/imei-tam/${encodeURIComponent(imei)}`),
 
   // Sıfır Cihaz
   sifirList: (params = {}) => {

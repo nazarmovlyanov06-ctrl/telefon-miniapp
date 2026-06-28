@@ -7,6 +7,20 @@ from datetime import date
 router = APIRouter(prefix="/sifir-cihaz", tags=["sifir-cihaz"])
 
 
+@router.get("/imei-tam/{imei}")
+async def imei_tam_gecmis(
+    imei: str,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        "SELECT * FROM sifir_cihazlar WHERE imei = ? ORDER BY created_at ASC",
+        (imei,)
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
 @router.get("/listesi")
 async def list_stok(
     kaynak: str = Query(None),
