@@ -109,12 +109,33 @@ async def create_repair(
 
     customer_id = body.get("customer_id")
     if not customer_id and body.get("customer_name"):
-        cur = await db.execute(
-            "INSERT INTO customers (name, phone) VALUES (?, ?)",
-            (body["customer_name"], body.get("customer_phone")),
+        # Önce aynı isimli müşteri var mı bak
+        phone = body.get("customer_phone") or ""
+        if phone:
+            cur = await db.execute(
+                "SELECT id FROM customers WHERE phone = ?", (phone,)
+            )
+        else:
+            cur = await db.execute(
+                "SELECT id FROM customers WHERE name = ?", (body["customer_name"],)
+            )
+        existing = await cur.fetchone()
+        if existing:
+            customer_id = existing["id"]
+        else:
+            cur = await db.execute(
+                "INSERT INTO customers (name, phone) VALUES (?, ?)",
+                (body["customer_name"], body.get("customer_phone")),
+            )
+            customer_id = cur.lastrowid
+            await db.commit()
+
+    # Müşteri ziyaret sayısını güncelle
+    if customer_id:
+        await db.execute(
+            "UPDATE customers SET visit_count = COALESCE(visit_count, 0) + 1 WHERE id = ?",
+            (customer_id,)
         )
-        customer_id = cur.lastrowid
-        await db.commit()
 
     cur = await db.execute(
         """INSERT INTO repairs

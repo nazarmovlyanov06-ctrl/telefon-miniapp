@@ -180,6 +180,7 @@ export default function NewRepair() {
         : null;
       const res = await api.createRepair({
         ...form,
+        customer_id: musteriSec?.id || null,
         estimated_price: form.estimated_price ? parseFloat(form.estimated_price) : null,
         screen_lock_type: lockEnabled ? lockType : null,
         screen_lock_value: lockValue || null,
