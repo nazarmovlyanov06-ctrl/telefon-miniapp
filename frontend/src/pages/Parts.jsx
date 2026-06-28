@@ -147,6 +147,7 @@ export default function Parts({ user }) {
       const data = await r.json();
       const rate = Math.round(data.usd.try * 100) / 100;
       setDollarRate(rate);
+      localStorage.setItem("son_dolar_kuru", String(rate));
     } catch(e) {
       setErr("Dolar kuru alınamadı");
     } finally {

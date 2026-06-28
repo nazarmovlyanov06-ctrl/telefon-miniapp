@@ -25,6 +25,7 @@ export default function Debts() {
     due_date: "", notes: ""
   });
   const [err, setErr] = useState("");
+  const [karaUyari, setKaraUyari] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -193,7 +194,12 @@ export default function Debts() {
                     borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
                     {oneriler.map(m => (
                       <div key={m.id}
-                        onMouseDown={() => { setForm(f => ({ ...f, customer_id: m.id, customer_name_display: m.name })); setShowOneriler(false); }}
+                        onMouseDown={() => {
+                          setForm(f => ({ ...f, customer_id: m.id, customer_name_display: m.name }));
+                          setShowOneriler(false);
+                          setKaraUyari([]);
+                          if (m.phone) api.karaListe(m.phone).then(r => setKaraUyari(r || [])).catch(() => {});
+                        }}
                         style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
                           borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
                         <span>👤 {m.name}</span>
@@ -202,6 +208,11 @@ export default function Debts() {
                     ))}
                   </div>
                 )}
+              {karaUyari.length > 0 && (
+                <div style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600, marginTop: 4 }}>
+                  ⛔ Kara liste: {karaUyari.map(k => k.sebep || k.ad).join(", ")}
+                </div>
+              )}
               </div>
             ) : (
               <div className="form-group" style={{ position: "relative" }}>
