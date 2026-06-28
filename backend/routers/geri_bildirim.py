@@ -13,7 +13,7 @@ async def calisanlar_listesi(
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     cur = await db.execute(
-        "SELECT id, name, role FROM users WHERE active=1 ORDER BY name"
+        "SELECT id, name, role FROM users ORDER BY name"
     )
     return [dict(r) for r in await cur.fetchall()]
 
@@ -70,7 +70,7 @@ async def skor(
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     cur = await db.execute(
-        """SELECT u.id, u.first_name,
+        """SELECT u.id, u.name,
                   SUM(CASE WHEN cb.tur='sikayet' THEN 1 ELSE 0 END) as sikayet_sayisi,
                   SUM(CASE WHEN cb.tur='ovgu'    THEN 1 ELSE 0 END) as ovgu_sayisi
            FROM users u

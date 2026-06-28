@@ -121,7 +121,7 @@ export default function GeriBildirim({ user }) {
                 onChange={e => setForm(f => ({ ...f, hedef_id: parseInt(e.target.value) }))}>
                 <option value="">Çalışan seç...</option>
                 {kullanicilar.map(u => (
-                  <option key={u.id} value={u.id}>{u.first_name}</option>
+                  <option key={u.id} value={u.id}>{u.name || u.first_name}</option>
                 ))}
               </select>
             </div>
@@ -154,7 +154,7 @@ export default function GeriBildirim({ user }) {
           <div className="card" style={{ marginBottom: 14 }}>
             {skor.map((s, i) => (
               <div key={s.id} className="card-row" style={{ padding: "8px 0", borderBottom: i < skor.length - 1 ? "1px solid var(--bg2)" : "none" }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{s.first_name}</span>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{s.name || s.first_name}</span>
                 <div style={{ display: "flex", gap: 10 }}>
                   <span style={{ fontSize: 13, color: "var(--success)", fontWeight: 600 }}>
                     ⭐ {s.ovgu_sayisi || 0}
