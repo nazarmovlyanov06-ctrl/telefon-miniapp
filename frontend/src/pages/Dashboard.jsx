@@ -141,14 +141,8 @@ export default function Dashboard({ user }) {
       </div>
 
       {/* Uyarılar */}
-      {((uyarilar.stok?.length || 0) + (uyarilar.garanti?.length || 0) + (uyarilar.borc?.length || 0)) > 0 && (
+      {((uyarilar.garanti?.length || 0) + (uyarilar.borc?.length || 0)) > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
-          {(uyarilar.stok || []).map((u, i) => (
-            <div key={"s"+i} onClick={() => navigate("/parts")}
-              style={{ background: "rgba(245,158,11,0.12)", borderRadius: 10, padding: "8px 12px", cursor: "pointer", borderLeft: "3px solid #f59e0b" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#f59e0b" }}>📦 {u.name} — stok kritik ({u.quantity} kaldı)</div>
-            </div>
-          ))}
           {(uyarilar.borc || []).map((u, i) => (
             <div key={"b"+i} onClick={() => navigate("/debts")}
               style={{ background: "rgba(239,68,68,0.12)", borderRadius: 10, padding: "8px 12px", cursor: "pointer", borderLeft: "3px solid #ef4444" }}>
