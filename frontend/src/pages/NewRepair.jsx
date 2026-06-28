@@ -88,11 +88,43 @@ export default function NewRepair() {
   const [karaUyari, setKaraUyari] = useState([]);
   const karaTimer = useRef(null);
 
+  // Müşteri autocomplete
+  const [musteriler, setMusteriler] = useState([]);
+  const [musteriOner, setMusteriOner] = useState([]);
+  const [showMusteriOner, setShowMusteriOner] = useState(false);
+  const [musteriSec, setMusteriSec] = useState(null);
+
   useEffect(() => {
     api.sablonlar().then(setSablonlar).catch(() => {});
     api.repairModeller().then(setModeller).catch(() => {});
     api.repairArizaOneri().then(setArizaGecmis).catch(() => {});
+    api.customers("").then(setMusteriler).catch(() => {});
   }, []);
+
+  function musteriAdiDegisti(v) {
+    setForm(f => ({ ...f, customer_name: v }));
+    setMusteriSec(null);
+    if (v.length >= 2) {
+      const q = v.toLowerCase();
+      const found = musteriler.filter(m =>
+        m.name.toLowerCase().includes(q) || (m.phone || "").includes(q)
+      ).slice(0, 6);
+      setMusteriOner(found);
+      setShowMusteriOner(found.length > 0);
+    } else {
+      setShowMusteriOner(false);
+    }
+  }
+
+  function musteriSecildi(m) {
+    setForm(f => ({ ...f, customer_name: m.name, customer_phone: m.phone || "" }));
+    setMusteriSec(m);
+    setShowMusteriOner(false);
+    // Kara liste kontrolü
+    if (m.phone) {
+      api.karaListe(m.phone).then(r => setKaraUyari(r || [])).catch(() => {});
+    }
+  }
 
   function set(k, v) {
     setForm(f => ({ ...f, [k]: v }));
@@ -258,14 +290,31 @@ export default function NewRepair() {
 
         <div className="section-title">Müşteri</div>
         <div className="card">
-          <div className="form-group">
+          <div className="form-group" style={{ position: "relative" }}>
             <label className="form-label">Müşteri Adı *</label>
             <div style={{ display: "flex", gap: 8 }}>
               <input className="form-input" style={{ flex: 1 }} placeholder="Ad Soyad"
                 value={form.customer_name}
-                onChange={e => set("customer_name", e.target.value)} />
-              <VoiceInput onResult={v => set("customer_name", v)} />
+                onChange={e => musteriAdiDegisti(e.target.value)}
+                onBlur={() => setTimeout(() => setShowMusteriOner(false), 150)}
+                onFocus={() => form.customer_name.length >= 2 && setShowMusteriOner(musteriOner.length > 0)}
+                autoComplete="off" />
+              <VoiceInput onResult={v => musteriAdiDegisti(v)} />
             </div>
+            {showMusteriOner && (
+              <div className="ac-dropdown" style={{ zIndex: 99, maxHeight: 200, overflowY: "auto" }}>
+                {musteriOner.map(m => (
+                  <div key={m.id} onMouseDown={() => musteriSecildi(m)}
+                    style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)" }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--hint)" }}>{m.phone || "Telefon yok"}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {musteriSec && (
+              <div style={{ fontSize: 12, color: "var(--success)", marginTop: 4 }}>✅ Kayıtlı müşteri seçildi</div>
+            )}
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Telefon</label>

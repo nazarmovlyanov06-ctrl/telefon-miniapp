@@ -9,9 +9,11 @@ export default function Debts() {
   });
   const [alacaklar, setAlacaklar] = useState([]);
   const [dukkanBorclari, setDukkanBorclari] = useState([]);
+  const [gecmis, setGecmis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [musteriler, setMusteriler] = useState([]);
+  const [toptancilar, setToptancilar] = useState([]);
   const [oneriler, setOneriler] = useState([]);
   const [showOneriler, setShowOneriler] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
@@ -28,21 +30,38 @@ export default function Debts() {
   useEffect(() => {
     load();
     api.customers("").then(setMusteriler).catch(() => {});
+    api.toptanciList().then(setToptancilar).catch(() => {});
   }, []);
 
   async function load() {
     setLoading(true);
     try {
-      const [a, d] = await Promise.all([
+      const [a, d, g] = await Promise.all([
         api.debts("alacak"),
         api.debts("dukkan_borcu"),
+        api.debtsGecmis(),
       ]);
       setAlacaklar(a);
       setDukkanBorclari(d);
+      setGecmis(g);
     } finally { setLoading(false); }
   }
 
-  const activeList = tab === "alacak" ? alacaklar : dukkanBorclari;
+  function handleAlacakliChange(val) {
+    setForm(f => ({ ...f, alacakli_adi: val }));
+    if (val.length >= 2) {
+      const q = val.toLowerCase();
+      const tFound = toptancilar.filter(t => t.ad.toLowerCase().includes(q)).map(t => ({ id: "t_" + t.id, name: t.ad, tip: "Toptancı" }));
+      const mFound = musteriler.filter(m => m.name.toLowerCase().includes(q)).map(m => ({ id: "m_" + m.id, name: m.name, tip: "Müşteri" }));
+      const combined = [...tFound, ...mFound].slice(0, 6);
+      setOneriler(combined);
+      setShowOneriler(combined.length > 0);
+    } else {
+      setShowOneriler(false);
+    }
+  }
+
+  const activeList = tab === "alacak" ? alacaklar : tab === "dukkan_borcu" ? dukkanBorclari : gecmis;
 
   function handleMusteriChange(val) {
     setForm(f => ({ ...f, customer_name_display: val, customer_id: null }));
@@ -51,7 +70,7 @@ export default function Debts() {
       const found = musteriler.filter(m =>
         m.name.toLowerCase().includes(q) || (m.phone || "").includes(q)
       ).slice(0, 5);
-      setOneriler(found); setShowOneriler(found.length > 0);
+      setOneriler(found.map(m => ({ ...m, tip: "Müşteri" }))); setShowOneriler(found.length > 0);
     } else { setShowOneriler(false); }
   }
 
@@ -115,9 +134,9 @@ export default function Debts() {
       <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate("/more")}>← Geri</button>
         <div className="page-title" style={{ margin: 0, flex: 1 }}>
-          {tab === "alacak" ? "💰 Alacaklar" : "🏦 Dükkan Borçları"}
+          {tab === "alacak" ? "💰 Alacaklar" : tab === "dukkan_borcu" ? "🏦 Dükkan Borçları" : "📋 Geçmiş"}
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setErr(""); resetForm(); }}>+ Yeni</button>
+        {tab !== "gecmis" && <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setErr(""); resetForm(); }}>+ Yeni</button>}
       </div>
 
       {/* Sekme */}
@@ -126,12 +145,15 @@ export default function Debts() {
           💰 Alacaklar {alacaklar.length > 0 && `(${alacaklar.length})`}
         </button>
         <button className={`tab ${tab === "dukkan_borcu" ? "active" : ""}`} onClick={() => { setTab("dukkan_borcu"); setShowForm(false); setExpandedId(null); }}>
-          🏦 Dükkan Borçları {dukkanBorclari.length > 0 && `(${dukkanBorclari.length})`}
+          🏦 Borçlar {dukkanBorclari.length > 0 && `(${dukkanBorclari.length})`}
+        </button>
+        <button className={`tab ${tab === "gecmis" ? "active" : ""}`} onClick={() => { setTab("gecmis"); setShowForm(false); setExpandedId(null); }}>
+          📋 Geçmiş
         </button>
       </div>
 
       {/* Özet kart */}
-      {!loading && (
+      {!loading && tab !== "gecmis" && (
         <div className="card" style={{ marginBottom: 12 }}>
           <div className="card-row">
             {tab === "alacak" ? (
@@ -182,12 +204,24 @@ export default function Debts() {
                 )}
               </div>
             ) : (
-              <div className="form-group">
+              <div className="form-group" style={{ position: "relative" }}>
                 <label className="form-label">Alacaklı (kime borçluyuz?) *</label>
                 <input className="form-input" required
                   value={form.alacakli_adi}
-                  onChange={e => setForm(f => ({ ...f, alacakli_adi: e.target.value }))}
-                  placeholder="Toptancı adı, mal sahibi..." />
+                  onChange={e => handleAlacakliChange(e.target.value)}
+                  onBlur={() => setTimeout(() => setShowOneriler(false), 150)}
+                  placeholder="Toptancı adı, mal sahibi..." autoComplete="off" />
+                {showOneriler && tab === "dukkan_borcu" && (
+                  <div className="ac-dropdown" style={{ zIndex: 99 }}>
+                    {oneriler.map(o => (
+                      <div key={o.id} onMouseDown={() => { setForm(f => ({ ...f, alacakli_adi: o.name })); setShowOneriler(false); }}
+                        style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
+                        <span>{o.name}</span>
+                        <span style={{ fontSize: 11, color: "var(--hint)" }}>{o.tip}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -236,8 +270,8 @@ export default function Debts() {
         <div className="loading">Yükleniyor...</div>
       ) : activeList.length === 0 ? (
         <div className="empty">
-          <div className="empty-icon">{tab === "alacak" ? "💰" : "🏦"}</div>
-          {tab === "alacak" ? "Açık alacak yok" : "Dükkan borcu yok"}
+          <div className="empty-icon">{tab === "alacak" ? "💰" : tab === "gecmis" ? "📋" : "🏦"}</div>
+          {tab === "alacak" ? "Açık alacak yok" : tab === "gecmis" ? "Geçmiş kayıt yok" : "Dükkan borcu yok"}
         </div>
       ) : (
         activeList.map((d) => (
@@ -249,18 +283,28 @@ export default function Debts() {
                   {d.customer_phone ? `📞 ${d.customer_phone}` : ""}
                   {d.payment_type === "taksit" ? " · Taksit" : d.payment_type === "senet" ? " · Senet" : ""}
                   {d.due_date ? ` · Vade: ${new Date(d.due_date).toLocaleDateString("tr-TR")}` : ""}
+                  {d.borc_turu === "alacak" && d.source_type === "parca_iade" ? " · Parça İade" : ""}
                 </div>
                 {d.notes && <div style={{ fontSize: 12, color: "var(--hint)" }}>{d.notes}</div>}
+                {d.created_at && (
+                  <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>
+                    📅 {new Date(d.created_at).toLocaleDateString("tr-TR")}
+                    {tab === "gecmis" && <span style={{ color: "var(--success)", fontWeight: 600, marginLeft: 6 }}>✅ Ödendi</span>}
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontWeight: 700, color: tab === "alacak" ? "var(--success)" : "var(--danger)", fontSize: 17 }}>
-                  ₺{(d.remaining || 0).toLocaleString("tr-TR")}
+                <div style={{ fontWeight: 700, color: tab === "gecmis" ? "var(--hint)" : tab === "alacak" ? "var(--success)" : "var(--danger)", fontSize: 17 }}>
+                  ₺{(d.total_amount || 0).toLocaleString("tr-TR")}
                 </div>
-                <div style={{ fontSize: 12, color: "var(--hint)" }}>
-                  /{(d.total_amount || 0).toLocaleString("tr-TR")}
-                </div>
+                {tab !== "gecmis" && (
+                  <div style={{ fontSize: 12, color: "var(--hint)" }}>
+                    kalan: {(d.remaining || 0).toLocaleString("tr-TR")}
+                  </div>
+                )}
               </div>
             </div>
+            {tab !== "gecmis" && (
             <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
               <button className="btn btn-ghost btn-sm" onClick={() => pay(d)}>
                 {tab === "alacak" ? "💵 Ödeme Al" : "✅ Ödedik"}
@@ -269,6 +313,7 @@ export default function Debts() {
                 {expandedId === d.id ? "▲ Gizle" : "▼ Geçmiş"}
               </button>
             </div>
+            )}
             {expandedId === d.id && (
               <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>

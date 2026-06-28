@@ -122,7 +122,9 @@ function NavShell({ children }) {
           style={{
             position: "fixed", bottom: 85, right: 16, zIndex: 200,
             width: 40, height: 40, borderRadius: "50%",
-            background: "var(--btn)",
+            background: "rgba(36,129,204,0.5)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
             border: "none",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 20, fontWeight: 700, cursor: "pointer", color: "var(--btn-text)",

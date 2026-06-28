@@ -16,6 +16,8 @@ export default function Maas() {
   const [err, setErr] = useState("");
   const [botUsers, setBotUsers] = useState([]);
   const [showBotPicker, setShowBotPicker] = useState(false);
+  const [avansDetay, setAvansDetay] = useState({}); // calisan_id → avanslar
+  const [expandedCalisan, setExpandedCalisan] = useState(null);
 
   useEffect(() => {
     load();
@@ -209,6 +211,29 @@ export default function Maas() {
                 <span style={{ fontWeight: 700, color: "var(--success)" }}>{(o.kalan || 0).toLocaleString("tr-TR")} ₺</span>
               </div>
               {o.odendi && <div style={{ fontSize: 12, color: "var(--success)", marginTop: 4 }}>✓ Ödendi</div>}
+              {o.alinan_avans > 0 && (
+                <button className="btn btn-ghost btn-sm" style={{ marginTop: 6, fontSize: 11 }}
+                  onClick={async () => {
+                    if (expandedCalisan === o.calisan_id) { setExpandedCalisan(null); return; }
+                    setExpandedCalisan(o.calisan_id);
+                    if (!avansDetay[o.calisan_id]) {
+                      const a = await api.calisanAvanslar(o.calisan_id).catch(() => []);
+                      setAvansDetay(d => ({ ...d, [o.calisan_id]: a }));
+                    }
+                  }}>
+                  {expandedCalisan === o.calisan_id ? "▲ Gizle" : "▼ Avans Detayı"}
+                </button>
+              )}
+              {expandedCalisan === o.calisan_id && avansDetay[o.calisan_id] && (
+                <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+                  {avansDetay[o.calisan_id].map(a => (
+                    <div key={a.id} className="card-row" style={{ fontSize: 13, padding: "4px 0" }}>
+                      <span style={{ color: "var(--hint)" }}>📅 {a.tarih}</span>
+                      <span style={{ color: "var(--danger)", fontWeight: 600 }}>-{(a.tutar || 0).toLocaleString("tr-TR")} ₺</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </>

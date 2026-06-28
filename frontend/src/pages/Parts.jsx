@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../api";
 
 const TABS = [
@@ -41,6 +41,7 @@ function relativeGun(dateStr) {
 }
 
 export default function Parts({ user }) {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") || "stok");
   const [parts, setParts] = useState([]);
@@ -83,8 +84,10 @@ export default function Parts({ user }) {
   const [hareketLoading, setHareketLoading] = useState(false);
   const [kullanForm, setKullanForm] = useState({ sebep: "tamir", aciklama: "", miktar: "1" });
   const [kullanErr, setKullanErr] = useState("");
-  const [ekleForm, setEkleForm] = useState({ miktar: "1", fiyat: "", aciklama: "" });
+  const [ekleForm, setEkleForm] = useState({ miktar: "1", fiyat: "", aciklama: "", toptanci: "" });
   const [ekleErr, setEkleErr] = useState("");
+  const [ekleTopOner, setEkleTopOner] = useState([]);
+  const [showEkleTopOner, setShowEkleTopOner] = useState(false);
 
   // Yeni parça form — mevcut parça önerisi
   const [addEklePart, setAddEklePart] = useState(null);
@@ -99,6 +102,7 @@ export default function Parts({ user }) {
 
   const [sortBy, setSortBy] = useState("yeni"); // "yeni" | "stok" | "isim"
   const [err, setErr] = useState("");
+  const [priceHidden, setPriceHidden] = useState(() => localStorage.getItem("priceHidden") === "1");
 
   useEffect(() => {
     api.toptanciList().then(setToptancilar).catch(() => {});
@@ -253,15 +257,24 @@ export default function Parts({ user }) {
   async function submitEkle(e) {
     e.preventDefault(); setEkleErr("");
     try {
+      const aciklama = [ekleForm.toptanci, ekleForm.aciklama].filter(Boolean).join(" - ") || null;
       await api.stokEkle(selectedPart.id, {
         miktar: parseInt(ekleForm.miktar) || 1,
         fiyat: ekleForm.fiyat ? parseFloat(ekleForm.fiyat) : null,
-        aciklama: ekleForm.aciklama || null,
+        aciklama,
       });
       setSelectedPart(null);
-      setEkleForm({ miktar: "1", fiyat: "", aciklama: "" });
+      setEkleForm({ miktar: "1", fiyat: "", aciklama: "", toptanci: "" });
       api.parts(q ? { q } : {}).then(setParts);
     } catch (e) { setEkleErr(e.message); }
+  }
+
+  function handleEkleTop(val) {
+    setEkleForm(f => ({ ...f, toptanci: val }));
+    if (val.length >= 1) {
+      const found = toptancilar.filter(t => t.ad.toLowerCase().includes(val.toLowerCase())).slice(0, 5);
+      setEkleTopOner(found); setShowEkleTopOner(found.length > 0);
+    } else { setShowEkleTopOner(false); }
   }
 
   async function deletePart(id) {
@@ -597,7 +610,7 @@ export default function Parts({ user }) {
                   <div className="list-item" style={{ background: isSelected ? "var(--bg2)" : undefined }}>
                     <div className="list-item-body" style={{ cursor: "pointer" }} onClick={() => openPanel(p, "ekle")}>
                       <div className="list-item-title">{p.name}</div>
-                      <div className="list-item-sub">{p.device_model} · {p.part_type}{p.purchase_price ? ` · ${p.purchase_price.toLocaleString("tr-TR")}₺` : ""}</div>
+                      <div className="list-item-sub">{p.device_model} · {p.part_type}{p.purchase_price && !priceHidden ? ` · ${p.purchase_price.toLocaleString("tr-TR")}₺` : p.purchase_price && priceHidden ? " · ••••₺" : ""}</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ textAlign: "right" }}>
@@ -701,11 +714,28 @@ export default function Parts({ user }) {
                               {kurLoading ? "..." : "🔄 Kur al"}
                             </button>
                           )}
+                          <div className="form-group" style={{ margin: 0, position: "relative" }}>
+                            <label className="form-label">Toptancı</label>
+                            <input className="form-input" value={ekleForm.toptanci}
+                              onChange={e => handleEkleTop(e.target.value)}
+                              onBlur={() => setTimeout(() => setShowEkleTopOner(false), 150)}
+                              placeholder="Toptancı adı..." autoComplete="off" />
+                            {showEkleTopOner && (
+                              <div className="ac-dropdown">
+                                {ekleTopOner.map(t => (
+                                  <div key={t.id} onMouseDown={() => { setEkleForm(f => ({ ...f, toptanci: t.ad })); setShowEkleTopOner(false); }}
+                                    style={{ padding: "8px 12px", cursor: "pointer", borderBottom: "1px solid var(--border)", fontSize: 13 }}>
+                                    {t.ad}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           <div className="form-group" style={{ margin: 0 }}>
-                            <label className="form-label">Açıklama / Toptancı</label>
+                            <label className="form-label">Not / Açıklama</label>
                             <input className="form-input" value={ekleForm.aciklama}
                               onChange={e => setEkleForm(f => ({ ...f, aciklama: e.target.value }))}
-                              placeholder="Nereden alındı, not..." />
+                              placeholder="Opsiyonel not..." />
                           </div>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button type="submit" className="btn btn-sm" style={{ background: "var(--success)", color: "#fff" }}>Ekle</button>
@@ -723,6 +753,7 @@ export default function Parts({ user }) {
                               { key: "satis", label: "💰 Satıldı" },
                               { key: "hasar", label: "💥 Hasar/Kayıp" },
                               { key: "diger", label: "📦 Diğer" },
+                              { key: "iade", label: "↩️ İade Et" },
                             ].map(s => (
                               <button key={s.key} type="button"
                                 onClick={() => setKullanForm(f => ({ ...f, sebep: s.key }))}
@@ -737,6 +768,19 @@ export default function Parts({ user }) {
                               </button>
                             ))}
                           </div>
+                          {kullanForm.sebep === "iade" ? (
+                            <div style={{ padding: "8px 0" }}>
+                              <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 8 }}>
+                                Parça iade sayfasına yönlendirileceksiniz.
+                              </div>
+                              <button className="btn btn-sm" style={{ background: "var(--warning, #f59e0b)", color: "#fff" }}
+                                onClick={() => {
+                                  navigate(`/parca-iade?part_id=${p.id}&part_name=${encodeURIComponent(p.name)}`);
+                                }}>
+                                ↩️ İade Sayfasına Git
+                              </button>
+                            </div>
+                          ) : (
                           <form onSubmit={submitKullan} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                             {kullanErr && <div style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600 }}>❌ {kullanErr}</div>}
                             <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8 }}>
@@ -766,6 +810,7 @@ export default function Parts({ user }) {
                               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedPart(null)}>İptal</button>
                             </div>
                           </form>
+                          )}
                         </>
                       )}
 
@@ -852,6 +897,11 @@ export default function Parts({ user }) {
                   <div className="form-group">
                     <label className="form-label">Tahmini Fiyat (₺)</label>
                     <input className="form-input" type="number" value={shopForm.estimated_price} onChange={e => setShopForm({ ...shopForm, estimated_price: e.target.value })} />
+                    {shopForm.estimated_price && dollarRate && (
+                      <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 3 }}>
+                        ≈ ${(parseFloat(shopForm.estimated_price) / dollarRate).toFixed(2)} USD
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="form-group">

@@ -239,3 +239,27 @@ async def monthly_report(
         (start, end),
     )
     return [dict(r) for r in await cur.fetchall()]
+
+
+@router.get("/feed")
+async def aktivite_feed(
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    import datetime
+    today = datetime.date.today().isoformat()
+    cur = await db.execute(
+        """SELECT r.id, r.repair_no, r.device_model, r.status,
+                  c.name as musteri_adi,
+                  u.name as guncelleyen,
+                  r.updated_at
+           FROM repairs r
+           LEFT JOIN customers c ON r.customer_id = c.id
+           LEFT JOIN users u ON u.id = r.son_guncelleyen_id
+           WHERE r.son_guncelleyen_id IS NOT NULL
+             AND DATE(r.updated_at) = ?
+           ORDER BY r.updated_at DESC LIMIT 30""",
+        (today,),
+    )
+    return [dict(r) for r in await cur.fetchall()]

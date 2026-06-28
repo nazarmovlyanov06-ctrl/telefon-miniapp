@@ -34,6 +34,25 @@ async def list_debts(
     return [dict(r) for r in await cur.fetchall()]
 
 
+@router.get("/gecmis")
+async def gecmis_debts(
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        """SELECT d.*,
+                  COALESCE(c.name, d.alacakli_adi, 'Bilinmiyor') as customer_name,
+                  c.phone as customer_phone,
+                  (d.total_amount - d.paid_amount) as remaining
+           FROM debts d
+           LEFT JOIN customers c ON d.customer_id = c.id
+           WHERE d.paid_amount >= d.total_amount AND d.total_amount > 0
+           ORDER BY d.created_at DESC LIMIT 100""",
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
 @router.post("/")
 async def create_debt(
     body: dict,

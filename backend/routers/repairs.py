@@ -168,7 +168,8 @@ async def update_repair(
            tamirde_at=COALESCE(tamirde_at, ?),
            completed_at=COALESCE(completed_at, ?),
            delivered_at=COALESCE(?, delivered_at),
-           son_guncelleyen_id=?
+           son_guncelleyen_id=?,
+           updated_at=CURRENT_TIMESTAMP
            WHERE id=?""",
         (
             body.get("device_model"),

@@ -56,8 +56,27 @@ async def add_iade(
         (body.get("toptanci_id"), part_id, body["parca"], miktar,
          body.get("sebep"), body.get("durum", "bekliyor"), beklenen_tutar),
     )
+    iade_id = cur.lastrowid
+
+    # Toptancıdan beklenen para → alacak borcu oluştur
+    if beklenen_tutar > 0:
+        toptanci_id = body.get("toptanci_id")
+        toptanci_adi = None
+        if toptanci_id:
+            tc = await db.execute("SELECT ad FROM toptancilar WHERE id=?", (toptanci_id,))
+            tr = await tc.fetchone()
+            toptanci_adi = dict(tr)["ad"] if tr else None
+        alacakli = toptanci_adi or body.get("parca", "Toptancı")
+        await db.execute(
+            """INSERT INTO debts (alacakli_adi, borc_turu, source_type, source_id,
+               total_amount, payment_type, notes, created_by)
+               VALUES (?, 'alacak', 'parca_iade', ?, ?, 'borc', ?, ?)""",
+            (alacakli, iade_id, beklenen_tutar,
+             f"Parça iade: {body['parca']} x{miktar}", user["id"]),
+        )
+
     await db.commit()
-    return {"id": cur.lastrowid}
+    return {"id": iade_id}
 
 
 @router.put("/{iade_id}/durum")

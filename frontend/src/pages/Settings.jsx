@@ -12,11 +12,13 @@ const ROLES = [
 export default function Settings({ user }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [feed, setFeed] = useState([]);
   const navigate = useNavigate();
 
   const load = () => {
     if (user?.role === "patron") {
       api.users().then(setUsers).finally(() => setLoading(false));
+      api.aktiviteFeed().then(setFeed).catch(() => {});
     } else {
       setLoading(false);
     }
@@ -74,6 +76,29 @@ export default function Settings({ user }) {
                       onClick={() => onayla(u)}>✅ Onayla</button>
                     <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "6px 14px" }}
                       onClick={() => reddet(u)}>❌ Reddet</button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {feed.length > 0 && (
+            <>
+              <div className="section-title">📋 Bugünkü Değişiklikler</div>
+              {feed.map(f => (
+                <div key={f.id} className="card" style={{ padding: "8px 14px", marginBottom: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>
+                        {f.guncelleyen || "?"} → #{f.repair_no} {f.device_model}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--hint)" }}>
+                        {f.musteri_adi ? `👤 ${f.musteri_adi} · ` : ""}{f.status}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--hint)", whiteSpace: "nowrap" }}>
+                      {f.updated_at ? new Date(f.updated_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) : ""}
+                    </div>
                   </div>
                 </div>
               ))}

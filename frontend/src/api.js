@@ -79,6 +79,7 @@ export const api = {
 
   // Borc
   debts: (tur) => get(`/debts/${tur ? "?tur=" + tur : ""}`),
+  debtsGecmis: () => get("/debts/gecmis"),
   createDebt: (data) => post("/debts/", data),
   payDebt: (id, data) => post(`/debts/${id}/pay`, data),
   debtOdemeler: (id) => get(`/debts/${id}/odemeler`),
@@ -168,6 +169,7 @@ export const api = {
   createCalisan: (data) => post("/maas/calisanlar", data),
   createAvans: (data) => post("/maas/avans", data),
   maasOzet: (yil, ay) => get(`/maas/ozet/${yil}/${ay}`),
+  calisanAvanslar: (id) => get(`/maas/avanslar/${id}`),
 
   // Kara Liste
   karaListe: (q) => get(`/kara-liste/${q ? "?q=" + encodeURIComponent(q) : ""}`),
@@ -213,6 +215,7 @@ export const api = {
 
   // İstatistik
   stats: () => get("/reports/genel"),
+  aktiviteFeed: () => get("/reports/feed"),
 
   // AI
   aiSor: (soru) => post("/ai/sor", { soru }),

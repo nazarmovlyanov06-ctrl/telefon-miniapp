@@ -53,6 +53,20 @@ async def add_avans(
     return {"id": cur.lastrowid}
 
 
+@router.get("/avanslar/{calisan_id}")
+async def calisan_avanslar(
+    calisan_id: int,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        "SELECT * FROM avanslar WHERE calisan_id=? ORDER BY tarih DESC LIMIT 50",
+        (calisan_id,),
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
 @router.get("/ozet/{yil}/{ay}")
 async def ozet(
     yil: int,

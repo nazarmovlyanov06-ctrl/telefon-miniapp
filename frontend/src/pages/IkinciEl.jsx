@@ -277,13 +277,25 @@ export default function IkinciEl({ user }) {
             return (
               <div key={c.id}>
                 <div className="card" onClick={() => selectCihaz(c)} style={{ cursor: "pointer" }}>
-                  <div className="card-row" style={{ marginBottom: 6 }}>
+                  <div className="card-row" style={{ marginBottom: 6, alignItems: "flex-start" }}>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>📱 {c.model}</div>
-                    <div style={{ textAlign: "right" }}>
+                    <div style={{ textAlign: "right", minWidth: 80 }}>
                       <div style={{ fontWeight: 700 }}>
                         {priceHidden ? "••••" : ((c.alis_fiyati || 0) + (c.toplam_masraf || 0)).toLocaleString("tr-TR") + " ₺"}
                       </div>
                       <div style={{ fontSize: 11, color: "var(--hint)" }}>maliyet</div>
+                      {(c.toplam_masraf || 0) > 0 && (
+                        <>
+                          <div style={{ fontWeight: 600, color: "var(--danger)", fontSize: 13, marginTop: 2 }}>
+                            {priceHidden ? "••••" : (c.toplam_masraf || 0).toLocaleString("tr-TR") + " ₺"}
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--hint)" }}>masraf</div>
+                        </>
+                      )}
+                      <div style={{ fontWeight: 600, fontSize: 13, marginTop: 2 }}>
+                        {priceHidden ? "••••" : (c.alis_fiyati || 0).toLocaleString("tr-TR") + " ₺"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--hint)" }}>alış fiyatı</div>
                     </div>
                   </div>
                   {/* Özellik chipler */}

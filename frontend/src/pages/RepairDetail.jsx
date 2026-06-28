@@ -146,15 +146,12 @@ export default function RepairDetail({ user }) {
       });
       // Ekleme başarılı — formu kapat
       setParcaForm({ part_id: "", quantity: 1 });
+      setParcaQ("");
       setParcaEkleOpen(false);
-      // Listeyi yenile (ayrı try — yenileme hatası eklemeyi iptal etmesin)
-      try {
-        const [p, parts] = await Promise.all([api.repairParcalar(id), api.parts()]);
-        setParcalar(p);
-        setPartsList(parts);
-      } catch (_) {
-        // Yenileme başarısız ama parça eklendi — sayfayı yenileyince görünür
-      }
+      // Parcaları yenile
+      api.repairParcalar(id).then(setParcalar).catch(() => {});
+      // Stok listesini ayrı yenile (hata olursa parcaları etkilemesin)
+      api.parts().then(setPartsList).catch(() => {});
     } catch (e) {
       setParcaHata(e.message === "Failed to fetch"
         ? "Sunucuya ulaşılamıyor. İnternet bağlantınızı kontrol edin ve tekrar deneyin."

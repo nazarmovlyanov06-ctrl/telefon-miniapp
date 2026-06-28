@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 
 const DURUM_LABEL = {
@@ -15,6 +15,7 @@ const DURUM_COLOR = {
 
 export default function ParcaIade() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [toptancilar, setToptancilar] = useState([]);
   const [parcalar, setParcalar] = useState([]);
@@ -27,8 +28,20 @@ export default function ParcaIade() {
   const [showParcaOner, setShowParcaOner] = useState(false);
   const [paraModal, setParaModal] = useState(null);
   const [alinanTutar, setAlinanTutar] = useState("");
+  const dolarKuru = parseFloat(localStorage.getItem("son_dolar_kuru") || "0");
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load().then(() => {
+      const partId = searchParams.get("part_id");
+      const partName = searchParams.get("part_name");
+      if (partId && partName) {
+        const id = parseInt(partId);
+        setParcaArama(partName);
+        setForm(f => ({ ...f, parca: partName, part_id: id }));
+        setShowForm(true);
+      }
+    });
+  }, []);
 
   async function load() {
     try {
@@ -40,6 +53,7 @@ export default function ParcaIade() {
       setList(l); setToptancilar(t);
       setParcalar(p.filter ? p.filter(x => x.quantity > 0) : (p || []));
     } finally { setLoading(false); }
+    return true;
   }
 
   function handleParcaArama(val) {
@@ -249,6 +263,11 @@ export default function ParcaIade() {
                 value={alinanTutar}
                 onChange={e => setAlinanTutar(e.target.value)}
                 placeholder={paraModal.beklenen_tutar > 0 ? String(paraModal.beklenen_tutar) : "0"} />
+              {alinanTutar && dolarKuru > 0 && (
+                <div style={{ fontSize: 12, color: "var(--accent)", marginTop: 4 }}>
+                  ≈ ${(parseFloat(alinanTutar) / dolarKuru).toFixed(2)} USD (1$={dolarKuru}₺)
+                </div>
+              )}
               <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>
                 Bu tutar kasaya otomatik girilir
               </div>
