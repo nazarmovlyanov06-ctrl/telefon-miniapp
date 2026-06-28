@@ -19,7 +19,7 @@ export default function IkinciEl({ user }) {
   const [deleteId, setDeleteId] = useState(null);
   const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "" });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
-  const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit" });
+  const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit", pesinat: "", taksit_sayi: "3" });
   const [err, setErr] = useState("");
   const [musteriler, setMusteriler] = useState([]);
   const [kimdenOner, setKimdenOner] = useState([]);
@@ -110,9 +110,14 @@ export default function IkinciEl({ user }) {
   async function submitSat(e) {
     e.preventDefault(); setErr("");
     try {
-      await api.ikinciElSat(selected.id, { ...satForm, satis_fiyati: parseFloat(satForm.satis_fiyati) });
+      await api.ikinciElSat(selected.id, {
+        ...satForm,
+        satis_fiyati: parseFloat(satForm.satis_fiyati),
+        pesinat: satForm.pesinat ? parseFloat(satForm.pesinat) : 0,
+        taksit_sayi: satForm.taksit_sayi ? parseInt(satForm.taksit_sayi) : 1,
+      });
       setShowSat(false); setSelected(null);
-      setSatForm({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit" });
+      setSatForm({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit", pesinat: "", taksit_sayi: "3" });
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -429,7 +434,31 @@ export default function IkinciEl({ user }) {
                           </select>
                         </div>
                         </div>
-                        {satForm.satis_fiyati && (
+                        {satForm.odeme_yontemi === "taksit" && (
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                            <div className="form-group">
+                              <label className="form-label">Peşinat (₺)</label>
+                              <input className="form-input" type="number" value={satForm.pesinat}
+                                onChange={e => setSatForm(f => ({ ...f, pesinat: e.target.value }))}
+                                placeholder="0" />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Taksit Sayısı</label>
+                              <select className="form-select" value={satForm.taksit_sayi}
+                                onChange={e => setSatForm(f => ({ ...f, taksit_sayi: e.target.value }))}>
+                                {[2,3,4,6,9,12].map(n => <option key={n} value={n}>{n} taksit</option>)}
+                              </select>
+                            </div>
+                          </div>
+                        )}
+                        {satForm.odeme_yontemi === "taksit" && satForm.satis_fiyati && (
+                          <div style={{ fontSize: 13, background: "var(--bg2)", borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>
+                            <div style={{ color: "var(--hint)" }}>Kalan borç: <b style={{ color: "var(--danger)" }}>
+                              {(parseFloat(satForm.satis_fiyati) - (parseFloat(satForm.pesinat) || 0)).toLocaleString("tr-TR")} ₺
+                            </b> → müşteri borcuna kaydedilecek</div>
+                          </div>
+                        )}
+                        {satForm.satis_fiyati && satForm.odeme_yontemi !== "taksit" && (
                           <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8, fontWeight: 600 }}>
                             Kâr: {(parseFloat(satForm.satis_fiyati) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺
                           </div>

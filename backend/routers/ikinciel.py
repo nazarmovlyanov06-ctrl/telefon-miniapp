@@ -176,7 +176,7 @@ async def sat_cihaz(
     tg_user=Depends(get_current_user),
     db: Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     cur = await db.execute("SELECT * FROM ikinci_el WHERE id = ?", (cihaz_id,))
     row = await cur.fetchone()
     if not row:
@@ -187,6 +187,9 @@ async def sat_cihaz(
 
     musteri_adi = body.get("musteri_adi") or ""
     musteri_telefon = body.get("musteri_telefon") or ""
+    odeme = body.get("odeme_yontemi", "nakit")
+    taksit_sayi = int(body.get("taksit_sayi") or 1)
+    pesinat = float(body.get("pesinat") or 0)
 
     await db.execute(
         """UPDATE ikinci_el SET durum='satildi', satis_fiyati=?, satis_kanali=?,
@@ -195,16 +198,8 @@ async def sat_cihaz(
          satis_tarihi, musteri_adi, musteri_telefon, cihaz_id),
     )
 
-    # Kasaya yaz
-    odeme = body.get("odeme_yontemi", "nakit")
-    await db.execute(
-        """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-           VALUES (?, 'gelir', ?, ?, ?, '2el_satis')""",
-        (satis_tarihi, odeme, satis_fiyati,
-         f"2.El Satış: {cihaz.get('model', '')} → {musteri_adi}".strip(" →")),
-    )
-
-    # Yeni müşteri otomatik kayıt
+    # Müşteri bul veya oluştur
+    customer_id = None
     if musteri_adi:
         lookup = [musteri_adi]
         sql = "SELECT id FROM customers WHERE name = ?"
@@ -212,11 +207,44 @@ async def sat_cihaz(
             sql += " OR phone = ?"
             lookup.append(musteri_telefon)
         cur2 = await db.execute(sql, lookup)
-        if not await cur2.fetchone():
-            await db.execute(
+        row2 = await cur2.fetchone()
+        if row2:
+            customer_id = row2["id"]
+        else:
+            ins = await db.execute(
                 "INSERT INTO customers (name, phone) VALUES (?, ?)",
                 (musteri_adi, musteri_telefon or None)
             )
+            customer_id = ins.lastrowid
+
+    aciklama = f"2.El Satış: {cihaz.get('model', '')} → {musteri_adi}".strip(" →")
+
+    if odeme == "taksit":
+        # Peşinat varsa kasaya yaz
+        if pesinat > 0:
+            await db.execute(
+                """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+                   VALUES (?, 'gelir', 'nakit', ?, ?, '2el_satis')""",
+                (satis_tarihi, pesinat, aciklama + f" (peşinat)"),
+            )
+        # Kalan tutar → borç kaydı
+        kalan = satis_fiyati - pesinat
+        if kalan > 0 and customer_id:
+            await db.execute(
+                """INSERT INTO debts
+                   (customer_id, borc_turu, source_type, amount, total_amount,
+                    payment_type, installment_count, notes, created_by)
+                   VALUES (?, 'alacak', '2el_taksit', ?, ?, 'taksit', ?, ?, ?)""",
+                (customer_id, kalan, kalan, taksit_sayi,
+                 aciklama, user["id"]),
+            )
+    else:
+        # Nakit / kart — tamamı kasaya
+        await db.execute(
+            """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+               VALUES (?, 'gelir', ?, ?, ?, '2el_satis')""",
+            (satis_tarihi, odeme, satis_fiyati, aciklama),
+        )
 
     await db.commit()
     return {"ok": True}
