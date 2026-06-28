@@ -69,9 +69,9 @@ async def add_iade(
         alacakli = toptanci_adi or body.get("parca", "Toptancı")
         await db.execute(
             """INSERT INTO debts (alacakli_adi, borc_turu, source_type, source_id,
-               total_amount, payment_type, notes, created_by)
-               VALUES (?, 'alacak', 'parca_iade', ?, ?, 'borc', ?, ?)""",
-            (alacakli, iade_id, beklenen_tutar,
+               amount, total_amount, payment_type, notes, created_by)
+               VALUES (?, 'alacak', 'parca_iade', ?, ?, ?, 'borc', ?, ?)""",
+            (alacakli, iade_id, beklenen_tutar, beklenen_tutar,
              f"Parça iade: {body['parca']} x{miktar}", user["id"]),
         )
 
