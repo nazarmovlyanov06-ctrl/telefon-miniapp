@@ -72,12 +72,13 @@ async def create_debt(
     cur = await db.execute(
         """INSERT INTO debts
            (customer_id, alacakli_adi, borc_turu, source_type,
-            total_amount, payment_type, installment_count, due_date, notes, created_by)
-           VALUES (?, ?, ?, 'manuel', ?, ?, ?, ?, ?, ?)""",
+            amount, total_amount, payment_type, installment_count, due_date, notes, created_by)
+           VALUES (?, ?, ?, 'manuel', ?, ?, ?, ?, ?, ?, ?)""",
         (
             customer_id,
             alacakli_adi,
             borc_turu,
+            body["total_amount"],
             body["total_amount"],
             body.get("payment_type", "borc"),
             body.get("installment_count", 1),
