@@ -24,6 +24,7 @@ import Hedef from "./pages/Hedef";
 import Maas from "./pages/Maas";
 import KaraListe from "./pages/KaraListe";
 import ParcaIade from "./pages/ParcaIade";
+import GeriBildirim from "./pages/GeriBildirim";
 import AiChat from "./pages/AiChat";
 import CustomerDetail from "./pages/CustomerDetail";
 import SifirCihaz from "./pages/SifirCihaz";
@@ -123,6 +124,7 @@ function AppRoutes({ user }) {
         <Route path="/sifir-cihaz" element={<SifirCihaz user={user} />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/search" element={<Search />} />
+        <Route path="/geri-bildirim" element={<GeriBildirim />} />
       </Routes>
       <BottomNav />
     </NavShell>

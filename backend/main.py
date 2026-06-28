@@ -7,7 +7,7 @@ from routers import users, customers, repairs, parts, shopping, imei, debts, rep
 from routers import (
     toptanci, ikinciel, garanti, kasa, gider, loaner,
     aksesuar, hedef, maas, karalist, parca_iade, ai_chat, sifir_cihaz,
-    arama, sablonlar,
+    arama, sablonlar, geri_bildirim,
 )
 
 SCHEMA = """
@@ -302,6 +302,18 @@ CREATE TABLE IF NOT EXISTS tamir_fotograflari (
     aciklama TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS geri_bildirimler (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tur TEXT NOT NULL,
+    musteri_adi TEXT,
+    telefon TEXT,
+    repair_id INTEGER REFERENCES repairs(id),
+    puan INTEGER,
+    mesaj TEXT NOT NULL,
+    durum TEXT DEFAULT 'bekliyor',
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -419,6 +431,7 @@ app.include_router(ai_chat.router)
 app.include_router(sifir_cihaz.router)
 app.include_router(arama.router)
 app.include_router(sablonlar.router)
+app.include_router(geri_bildirim.router)
 
 
 @app.get("/health")

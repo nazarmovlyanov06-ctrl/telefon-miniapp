@@ -174,6 +174,12 @@ export const api = {
   createParcaIade: (data) => post("/parca-iade/", data),
   updateParcaIadeDurum: (id, durum, alinan_tutar) => put(`/parca-iade/${id}/durum`, { durum, alinan_tutar }),
 
+  // Geri Bildirim
+  geriBildirimList: (tur) => get(`/geri-bildirim/${tur ? "?tur=" + tur : ""}`),
+  createGeriBildirim: (data) => post("/geri-bildirim/", data),
+  geriBildirimDurum: (id, durum) => put(`/geri-bildirim/${id}/durum`, { durum }),
+  deleteGeriBildirim: (id) => del(`/geri-bildirim/${id}`),
+
   // Evrensel Arama
   ara: (q) => get(`/arama/?q=${encodeURIComponent(q)}`),
 

@@ -16,6 +16,7 @@ const ITEMS = [
   { icon: "🛡️", label: "Garanti",   path: "/garanti",    color: "#f0fdf4", iconBg: "#16a34a" },
   { icon: "📲", label: "Yedek Tel", path: "/loaner",     color: "#eff6ff", iconBg: "#3b82f6" },
   { icon: "🚫", label: "Kara Liste",path: "/karalist",   color: "#fef2f2", iconBg: "#dc2626" },
+  { icon: "💬", label: "Şikayet/Övgü", path: "/geri-bildirim", color: "#fff7ed", iconBg: "#f97316" },
   // Çalışan
   { icon: "💵", label: "Maaş",      path: "/maas",       color: "#fdf4ff", iconBg: "#7c3aed" },
   // Araçlar
