@@ -27,12 +27,14 @@ export default function Maas() {
 
   async function load() {
     try {
-      const [c, o] = await Promise.all([
-        api.calisanlar(),
-        api.maasOzet(now.getFullYear(), now.getMonth() + 1),
-      ]);
-      setCalisanlar(c); setOzet(o);
-    } finally { setLoading(false); }
+      const c = await api.calisanlar();
+      setCalisanlar(c);
+    } catch (e) { console.error("calisanlar:", e); }
+    try {
+      const o = await api.maasOzet(now.getFullYear(), now.getMonth() + 1);
+      setOzet(o);
+    } catch (e) { console.error("ozet:", e); }
+    setLoading(false);
   }
 
   async function submitCalisan(e) {
