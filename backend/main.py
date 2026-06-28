@@ -422,6 +422,7 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE repairs ADD COLUMN updated_at TIMESTAMP",
             "ALTER TABLE debts ADD COLUMN source_id INTEGER",
             "ALTER TABLE avanslar ADD COLUMN aciklama TEXT",
+            "ALTER TABLE customers ADD COLUMN visit_count INTEGER DEFAULT 0",
         ]:
             try:
                 await db.execute(m)
