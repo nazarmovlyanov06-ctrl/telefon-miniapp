@@ -372,6 +372,7 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE loaner_cihazlar ADD COLUMN hasar_tutar REAL DEFAULT 0",
             "ALTER TABLE ikinci_el ADD COLUMN kaynak TEXT DEFAULT 'dukkan'",
             "ALTER TABLE repairs ADD COLUMN fault_desc TEXT",
+            "ALTER TABLE repairs ADD COLUMN estimated_price REAL DEFAULT 0",
             "ALTER TABLE repairs ADD COLUMN final_price REAL DEFAULT 0",
             "ALTER TABLE repairs ADD COLUMN paid_amount REAL DEFAULT 0",
             "ALTER TABLE repairs ADD COLUMN warranty_days INTEGER DEFAULT 0",
