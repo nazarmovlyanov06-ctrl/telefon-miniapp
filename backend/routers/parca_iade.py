@@ -48,11 +48,13 @@ async def add_iade(
             (part_id, miktar, body.get("sebep") or "Toptancıya iade", date.today().isoformat())
         )
 
+    beklenen_tutar = float(body.get("beklenen_tutar") or 0)
+
     cur = await db.execute(
-        """INSERT INTO parca_iadeler (toptanci_id, part_id, parca, miktar, sebep, durum)
-           VALUES (?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO parca_iadeler (toptanci_id, part_id, parca, miktar, sebep, durum, beklenen_tutar)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
         (body.get("toptanci_id"), part_id, body["parca"], miktar,
-         body.get("sebep"), body.get("durum", "bekliyor")),
+         body.get("sebep"), body.get("durum", "bekliyor"), beklenen_tutar),
     )
     await db.commit()
     return {"id": cur.lastrowid}
@@ -65,10 +67,30 @@ async def update_durum(
     tg_user=Depends(get_current_user),
     db: Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    yeni_durum = body["durum"]
+
+    cur = await db.execute("SELECT * FROM parca_iadeler WHERE id = ?", (iade_id,))
+    iade = await cur.fetchone()
+    if not iade:
+        raise HTTPException(404, "İade bulunamadı")
+    iade = dict(iade)
+
     await db.execute(
         "UPDATE parca_iadeler SET durum = ? WHERE id = ?",
-        (body["durum"], iade_id),
+        (yeni_durum, iade_id),
     )
+
+    # Para alındı → kasaya giris ekle
+    if yeni_durum == "para_iade_alindi":
+        tutar = float(body.get("alinan_tutar") or iade.get("beklenen_tutar") or 0)
+        if tutar > 0:
+            parca_adi = iade.get("parca", "Parça")
+            await db.execute(
+                """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+                   VALUES (?, 'giris', 'nakit', ?, ?, 'parca_iade')""",
+                (date.today().isoformat(), tutar, f"Parça iade parası: {parca_adi}")
+            )
+
     await db.commit()
     return {"ok": True}

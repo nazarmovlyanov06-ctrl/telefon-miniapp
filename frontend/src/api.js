@@ -78,7 +78,7 @@ export const api = {
   imeiBtk: (imei) => get(`/imei/btk/${imei}`),
 
   // Borc
-  debts: () => get("/debts/"),
+  debts: (tur) => get(`/debts/${tur ? "?tur=" + tur : ""}`),
   createDebt: (data) => post("/debts/", data),
   payDebt: (id, data) => post(`/debts/${id}/pay`, data),
   debtOdemeler: (id) => get(`/debts/${id}/odemeler`),
@@ -171,7 +171,7 @@ export const api = {
   // Parca Iade
   parcaIadeList: () => get("/parca-iade/"),
   createParcaIade: (data) => post("/parca-iade/", data),
-  updateParcaIadeDurum: (id, durum) => put(`/parca-iade/${id}/durum`, { durum }),
+  updateParcaIadeDurum: (id, durum, alinan_tutar) => put(`/parca-iade/${id}/durum`, { durum, alinan_tutar }),
 
   // Evrensel Arama
   ara: (q) => get(`/arama/?q=${encodeURIComponent(q)}`),
