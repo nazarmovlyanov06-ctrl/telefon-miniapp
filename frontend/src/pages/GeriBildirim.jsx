@@ -33,7 +33,7 @@ export default function GeriBildirim({ user }) {
         api.geriBildirimList(),
         api.geriBildirimSkor(),
         api.geriBildirimBekleyen(),
-        api.users(),
+        api.geriBildirimCalisanlar(),
       ]);
       setList(l);
       setSkor(s);

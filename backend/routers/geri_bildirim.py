@@ -6,6 +6,18 @@ from auth import get_current_user
 router = APIRouter(prefix="/geri-bildirim", tags=["geri-bildirim"])
 
 
+@router.get("/calisanlar")
+async def calisanlar_listesi(
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    cur = await db.execute(
+        "SELECT id, name, role FROM users WHERE active=1 ORDER BY name"
+    )
+    return [dict(r) for r in await cur.fetchall()]
+
+
 @router.get("/bildirim")
 async def bildirim_sayisi(
     tg_user=Depends(get_current_user),

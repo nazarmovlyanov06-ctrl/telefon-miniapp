@@ -175,6 +175,7 @@ export const api = {
   updateParcaIadeDurum: (id, durum, alinan_tutar) => put(`/parca-iade/${id}/durum`, { durum, alinan_tutar }),
 
   // Çalışan Bildirim (Şikayet/Övgü)
+  geriBildirimCalisanlar: () => get("/geri-bildirim/calisanlar"),
   geriBildirimList: () => get("/geri-bildirim/"),
   geriBildirimSkor: () => get("/geri-bildirim/skor"),
   geriBildirimBekleyen: () => get("/geri-bildirim/bildirim"),
