@@ -37,6 +37,8 @@ export default function RepairDetail({ user }) {
   const [parcaEkleOpen, setParcaEkleOpen] = useState(false);
   const [parcaSaving, setParcaSaving] = useState(false);
   const [parcaHata, setParcaHata] = useState("");
+  const [parcaQ, setParcaQ] = useState("");
+  const [showParcaOner, setShowParcaOner] = useState(false);
 
   // Fotoğraflar
   const [fotolar, setFotolar] = useState([]);
@@ -120,6 +122,8 @@ export default function RepairDetail({ user }) {
     setParcaEkleOpen(open);
     setParcaHata("");
     setParcaForm({ part_id: "", quantity: 1 });
+    setParcaQ("");
+    setShowParcaOner(false);
     if (open) {
       try {
         const fresh = await api.parts();
@@ -563,17 +567,66 @@ export default function RepairDetail({ user }) {
               const maxAdet = seciliParca?.quantity ?? 99;
               return (
                 <div style={{ background: "var(--bg2)", borderRadius: 8, padding: 10, marginBottom: 10 }}>
-                  <div className="form-group" style={{ marginBottom: 8 }}>
-                    <select className="form-select"
-                      value={parcaForm.part_id}
-                      onChange={e => { setParcaForm(f => ({ ...f, part_id: e.target.value, quantity: 1 })); setParcaHata(""); }}>
-                      <option value="">— Parça Seç —</option>
-                      {partsList.filter(p => p.quantity > 0).sort((a, b) => a.name.localeCompare(b.name, "tr")).map(p => (
-                        <option key={p.id} value={String(p.id)}>
-                          {p.name} ({p.quantity} stok){p.device_model ? ` · ${p.device_model}` : ""}
-                        </option>
-                      ))}
-                    </select>
+                  <div style={{ position: "relative", marginBottom: 8 }}>
+                    {(() => {
+                      const secP = partsList.find(p => p.id === parseInt(parcaForm.part_id));
+                      if (secP) return (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8,
+                          background: "rgba(36,129,204,0.1)", borderRadius: 8, padding: "8px 10px",
+                          border: "1.5px solid var(--accent)" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13 }}>{secP.name}</div>
+                            <div style={{ fontSize: 11, color: "var(--hint)" }}>
+                              {secP.device_model ? `${secP.device_model} · ` : ""}{secP.quantity} stok
+                            </div>
+                          </div>
+                          <button type="button"
+                            onClick={() => { setParcaForm(f => ({ ...f, part_id: "" })); setParcaQ(""); setParcaHata(""); }}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", fontSize: 16 }}>✕</button>
+                        </div>
+                      );
+                      const filtered = partsList
+                        .filter(p => p.quantity > 0 && (!parcaQ ||
+                          p.name.toLowerCase().includes(parcaQ.toLowerCase()) ||
+                          (p.device_model || "").toLowerCase().includes(parcaQ.toLowerCase())))
+                        .sort((a, b) => a.name.localeCompare(b.name, "tr"))
+                        .slice(0, 8);
+                      return (
+                        <>
+                          <input className="form-input" placeholder="🔍 Parça ara..."
+                            value={parcaQ}
+                            onChange={e => { setParcaQ(e.target.value); setShowParcaOner(true); }}
+                            onFocus={() => setShowParcaOner(true)}
+                            onBlur={() => setTimeout(() => setShowParcaOner(false), 150)}
+                            autoComplete="off" />
+                          {showParcaOner && (
+                            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50,
+                              background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10,
+                              boxShadow: "0 4px 16px rgba(0,0,0,0.18)", overflow: "hidden",
+                              maxHeight: 200, overflowY: "auto" }}>
+                              {filtered.length === 0 ? (
+                                <div style={{ padding: "10px 14px", fontSize: 13, color: "var(--hint)" }}>
+                                  {parcaQ ? "Parça bulunamadı" : "Aramak için yazın..."}
+                                </div>
+                              ) : filtered.map(p => (
+                                <div key={p.id}
+                                  onMouseDown={() => {
+                                    setParcaForm(f => ({ ...f, part_id: String(p.id), quantity: 1 }));
+                                    setParcaQ(""); setShowParcaOner(false); setParcaHata("");
+                                  }}
+                                  style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)" }}>
+                                  <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
+                                  <div style={{ fontSize: 11, color: "var(--hint)" }}>
+                                    {p.device_model ? `${p.device_model} · ` : ""}
+                                    {p.part_type ? `${p.part_type} · ` : ""}{p.quantity} stok
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <input className="form-input" type="number" min="1" max={maxAdet}

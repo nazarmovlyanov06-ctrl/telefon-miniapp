@@ -132,6 +132,7 @@ export const api = {
   kasaBugun: () => get("/kasa/bugun"),
   kasaTarih: (tarih) => get(`/kasa/tarih/${tarih}`),
   kasaGider: (data) => post("/kasa/gider", data),
+  kasaDuzelt: (data) => post("/kasa/duzelt", data),
 
   // Gider
   giderList: () => get("/giderler/"),

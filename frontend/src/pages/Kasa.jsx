@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 
@@ -10,6 +10,10 @@ export default function Kasa() {
   const [showGider, setShowGider] = useState(false);
   const [giderForm, setGiderForm] = useState({ tutar: "", aciklama: "", odeme_yontemi: "nakit" });
   const [err, setErr] = useState("");
+  const [showDuzelt, setShowDuzelt] = useState(false);
+  const [duzeltForm, setDuzeltForm] = useState({ tur: "giris", tutar: "", aciklama: "Manuel düzeltme", odeme_yontemi: "nakit" });
+  const tapRef = useRef(0);
+  const tapTimer = useRef(null);
 
   useEffect(() => { load(tarih); }, [tarih]);
 
@@ -19,6 +23,28 @@ export default function Kasa() {
       const data = t === today() ? await api.kasaBugun() : await api.kasaTarih(t);
       setOzet(data);
     } finally { setLoading(false); }
+  }
+
+  function handleTitleTap() {
+    tapRef.current += 1;
+    clearTimeout(tapTimer.current);
+    if (tapRef.current >= 3) {
+      setShowDuzelt(v => !v);
+      tapRef.current = 0;
+    } else {
+      tapTimer.current = setTimeout(() => { tapRef.current = 0; }, 1200);
+    }
+  }
+
+  async function submitDuzelt(e) {
+    e.preventDefault();
+    setErr("");
+    try {
+      await api.kasaDuzelt({ ...duzeltForm, tutar: parseFloat(duzeltForm.tutar), tarih });
+      setShowDuzelt(false);
+      setDuzeltForm({ tur: "giris", tutar: "", aciklama: "Manuel düzeltme", odeme_yontemi: "nakit" });
+      load(tarih);
+    } catch (e) { setErr(e.message); }
   }
 
   async function submitGider(e) {
@@ -38,13 +64,58 @@ export default function Kasa() {
     <div className="page">
       <div className="card-row" style={{ marginBottom: 14 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
-        <h1 className="page-title" style={{ margin: 0 }}>Günlük Kasa</h1>
+        <h1 className="page-title" style={{ margin: 0, cursor: "default", userSelect: "none" }}
+          onClick={handleTitleTap}>Günlük Kasa</h1>
         <button className="btn btn-primary btn-sm" onClick={() => setShowGider(true)}>- Gider</button>
       </div>
 
       <div className="form-group">
         <input className="form-input" type="date" value={tarih} onChange={e => setTarih(e.target.value)} />
       </div>
+
+      {showDuzelt && (
+        <div className="card" style={{ marginBottom: 10, border: "2px solid var(--warn, #f59e0b)" }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--warn, #f59e0b)", marginBottom: 10 }}>🔧 Manuel Düzeltme</div>
+          <form onSubmit={submitDuzelt}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "4px 0", fontWeight: 600 }}>❌ {err}</div>}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {[{ v: "giris", l: "Gelir Ekle" }, { v: "cikis", l: "Gider Ekle" }].map(t => (
+                <button key={t.v} type="button"
+                  onClick={() => setDuzeltForm(f => ({ ...f, tur: t.v }))}
+                  style={{
+                    padding: "9px 0", borderRadius: 10, border: "1.5px solid",
+                    borderColor: duzeltForm.tur === t.v ? (t.v === "giris" ? "var(--success)" : "var(--danger)") : "var(--border)",
+                    background: duzeltForm.tur === t.v ? (t.v === "giris" ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)") : "var(--bg2)",
+                    color: duzeltForm.tur === t.v ? (t.v === "giris" ? "var(--success)" : "var(--danger)") : "var(--text)",
+                    fontWeight: 700, fontSize: 13, cursor: "pointer",
+                  }}>{t.l}</button>
+              ))}
+            </div>
+            <div className="form-group" style={{ marginTop: 10 }}>
+              <label className="form-label">Tutar (₺)</label>
+              <input className="form-input" type="number" required min="0.01" step="0.01"
+                value={duzeltForm.tutar} onChange={e => setDuzeltForm(f => ({ ...f, tutar: e.target.value }))} placeholder="0" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Açıklama</label>
+              <input className="form-input" value={duzeltForm.aciklama}
+                onChange={e => setDuzeltForm(f => ({ ...f, aciklama: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Ödeme Yöntemi</label>
+              <select className="form-select" value={duzeltForm.odeme_yontemi}
+                onChange={e => setDuzeltForm(f => ({ ...f, odeme_yontemi: e.target.value }))}>
+                <option value="nakit">Nakit</option>
+                <option value="kart">Kart</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="submit" className="btn btn-primary">Kaydet</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowDuzelt(false)}>İptal</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {loading ? <div style={{ textAlign: "center", color: "var(--hint)", padding: 20 }}>Yükleniyor...</div> : ozet && (
         <>

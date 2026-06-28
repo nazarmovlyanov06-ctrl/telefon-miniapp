@@ -24,7 +24,7 @@ async def list_parts(
         where.append("quantity <= min_quantity")
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
     cur = await db.execute(
-        f"SELECT * FROM parts {where_sql} ORDER BY quantity ASC, name ASC LIMIT 100",
+        f"SELECT * FROM parts {where_sql} ORDER BY created_at DESC LIMIT 100",
         params,
     )
     return [dict(r) for r in await cur.fetchall()]

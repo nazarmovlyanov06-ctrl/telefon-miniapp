@@ -65,6 +65,11 @@ export default function Parts({ user }) {
   const [showToptanciOner, setShowToptanciOner] = useState(false);
   const [dollarRate, setDollarRate] = useState(null);
   const [kurLoading, setKurLoading] = useState(false);
+  const [matchingParts, setMatchingParts] = useState([]);
+  const [boughtExistingId, setBoughtExistingId] = useState(null);
+  const [gecmisQ, setGecmisQ] = useState("");
+  const [ekleDolarMode, setEkleDolarMode] = useState(false);
+  const [ekleDolarMiktar, setEkleDolarMiktar] = useState("");
 
   // Stok ekle formu
   const [showAddForm, setShowAddForm] = useState(false);
@@ -97,6 +102,15 @@ export default function Parts({ user }) {
   useEffect(() => {
     api.toptanciList().then(setToptancilar).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!boughtItem) { setMatchingParts([]); setBoughtExistingId(null); return; }
+    api.parts({ q: boughtItem.part_name }).then(m => {
+      const matches = m.filter(p => p.quantity > 0).slice(0, 4);
+      setMatchingParts(matches);
+      setBoughtExistingId(matches.length > 0 ? matches[0].id : null);
+    }).catch(() => {});
+  }, [boughtItem]);
 
   useEffect(() => {
     setLoading(true);
@@ -154,6 +168,7 @@ export default function Parts({ user }) {
         stok_ekle: boughtData.stokEkle,
         stok_miktar: parseInt(boughtData.stokMiktar) || 1,
         part_type: boughtData.partType || null,
+        existing_part_id: boughtData.stokEkle ? boughtExistingId : null,
       });
       const willAddStock = boughtData.stokEkle;
       const partName = boughtItem.part_name;
@@ -556,7 +571,7 @@ export default function Parts({ user }) {
                   <div className="list-item" style={{ background: isSelected ? "var(--bg2)" : undefined }}>
                     <div className="list-item-body" style={{ cursor: "pointer" }} onClick={() => openPanel(p, "ekle")}>
                       <div className="list-item-title">{p.name}</div>
-                      <div className="list-item-sub">{p.device_model} · {p.part_type}</div>
+                      <div className="list-item-sub">{p.device_model} · {p.part_type}{p.purchase_price ? ` · ${p.purchase_price.toLocaleString("tr-TR")}₺` : ""}</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ textAlign: "right" }}>
@@ -591,9 +606,9 @@ export default function Parts({ user }) {
                       {/* Panel sekme */}
                       <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                         {[
-                          { key: "ekle", label: "➕ Stok Ekle" },
-                          { key: "dus", label: "➖ Stok Düş" },
-                          { key: "gecmis", label: "📋 Geçmiş" },
+                          { key: "ekle", label: "Stok Ekle", clr: "var(--success)" },
+                          { key: "dus", label: "Stok Düş", clr: "var(--danger)" },
+                          { key: "gecmis", label: "📋 Geçmiş", clr: "var(--accent)" },
                         ].map(s => (
                           <button key={s.key} onClick={() => {
                             setPanelTab(s.key);
@@ -603,7 +618,7 @@ export default function Parts({ user }) {
                             }
                           }}
                             style={{ padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer",
-                              background: panelTab === s.key ? "var(--accent)" : "var(--bg)",
+                              background: panelTab === s.key ? s.clr : "var(--bg)",
                               color: panelTab === s.key ? "#fff" : "var(--text)", fontWeight: 600, fontSize: 12 }}>
                             {s.label}
                           </button>
@@ -622,13 +637,44 @@ export default function Parts({ user }) {
                                 onChange={e => setEkleForm(f => ({ ...f, miktar: e.target.value }))} />
                             </div>
                             <div className="form-group" style={{ margin: 0 }}>
-                              <label className="form-label">Alış Fiyatı (₺)</label>
-                              <input className="form-input" type="number" step="0.01"
-                                value={ekleForm.fiyat}
-                                onChange={e => setEkleForm(f => ({ ...f, fiyat: e.target.value }))}
-                                placeholder="Opsiyonel" />
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                <span className="form-label" style={{ margin: 0 }}>
+                                  {ekleDolarMode ? "Dolar ($)" : "Alış Fiyatı (₺)"}
+                                </span>
+                                <button type="button"
+                                  onClick={() => { setEkleDolarMode(m => !m); setEkleDolarMiktar(""); setEkleForm(f => ({ ...f, fiyat: "" })); }}
+                                  style={{ marginLeft: "auto", fontSize: 10, padding: "2px 7px", borderRadius: 10, border: "none",
+                                    background: ekleDolarMode ? "var(--accent)" : "var(--bg2)", color: ekleDolarMode ? "#fff" : "var(--hint)",
+                                    cursor: "pointer", fontWeight: 700 }}>
+                                  💵 $
+                                </button>
+                              </div>
+                              {ekleDolarMode ? (
+                                <div style={{ display: "flex", gap: 4 }}>
+                                  <input className="form-input" type="number" step="0.01"
+                                    value={ekleDolarMiktar} placeholder="0.00"
+                                    onChange={e => {
+                                      setEkleDolarMiktar(e.target.value);
+                                      const tl = dollarRate ? String(Math.round(parseFloat(e.target.value || 0) * dollarRate)) : "";
+                                      setEkleForm(f => ({ ...f, fiyat: tl }));
+                                    }} />
+                                  {dollarRate && <span style={{ fontSize: 11, color: "var(--hint)", alignSelf: "center", whiteSpace: "nowrap" }}>≈{ekleForm.fiyat}₺</span>}
+                                </div>
+                              ) : (
+                                <input className="form-input" type="number" step="0.01"
+                                  value={ekleForm.fiyat}
+                                  onChange={e => setEkleForm(f => ({ ...f, fiyat: e.target.value }))}
+                                  placeholder="Opsiyonel" />
+                              )}
                             </div>
                           </div>
+                          {ekleDolarMode && !dollarRate && (
+                            <button type="button" onClick={fetchDollarRate} disabled={kurLoading}
+                              style={{ alignSelf: "flex-start", fontSize: 11, padding: "3px 10px", borderRadius: 10,
+                                border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--hint)" }}>
+                              {kurLoading ? "..." : "🔄 Kur al"}
+                            </button>
+                          )}
                           <div className="form-group" style={{ margin: 0 }}>
                             <label className="form-label">Açıklama / Toptancı</label>
                             <input className="form-input" value={ekleForm.aciklama}
@@ -636,7 +682,7 @@ export default function Parts({ user }) {
                               placeholder="Nereden alındı, not..." />
                           </div>
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button type="submit" className="btn btn-primary btn-sm">➕ Ekle</button>
+                            <button type="submit" className="btn btn-sm" style={{ background: "var(--success)", color: "#fff" }}>Ekle</button>
                             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedPart(null)}>İptal</button>
                           </div>
                         </form>
@@ -690,7 +736,7 @@ export default function Parts({ user }) {
                               </div>
                             </div>
                             <div style={{ display: "flex", gap: 8 }}>
-                              <button type="submit" className="btn btn-primary btn-sm">Düş</button>
+                              <button type="submit" className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff" }}>Düş</button>
                               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedPart(null)}>İptal</button>
                             </div>
                           </form>
@@ -940,6 +986,44 @@ export default function Parts({ user }) {
                         </select>
                       </div>
                     )}
+                    {boughtData.stokEkle && matchingParts.length > 0 && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 6, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                          Hangi stoğa eklensin?
+                        </div>
+                        {matchingParts.map(p => (
+                          <div key={p.id}
+                            onClick={() => setBoughtExistingId(p.id)}
+                            style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
+                              borderRadius: 8, marginBottom: 4,
+                              background: boughtExistingId === p.id ? "rgba(36,129,204,0.12)" : "transparent",
+                              border: `1.5px solid ${boughtExistingId === p.id ? "var(--accent)" : "var(--border)"}`,
+                              cursor: "pointer" }}>
+                            <div style={{ width: 14, height: 14, borderRadius: "50%", flexShrink: 0,
+                              border: `2px solid ${boughtExistingId === p.id ? "var(--accent)" : "var(--hint)"}`,
+                              background: boughtExistingId === p.id ? "var(--accent)" : "transparent" }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: 12 }}>{p.name}</div>
+                              <div style={{ fontSize: 11, color: "var(--hint)" }}>
+                                {p.device_model ? `${p.device_model} · ` : ""}{p.quantity} stok
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <div
+                          onClick={() => setBoughtExistingId(null)}
+                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
+                            borderRadius: 8,
+                            background: boughtExistingId === null ? "rgba(36,129,204,0.12)" : "transparent",
+                            border: `1.5px solid ${boughtExistingId === null ? "var(--accent)" : "var(--border)"}`,
+                            cursor: "pointer" }}>
+                          <div style={{ width: 14, height: 14, borderRadius: "50%", flexShrink: 0,
+                            border: `2px solid ${boughtExistingId === null ? "var(--accent)" : "var(--hint)"}`,
+                            background: boughtExistingId === null ? "var(--accent)" : "transparent" }} />
+                          <div style={{ fontSize: 12, color: "var(--text)" }}>➕ Yeni stok kaydı oluştur</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: "flex", gap: 8 }}>
@@ -956,10 +1040,21 @@ export default function Parts({ user }) {
       {/* GEÇMİŞ TAB — alisveris_listesi alındı */}
       {tab === "gecmis" && (
         <>
+          <div className="search-bar" style={{ marginBottom: 10 }}>
+            <input className="search-input" placeholder="🔍 Geçmişte ara..." value={gecmisQ} onChange={e => setGecmisQ(e.target.value)} />
+          </div>
           {loading ? <div className="loading">Yükleniyor...</div> :
-            shopping.alindi.length === 0 ? (
+            shopping.alindi.filter(i =>
+              !gecmisQ || i.part_name.toLowerCase().includes(gecmisQ.toLowerCase()) ||
+              (i.device_model || "").toLowerCase().includes(gecmisQ.toLowerCase()) ||
+              (i.bought_from || "").toLowerCase().includes(gecmisQ.toLowerCase())
+            ).length === 0 ? (
               <div className="empty"><div className="empty-icon">✅</div>Henüz alınan parça yok</div>
-            ) : shopping.alindi.map((item) => (
+            ) : shopping.alindi.filter(i =>
+              !gecmisQ || i.part_name.toLowerCase().includes(gecmisQ.toLowerCase()) ||
+              (i.device_model || "").toLowerCase().includes(gecmisQ.toLowerCase()) ||
+              (i.bought_from || "").toLowerCase().includes(gecmisQ.toLowerCase())
+            ).map((item) => (
               <div key={item.id} className="list-item" style={{ opacity: 0.9 }}>
                 <div className="list-item-body">
                   <div className="list-item-title">✅ {item.part_name}</div>

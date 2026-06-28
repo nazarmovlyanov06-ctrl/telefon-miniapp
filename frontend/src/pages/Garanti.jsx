@@ -13,6 +13,8 @@ export default function Garanti() {
   const [err, setErr] = useState("");
   const [aramaQ, setAramaQ] = useState("");
   const [gosterTab, setGosterTab] = useState("aktif");
+  const [hazirTamirler, setHazirTamirler] = useState([]);
+  const [showTamirPicker, setShowTamirPicker] = useState(false);
   const [form, setForm] = useState({
     musteri_adi: "", telefon: "", cihaz: "", tamir_aciklama: "",
     baslangic_tarihi: today(), sure_gun: "90"
@@ -22,6 +24,12 @@ export default function Garanti() {
     load();
     api.customers("").then(setMusteriler).catch(() => {});
   }, [gosterTab]);
+
+  useEffect(() => {
+    if (showForm) {
+      api.repairs({ status: "hazir" }).then(setHazirTamirler).catch(() => {});
+    }
+  }, [showForm]);
 
   async function load() {
     try {
@@ -114,6 +122,13 @@ export default function Garanti() {
 
       {showForm && (
         <div className="card">
+          {hazirTamirler.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowTamirPicker(true)}>
+                📋 Tamirden Doldur
+              </button>
+            </div>
+          )}
           <form onSubmit={submit}>
             {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
             <div className="form-group" style={{ position: "relative" }}>
@@ -172,6 +187,32 @@ export default function Garanti() {
               <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>İptal</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {showTamirPicker && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", padding: 16 }}
+          onClick={() => setShowTamirPicker(false)}>
+          <div className="card" style={{ width: "100%", maxHeight: "60vh", overflowY: "auto" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, marginBottom: 10 }}>✅ Hazır Tamir Seç</div>
+            {hazirTamirler.map(t => (
+              <div key={t.id} onMouseDown={() => {
+                setForm(f => ({
+                  ...f,
+                  musteri_adi: t.customer_name || "",
+                  telefon: t.customer_phone || "",
+                  cihaz: t.device_model || "",
+                  tamir_aciklama: t.fault_desc || "",
+                }));
+                setShowTamirPicker(false);
+              }} style={{ padding: "10px 12px", borderRadius: 10, background: "var(--bg2)", marginBottom: 8, cursor: "pointer" }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{t.customer_name}</div>
+                <div style={{ fontSize: 12, color: "var(--hint)" }}>{t.device_model} · {t.fault_desc}</div>
+              </div>
+            ))}
+            <button className="btn btn-ghost btn-sm" style={{ marginTop: 4 }} onClick={() => setShowTamirPicker(false)}>Kapat</button>
+          </div>
         </div>
       )}
 

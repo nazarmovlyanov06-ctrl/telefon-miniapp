@@ -84,13 +84,29 @@ export default function NewRepair() {
   // Arıza öneriler (geçmiş)
   const [arizaGecmis, setArizaGecmis] = useState([]);
 
+  // Kara liste uyarı
+  const [karaUyari, setKaraUyari] = useState([]);
+  const karaTimer = useRef(null);
+
   useEffect(() => {
     api.sablonlar().then(setSablonlar).catch(() => {});
     api.repairModeller().then(setModeller).catch(() => {});
     api.repairArizaOneri().then(setArizaGecmis).catch(() => {});
   }, []);
 
-  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+  function set(k, v) {
+    setForm(f => ({ ...f, [k]: v }));
+    if (k === "customer_phone") {
+      clearTimeout(karaTimer.current);
+      if (v.length >= 7) {
+        karaTimer.current = setTimeout(() => {
+          api.karaListe(v).then(r => setKaraUyari(r || [])).catch(() => {});
+        }, 600);
+      } else {
+        setKaraUyari([]);
+      }
+    }
+  }
 
   function modelDegisti(v) {
     set("device_model", v);
@@ -256,6 +272,16 @@ export default function NewRepair() {
             <input className="form-input" placeholder="05xx xxx xx xx" type="tel"
               value={form.customer_phone}
               onChange={e => set("customer_phone", e.target.value)} />
+            {karaUyari.length > 0 && (
+              <div style={{ background: "rgba(239,68,68,0.12)", borderRadius: 8, padding: "8px 12px", marginTop: 8, borderLeft: "3px solid #ef4444" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444" }}>⛔ Kara Listede!</div>
+                {karaUyari.map(k => (
+                  <div key={k.id} style={{ fontSize: 12, color: "var(--text)", marginTop: 2 }}>
+                    {k.ad}{k.sebep ? ` — ${k.sebep}` : ""}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

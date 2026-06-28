@@ -86,26 +86,35 @@ async def mark_bought(
         miktar = int(body.get("stok_miktar") or item.get("quantity") or 1)
         parca_adi = item.get("part_name", "")
         try:
-            src = await db.execute(
-                "SELECT id, name FROM parts WHERE LOWER(name) LIKE ? LIMIT 1",
-                (f"%{parca_adi.lower()}%",)
-            )
-            existing = await src.fetchone()
-            if existing:
-                part_id_log = existing["id"]
+            explicit_id = body.get("existing_part_id")
+            if explicit_id:
+                part_id_log = int(explicit_id)
+                cur_p = await db.execute("SELECT name FROM parts WHERE id=?", (part_id_log,))
+                p_row = await cur_p.fetchone()
                 await db.execute("UPDATE parts SET quantity = quantity + ? WHERE id = ?",
-                                 (miktar, existing["id"]))
-                stok_mesaj = f"guncellendi:{existing['name']}"
+                                 (miktar, part_id_log))
+                stok_mesaj = f"guncellendi:{p_row['name'] if p_row else part_id_log}"
             else:
-                ins = await db.execute(
-                    """INSERT INTO parts (name, device_model, part_type, quantity, min_quantity,
-                       purchase_price, sale_price, created_by) VALUES (?, ?, ?, ?, 2, ?, 0, ?)""",
-                    (parca_adi, item.get("device_model"),
-                     body.get("part_type") or item.get("part_type"),
-                     miktar, float(body.get("bought_price") or 0), user["id"])
+                src = await db.execute(
+                    "SELECT id, name FROM parts WHERE LOWER(name) LIKE ? LIMIT 1",
+                    (f"%{parca_adi.lower()}%",)
                 )
-                part_id_log = ins.lastrowid
-                stok_mesaj = f"yeni:{parca_adi}"
+                existing = await src.fetchone()
+                if existing:
+                    part_id_log = existing["id"]
+                    await db.execute("UPDATE parts SET quantity = quantity + ? WHERE id = ?",
+                                     (miktar, existing["id"]))
+                    stok_mesaj = f"guncellendi:{existing['name']}"
+                else:
+                    ins = await db.execute(
+                        """INSERT INTO parts (name, device_model, part_type, quantity, min_quantity,
+                           purchase_price, sale_price, created_by) VALUES (?, ?, ?, ?, 2, ?, 0, ?)""",
+                        (parca_adi, item.get("device_model"),
+                         body.get("part_type") or item.get("part_type"),
+                         miktar, float(body.get("bought_price") or 0), user["id"])
+                    )
+                    part_id_log = ins.lastrowid
+                    stok_mesaj = f"yeni:{parca_adi}"
 
             if part_id_log:
                 await db.execute(

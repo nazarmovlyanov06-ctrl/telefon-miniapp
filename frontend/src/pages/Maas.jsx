@@ -14,8 +14,13 @@ export default function Maas() {
   const [cForm, setCForm] = useState({ ad: "", telefon: "", aylik_maas: "" });
   const [aForm, setAForm] = useState({ calisan_id: "", tutar: "", tarih: today(), notlar: "" });
   const [err, setErr] = useState("");
+  const [botUsers, setBotUsers] = useState([]);
+  const [showBotPicker, setShowBotPicker] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.users().then(setBotUsers).catch(() => {});
+  }, []);
 
   async function load() {
     try {
@@ -82,7 +87,28 @@ export default function Maas() {
                 {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
                 <div className="form-group">
                   <label className="form-label">Ad Soyad *</label>
-                  <input className="form-input" required value={cForm.ad} onChange={e => setCForm({ ...cForm, ad: e.target.value })} />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input className="form-input" required value={cForm.ad} onChange={e => setCForm({ ...cForm, ad: e.target.value })} />
+                    {botUsers.length > 0 && (
+                      <button type="button" className="btn btn-ghost btn-sm" style={{ whiteSpace: "nowrap" }}
+                        onClick={() => setShowBotPicker(v => !v)}>
+                        📲
+                      </button>
+                    )}
+                  </div>
+                  {showBotPicker && (
+                    <div style={{ marginTop: 6, border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", background: "var(--card)" }}>
+                      {botUsers.map(u => (
+                        <div key={u.id} onMouseDown={() => {
+                          setCForm(f => ({ ...f, ad: u.name }));
+                          setShowBotPicker(false);
+                        }} style={{ padding: "9px 12px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span>👤 {u.name}</span>
+                          <span className={`badge badge-${u.role}`}>{u.role}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Telefon</label>

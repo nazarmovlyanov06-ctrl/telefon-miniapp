@@ -444,7 +444,7 @@ export default function IkinciEl({ user }) {
                 <div style={{ fontWeight: 700, fontSize: 15 }}>📱 {c.model}</div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontWeight: 700, color: "var(--success)" }}>{(c.satis_fiyati || 0).toLocaleString("tr-TR")} ₺</div>
-                  <div style={{ fontSize: 12, color: "var(--success)" }}>
+                  <div style={{ fontSize: 12, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)) >= 0 ? "var(--success)" : "var(--danger)" }}>
                     Kâr: {((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺
                   </div>
                 </div>

@@ -70,15 +70,15 @@ function NavShell({ children }) {
       {/* Geri butonu — kök sayfalarda gizli */}
       {!isRoot && (
         <button
+          className="back-btn-pulse"
           onClick={() => navigate(-1)}
           style={{
-            position: "fixed", top: 10, left: 12, zIndex: 200,
-            width: 36, height: 36, borderRadius: "50%",
-            background: "var(--card)",
-            border: "1px solid var(--border)",
+            position: "fixed", bottom: 85, right: 16, zIndex: 200,
+            width: 40, height: 40, borderRadius: "50%",
+            background: "var(--btn)",
+            border: "none",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, fontWeight: 300, cursor: "pointer", color: "var(--text)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            fontSize: 20, fontWeight: 700, cursor: "pointer", color: "var(--btn-text)",
             lineHeight: 1,
           }}
           aria-label="Geri"
@@ -86,8 +86,7 @@ function NavShell({ children }) {
           ‹
         </button>
       )}
-      {/* Alt sayfalar için üst boşluk (geri buton alanı) */}
-      <div style={{ paddingTop: isRoot ? 0 : 56 }}>
+      <div style={{ paddingTop: 0 }}>
         {children}
       </div>
     </div>

@@ -16,11 +16,15 @@ export default function Loaner() {
   const [musteriler, setMusteriler] = useState([]);
   const [oneriler, setOneriler] = useState([]);
   const [showOneriler, setShowOneriler] = useState(false);
+  const [ikinciElStock, setIkinciElStock] = useState([]);
+  const [cihazOneri, setCihazOneri] = useState([]);
+  const [showCihazOneri, setShowCihazOneri] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
     load();
     api.customers("").then(setMusteriler).catch(() => {});
+    api.ikinciElList().then(list => setIkinciElStock((list || []).filter(c => !c.satis_fiyati))).catch(() => {});
   }, []);
 
   async function load() {
@@ -39,6 +43,20 @@ export default function Loaner() {
       ).slice(0, 5);
       setOneriler(found); setShowOneriler(found.length > 0);
     } else { setShowOneriler(false); }
+  }
+
+  function handleCihazChange(val) {
+    setForm(f => ({ ...f, cihaz: val }));
+    if (val.length >= 2) {
+      const q = val.toLowerCase();
+      const found = ikinciElStock.filter(c =>
+        (c.model || "").toLowerCase().includes(q)
+      ).slice(0, 5);
+      setCihazOneri(found);
+      setShowCihazOneri(found.length > 0);
+    } else {
+      setShowCihazOneri(false);
+    }
   }
 
   async function submit(e) {
@@ -135,11 +153,28 @@ export default function Loaner() {
                 </div>
               )}
             </div>
-            <div className="form-group">
+            <div className="form-group" style={{ position: "relative" }}>
               <label className="form-label">Teslim Edilen Cihaz *</label>
               <input className="form-input" required value={form.cihaz}
-                onChange={e => setForm({ ...form, cihaz: e.target.value })}
+                onChange={e => handleCihazChange(e.target.value)}
+                onBlur={() => setTimeout(() => setShowCihazOneri(false), 150)}
                 placeholder="Samsung A12, Huawei P20..." />
+              {showCihazOneri && (
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
+                  background: "var(--card)", border: "1px solid var(--border)",
+                  borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                  {cihazOneri.map(c => (
+                    <div key={c.id} onMouseDown={() => {
+                      setForm(f => ({ ...f, cihaz: c.model || "" }));
+                      setShowCihazOneri(false);
+                    }} style={{ padding: "9px 12px", cursor: "pointer", fontSize: 13,
+                      borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
+                      <span>📱 {c.model}</span>
+                      <span style={{ fontSize: 11, color: "var(--hint)" }}>2.El Stok</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Teslim Tarihi</label>

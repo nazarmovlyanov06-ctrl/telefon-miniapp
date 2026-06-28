@@ -71,3 +71,27 @@ async def manuel_hareket(
     )
     await db.commit()
     return {"id": cur.lastrowid}
+
+
+@router.post("/duzelt")
+async def manuel_duzelt(
+    body: dict,
+    tg_user=Depends(get_current_user),
+    db: Connection = Depends(get_db),
+):
+    from fastapi import HTTPException
+    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    if user["role"] != "patron":
+        raise HTTPException(403, "Sadece patron")
+    await db.execute(
+        """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (body.get("tarih", date.today().isoformat()),
+         body.get("tur", "cikis"),
+         body.get("odeme_yontemi", "nakit"),
+         float(body["tutar"]),
+         body.get("aciklama", "Manuel düzeltme"),
+         "duzeltme"),
+    )
+    await db.commit()
+    return {"ok": True}

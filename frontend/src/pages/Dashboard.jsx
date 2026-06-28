@@ -6,7 +6,7 @@ const QUICK = [
   { icon: "📱", label: "2. El",     path: "/ikinciel",    bg: "#8b5cf6", shadow: "#8b5cf620" },
   { icon: "📦", label: "Sıfır",    path: "/sifir-cihaz", bg: "#3b82f6", shadow: "#3b82f620" },
   { icon: "🛡️", label: "Garanti",  path: "/garanti",     bg: "#10b981", shadow: "#10b98120" },
-  { icon: "📋", label: "Siparişler",path: "/parts",       bg: "#f59e0b", shadow: "#f59e0b20" },
+  { icon: "📋", label: "Siparişler",path: "/parts?tab=orders", bg: "#f59e0b", shadow: "#f59e0b20" },
   { icon: "🎧", label: "Aksesuar", path: "/aksesuar",    bg: "#ec4899", shadow: "#ec489920" },
   { icon: "💳", label: "Borçlar",  path: "/debts",       bg: "#ef4444", shadow: "#ef444420" },
   { icon: "📊", label: "Rapor",    path: "/stats",       bg: "#06b6d4", shadow: "#06b6d420" },
@@ -44,7 +44,17 @@ function gun_fark(tarih) {
 export default function Dashboard({ user }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [priceHidden, setPriceHidden] = useState(() => localStorage.getItem("priceHidden") === "1");
   const navigate = useNavigate();
+
+  function togglePriceHide() {
+    const next = !priceHidden;
+    setPriceHidden(next);
+    localStorage.setItem("priceHidden", next ? "1" : "0");
+  }
+
+  function fmtH(n) { return priceHidden ? "••••" : fmt(n); }
+  function numH(n) { return priceHidden ? "••••" : (n || 0).toLocaleString("tr-TR"); }
 
   useEffect(() => {
     api.dashboard().then(setData).finally(() => setLoading(false));
@@ -89,10 +99,17 @@ export default function Dashboard({ user }) {
         </span>
       </div>
 
-      {/* Selam + isim */}
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 13, color: "var(--hint)" }}>{selam}{isim ? `, ${isim}` : ""}</div>
-        <div style={{ fontSize: 20, fontWeight: 800 }}>Bugün</div>
+      {/* Selam + isim + fiyat gizle */}
+      <div style={{ marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: 13, color: "var(--hint)" }}>{selam}{isim ? `, ${isim}` : ""}</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>Bugün</div>
+        </div>
+        <button onClick={togglePriceHide}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--hint)", padding: 4 }}
+          title={priceHidden ? "Fiyatları göster" : "Fiyatları gizle"}>
+          {priceHidden ? "🙈" : "👁️"}
+        </button>
       </div>
 
       {/* Tamir durum sayıları */}
@@ -116,11 +133,11 @@ export default function Dashboard({ user }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
         <div className="card" style={{ margin: 0, padding: "10px 14px" }}>
           <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 2 }}>💰 Bugün Gelir</div>
-          <div style={{ fontWeight: 800, fontSize: 17, color: "#10b981" }}>{fmt(kasa.gelir)}₺</div>
+          <div style={{ fontWeight: 800, fontSize: 17, color: "#10b981" }}>{fmtH(kasa.gelir)}₺</div>
         </div>
         <div className="card" style={{ margin: 0, padding: "10px 14px" }}>
           <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 2 }}>📉 Bugün Gider</div>
-          <div style={{ fontWeight: 800, fontSize: 17, color: "#ef4444" }}>{fmt(kasa.gider)}₺</div>
+          <div style={{ fontWeight: 800, fontSize: 17, color: "#ef4444" }}>{fmtH(kasa.gider)}₺</div>
         </div>
       </div>
 
@@ -129,7 +146,7 @@ export default function Dashboard({ user }) {
         <div className="card-row">
           <div>
             <div style={{ fontWeight: 700, fontSize: 16, color: "var(--accent)" }}>
-              {(bu_ay.gelir || 0).toLocaleString("tr-TR")}₺
+              {numH(bu_ay.gelir)}₺
             </div>
             <div style={{ fontSize: 12, color: "var(--hint)" }}>Bu ay kazanç</div>
           </div>
@@ -146,7 +163,7 @@ export default function Dashboard({ user }) {
           {(uyarilar.borc || []).map((u, i) => (
             <div key={"b"+i} onClick={() => navigate("/debts")}
               style={{ background: "rgba(239,68,68,0.12)", borderRadius: 10, padding: "8px 12px", cursor: "pointer", borderLeft: "3px solid #ef4444" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#ef4444" }}>💳 {u.musteri_adi} — {(u.kalan || 0).toLocaleString("tr-TR")}₺ gecikmiş borç</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#ef4444" }}>💳 {u.musteri_adi} — {numH(u.kalan)}₺ gecikmiş borç</div>
             </div>
           ))}
           {(uyarilar.garanti || []).map((u, i) => (

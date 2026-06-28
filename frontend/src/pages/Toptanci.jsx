@@ -9,6 +9,7 @@ export default function Toptanci() {
   const [selected, setSelected] = useState(null);
   const [alislar, setAlislar] = useState([]);
   const [alisLoading, setAlisLoading] = useState(false);
+  const [alisErr, setAlisErr] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showAlisForm, setShowAlisForm] = useState(false);
   const [form, setForm] = useState({ ad: "", telefon: "", sehir: "", notlar: "" });
@@ -23,8 +24,12 @@ export default function Toptanci() {
 
   async function selectToptanci(t) {
     setSelected(t);
+    setAlislar([]);
+    setAlisErr("");
     setAlisLoading(true);
-    try { setAlislar(await api.toptanciAlislar(t.id)); } finally { setAlisLoading(false); }
+    try { setAlislar(await api.toptanciAlislar(t.id)); }
+    catch (e) { setAlisErr(e.message || "Geçmiş yüklenemedi"); }
+    finally { setAlisLoading(false); }
   }
 
   async function submitToptanci(e) {
@@ -120,8 +125,9 @@ export default function Toptanci() {
             </form>
           </div>
         )}
+        {alisErr && <div style={{ color: "var(--danger)", fontSize: 13, textAlign: "center", padding: "6px 0", marginBottom: 4 }}>❌ {alisErr}</div>}
         {alisLoading ? <div style={{ textAlign: "center", color: "var(--hint)" }}>Yükleniyor...</div> :
-          alislar.length === 0 ? <div className="card" style={{ color: "var(--hint)", textAlign: "center" }}>Henüz alış kaydı yok</div> :
+          alislar.length === 0 && !alisErr ? <div className="card" style={{ color: "var(--hint)", textAlign: "center" }}>Henüz alış kaydı yok</div> :
           alislar.map(a => (
             <div key={a.id} className="card">
               <div className="card-row">
