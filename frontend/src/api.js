@@ -86,6 +86,9 @@ export const api = {
   // Kullaniciler
   users: () => get("/users/"),
   changeRole: (id, role) => put(`/users/${id}/role`, { role }),
+  davetKodu: (kod) => post("/users/davet", { kod }),
+  onaylaUser: (id) => put(`/users/${id}/onayla`, {}),
+  reddetUser: (id) => del(`/users/${id}/reddet`),
 
   // Toptanci
   toptanciList: () => get("/toptanci/"),

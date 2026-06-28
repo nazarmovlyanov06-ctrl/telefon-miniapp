@@ -29,6 +29,17 @@ export default function Settings({ user }) {
     load();
   }
 
+  async function onayla(u) {
+    await api.onaylaUser(u.id);
+    load();
+  }
+
+  async function reddet(u) {
+    if (!confirm(`${u.name} reddedilsin mi? (silinir)`)) return;
+    await api.reddetUser(u.id);
+    load();
+  }
+
   return (
     <div className="page">
       <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
@@ -44,8 +55,33 @@ export default function Settings({ user }) {
         <div className="loading">Yükleniyor...</div>
       ) : (
         <>
+          {users.some(u => u.durum === "bekliyor") && (
+            <>
+              <div className="section-title" style={{ color: "var(--danger)" }}>
+                🔔 Onay Bekleyenler ({users.filter(u => u.durum === "bekliyor").length})
+              </div>
+              {users.filter(u => u.durum === "bekliyor").map(u => (
+                <div key={u.id} className="card" style={{ borderLeft: "3px solid var(--danger)" }}>
+                  <div className="card-row" style={{ marginBottom: 10 }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{u.name}</div>
+                      <div style={{ fontSize: 12, color: "var(--hint)" }}>ID: {u.telegram_id}</div>
+                    </div>
+                    <span style={{ fontSize: 11, color: "var(--danger)", fontWeight: 700 }}>⏳ Bekliyor</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-sm" style={{ background: "var(--success)", color: "#fff", padding: "6px 14px" }}
+                      onClick={() => onayla(u)}>✅ Onayla</button>
+                    <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "6px 14px" }}
+                      onClick={() => reddet(u)}>❌ Reddet</button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
           <div className="section-title">Çalışanlar</div>
-          {users.map((u) => (
+          {users.filter(u => u.durum !== "bekliyor").map((u) => (
             <div key={u.id} className="card">
               <div className="card-row" style={{ marginBottom: 10 }}>
                 <div>

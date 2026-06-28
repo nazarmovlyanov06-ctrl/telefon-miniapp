@@ -19,7 +19,7 @@ async def get_or_create_user(db: aiosqlite.Connection, tg_id: int, name: str) ->
     if row:
         return dict(row)
     await db.execute(
-        "INSERT INTO users (telegram_id, name, role) VALUES (?, ?, 'cirak')",
+        "INSERT INTO users (telegram_id, name, role, durum) VALUES (?, ?, 'cirak', 'bekliyor')",
         (tg_id, name),
     )
     await db.commit()

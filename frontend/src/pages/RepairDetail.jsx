@@ -432,6 +432,15 @@ export default function RepairDetail({ user }) {
             <Row label="IMEI" value={repair.imei || "—"} />
             <div className="divider" />
             <Row label="Arıza" value={repair.fault_desc || "—"} />
+            {repair.son_guncelleyen_adi && (
+              <>
+                <div className="divider" />
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: 12, color: "var(--hint)" }}>
+                  <span>✏️ Son düzenleyen</span>
+                  <span style={{ fontWeight: 600, color: "var(--text)" }}>{repair.son_guncelleyen_adi}</span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Ekran kilidi */}

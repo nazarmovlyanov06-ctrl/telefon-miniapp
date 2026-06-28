@@ -390,6 +390,8 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE debts ADD COLUMN borc_turu TEXT DEFAULT 'alacak'",
             "ALTER TABLE debts ADD COLUMN alacakli_adi TEXT",
             "ALTER TABLE parca_iadeler ADD COLUMN beklenen_tutar REAL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN durum TEXT DEFAULT 'aktif'",
+            "ALTER TABLE repairs ADD COLUMN son_guncelleyen_id INTEGER REFERENCES users(id)",
         ]:
             try:
                 await db.execute(m)

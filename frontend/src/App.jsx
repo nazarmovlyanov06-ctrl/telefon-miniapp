@@ -2,6 +2,52 @@ import { useEffect, useState, useRef } from "react";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { initTg } from "./tg";
 import { api } from "./api";
+
+function BekleyenEkran({ user }) {
+  const [kod, setKod] = useState("");
+  const [mesaj, setMesaj] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function gonder(e) {
+    e.preventDefault(); setErr(""); setMesaj("");
+    setLoading(true);
+    try {
+      const r = await api.davetKodu(kod);
+      setMesaj(r.mesaj || "Onaylandı!");
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center",
+      height: "100vh", padding: 24, flexDirection: "column", gap: 16, textAlign: "center" }}>
+      <div style={{ fontSize: 52 }}>⏳</div>
+      <div style={{ fontWeight: 700, fontSize: 18 }}>Patron Onayı Bekleniyor</div>
+      <div style={{ fontSize: 14, color: "var(--hint)", maxWidth: 300 }}>
+        Hesabın henüz onaylanmadı. Patron seni onayladıktan sonra giriş yapabilirsin.
+      </div>
+      <div style={{ width: "100%", maxWidth: 300, marginTop: 8 }}>
+        <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 8 }}>
+          Veya davet kodu varsa gir:
+        </div>
+        <form onSubmit={gonder} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <input className="form-input" placeholder="Davet kodu..."
+            value={kod} onChange={e => setKod(e.target.value)} />
+          {err && <div style={{ color: "var(--danger)", fontSize: 13 }}>❌ {err}</div>}
+          {mesaj && <div style={{ color: "var(--success)", fontSize: 13 }}>✅ {mesaj}</div>}
+          <button type="submit" className="btn btn-primary" disabled={loading || !kod}>
+            {loading ? "Kontrol ediliyor..." : "Gönder"}
+          </button>
+        </form>
+      </div>
+      <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 8 }}>
+        👤 {user?.name}
+      </div>
+    </div>
+  );
+}
 import BottomNav from "./components/BottomNav";
 import Dashboard from "./pages/Dashboard";
 import Repairs from "./pages/Repairs";
@@ -168,6 +214,10 @@ export default function App() {
         </button>
       </div>
     );
+  }
+
+  if (user?.durum === "bekliyor") {
+    return <BekleyenEkran user={user} />;
   }
 
   return (

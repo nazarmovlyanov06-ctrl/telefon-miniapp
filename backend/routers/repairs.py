@@ -81,9 +81,11 @@ async def get_repair(
 ):
     await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     cur = await db.execute(
-        """SELECT r.*, c.name as customer_name, c.phone as customer_phone
+        """SELECT r.*, c.name as customer_name, c.phone as customer_phone,
+                  u.name as son_guncelleyen_adi
            FROM repairs r
            LEFT JOIN customers c ON r.customer_id = c.id
+           LEFT JOIN users u ON u.id = r.son_guncelleyen_id
            WHERE r.id = ?""",
         (repair_id,),
     )
@@ -145,7 +147,7 @@ async def update_repair(
     tg_user=Depends(get_current_user),
     db: Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
+    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
 
     now = datetime.datetime.now().isoformat()
     tamirde_at = now if body.get("status") == "tamirde" else None
@@ -165,7 +167,8 @@ async def update_repair(
            screen_lock_value=COALESCE(?, screen_lock_value),
            tamirde_at=COALESCE(tamirde_at, ?),
            completed_at=COALESCE(completed_at, ?),
-           delivered_at=COALESCE(?, delivered_at)
+           delivered_at=COALESCE(?, delivered_at),
+           son_guncelleyen_id=?
            WHERE id=?""",
         (
             body.get("device_model"),
@@ -183,6 +186,7 @@ async def update_repair(
             tamirde_at,
             completed_at,
             delivered_at,
+            user["id"],
             repair_id,
         ),
     )
