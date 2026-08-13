@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import BrandModelPicker from "../components/BrandModelPicker";
 import PartTypePicker from "../components/PartTypePicker";
+import BrandLogo from "../components/BrandLogo";
 
 const TABS = [
   { key: "stok", label: "Stok" },
@@ -518,6 +519,16 @@ export default function Parts({ user }) {
                 {s.label}
               </button>
             ))}
+            <button onClick={() => setLowStock(v => !v)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer",
+                background: lowStock ? "var(--orange)" : "var(--bg2)",
+                color: lowStock ? "#191b20" : "var(--text)",
+                fontWeight: lowStock ? 700 : 400, fontSize: 12, marginLeft: "auto",
+              }}>
+              <TriangleAlert size={12} strokeWidth={2.2} /> Kritik Stok
+            </button>
           </div>
           {brands.length > 1 && (
             <div style={{ marginBottom: 8 }}>
@@ -560,6 +571,9 @@ export default function Parts({ user }) {
                 <div key={p.id}>
                   {/* Parça satırı */}
                   <div className="list-item" style={{ background: isSelected ? "var(--bg2)" : undefined }}>
+                    <div style={{ display: "flex", position: "relative", zIndex: 1 }}>
+                      <BrandLogo marka={(p.device_model || "").split(" ")[0]} size={28} />
+                    </div>
                     <div className="list-item-body" style={{ cursor: "pointer" }} onClick={() => openPanel(p, "ekle")}>
                       <div className="list-item-title">{p.name}</div>
                       <div className="list-item-sub">{p.device_model} · {p.part_type}{p.purchase_price && !priceHidden ? ` · ${p.purchase_price.toLocaleString("tr-TR")}₺` : p.purchase_price && priceHidden ? " · ••••₺" : ""}</div>

@@ -342,6 +342,40 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+/* ── Masaüstü tablo / mobil kart geçişi ──────────────────────
+   Aynı veri iki markupla render edilir (Sidebar/BottomNav deseniyle
+   aynı yaklaşım): .mobile-list kartlar <1024px, .desktop-table-wrap
+   tablo ≥1024px görünür. Tek kod tabanı, ayrı sayfa yok. */
+
+.desktop-table-wrap { display: none; }
+
+@media (min-width: 1024px) {
+  .mobile-list { display: none; }
+  .desktop-table-wrap { display: block; }
+}
+
+.data-table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  border-radius: var(--radius); overflow: hidden;
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
+}
+.data-table th {
+  text-align: left; padding: 12px 16px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--hint);
+  border-bottom: 1px solid var(--divider);
+}
+.data-table th.sortable { cursor: pointer; user-select: none; }
+.data-table th.sortable:hover { color: var(--text); }
+.data-table th .th-inner { display: flex; align-items: center; gap: 5px; }
+.data-table td {
+  padding: 12px 16px; font-size: 14px; color: var(--text);
+  border-bottom: 1px solid var(--divider);
+}
+.data-table tbody tr { cursor: pointer; transition: background 0.12s; }
+.data-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+.data-table tbody tr:last-child td { border-bottom: none; }
+
 /* ── Arama ───────────────────────────────────────────────── */
 
 .search-bar { display: flex; gap: 8px; margin-bottom: 14px; }

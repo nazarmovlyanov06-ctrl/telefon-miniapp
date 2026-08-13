@@ -2,6 +2,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
 from database import get_db
 from auth import get_current_user, get_dukkan_id
+from photo_storage import save_photo, delete_photo
 import datetime
 
 router = APIRouter(prefix="/repairs", tags=["repairs"])
@@ -334,19 +335,10 @@ async def get_repair_fotolar(
     db: asyncpg.Connection = Depends(get_db),
 ):
     rows = await db.fetch(
-        "SELECT id, aciklama, created_at FROM tamir_fotograflari WHERE repair_id = $1 AND dukkan_id = $2 ORDER BY created_at",
+        "SELECT id, foto, aciklama, created_at FROM tamir_fotograflari WHERE repair_id = $1 AND dukkan_id = $2 ORDER BY created_at",
         repair_id, dukkan_id,
     )
-    rows = [dict(r) for r in rows]
-    # Load foto data separately to avoid huge row in listing
-    result = []
-    for r in rows:
-        frow = await db.fetchrow(
-            "SELECT foto FROM tamir_fotograflari WHERE id = $1 AND dukkan_id = $2",
-            r["id"], dukkan_id,
-        )
-        result.append({**r, "foto": frow["foto"] if frow else ""})
-    return result
+    return [dict(r) for r in rows]
 
 
 @router.post("/{repair_id}/fotolar")
@@ -360,9 +352,13 @@ async def add_repair_foto(
     foto = body.get("foto", "")
     if not foto:
         raise HTTPException(400, "Fotoğraf verisi gerekli")
+    try:
+        foto_path = save_photo(foto, "repairs", repair_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     await db.execute(
         "INSERT INTO tamir_fotograflari (dukkan_id, repair_id, foto, aciklama) VALUES ($1, $2, $3, $4)",
-        dukkan_id, repair_id, foto, body.get("aciklama"),
+        dukkan_id, repair_id, foto_path, body.get("aciklama"),
     )
     return {"ok": True}
 
@@ -375,8 +371,14 @@ async def delete_repair_foto(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
+    row = await db.fetchrow(
+        "SELECT foto FROM tamir_fotograflari WHERE id = $1 AND repair_id = $2 AND dukkan_id = $3",
+        foto_id, repair_id, dukkan_id,
+    )
     await db.execute(
         "DELETE FROM tamir_fotograflari WHERE id = $1 AND repair_id = $2 AND dukkan_id = $3",
         foto_id, repair_id, dukkan_id,
     )
+    if row:
+        delete_photo(row["foto"])
     return {"ok": True}

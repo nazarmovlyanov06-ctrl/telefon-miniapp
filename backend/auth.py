@@ -1,3 +1,4 @@
+import logging
 import time
 import bcrypt
 import jwt
@@ -6,6 +7,8 @@ import asyncpg
 
 from config import JWT_SECRET, JWT_ALGO, JWT_ACCESS_MIN, ROLE_SUPER_ADMIN
 from database import get_db
+
+log = logging.getLogger("auth")
 
 
 def hash_sifre(sifre: str) -> str:
@@ -16,6 +19,9 @@ def dogrula_sifre(sifre: str, hash_: str) -> bool:
     try:
         return bcrypt.checkpw(sifre.encode(), hash_.encode())
     except Exception:
+        # checkpw yanlış şifrede exception atmaz, sadece False döner — buraya
+        # düşmek bozuk/beklenmeyen formatlı bir hash olduğu anlamına gelir.
+        log.warning("Şifre doğrulama hatası — hash formatı bozuk olabilir", exc_info=True)
         return False
 
 

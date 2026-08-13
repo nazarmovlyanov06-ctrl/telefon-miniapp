@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api";
+import { api, fotoUrl } from "../api";
 import {
   Smartphone, ClipboardList, CircleX, User, Camera, X, TriangleAlert,
   CheckCircle2, Calendar,
@@ -248,7 +248,7 @@ export default function Loaner() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {fotolar.map(f => (
                   <div key={f.id}>
-                    <img src={f.foto} alt={f.aciklama || "foto"} style={{ width: "100%", borderRadius: 10, objectFit: "cover", aspectRatio: "1" }} />
+                    <img src={fotoUrl(f.foto)} alt={f.aciklama || "foto"} style={{ width: "100%", borderRadius: 10, objectFit: "cover", aspectRatio: "1" }} />
                     {f.created_at && <div style={{ fontSize: 10, color: "var(--hint)", textAlign: "center", marginTop: 3 }}>
                       {new Date(f.created_at).toLocaleDateString("tr-TR")}
                     </div>}

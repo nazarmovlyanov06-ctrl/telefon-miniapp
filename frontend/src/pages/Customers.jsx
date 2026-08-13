@@ -1,7 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { Users, Search, CircleX, Star, User, Ban, Plus } from "lucide-react";
+import { Users, Search, CircleX, Star, User, Ban, Plus, ChevronUp, ChevronDown } from "lucide-react";
+
+function SortTh({ label, col, sort, setSort }) {
+  const active = sort.col === col;
+  return (
+    <th className="sortable" onClick={() => setSort(s => ({ col, dir: s.col === col && s.dir === "asc" ? "desc" : "asc" }))}>
+      <span className="th-inner">
+        {label}
+        {active && (sort.dir === "asc" ? <ChevronUp size={12} strokeWidth={2.4} /> : <ChevronDown size={12} strokeWidth={2.4} />)}
+      </span>
+    </th>
+  );
+}
 
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
@@ -10,6 +22,7 @@ export default function Customers() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", notes: "" });
   const [err, setErr] = useState("");
+  const [sort, setSort] = useState({ col: "name", dir: "asc" });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -19,6 +32,21 @@ export default function Customers() {
     }, 300);
     return () => clearTimeout(t);
   }, [q]);
+
+  const sortedCustomers = useMemo(() => {
+    const list = [...customers];
+    const { col, dir } = sort;
+    const mul = dir === "asc" ? 1 : -1;
+    list.sort((a, b) => {
+      let av = a[col], bv = b[col];
+      if (col === "visit_count") { av = av || 0; bv = bv || 0; }
+      else { av = (av || "").toString().toLowerCase(); bv = (bv || "").toString().toLowerCase(); }
+      if (av < bv) return -1 * mul;
+      if (av > bv) return 1 * mul;
+      return 0;
+    });
+    return list;
+  }, [customers, sort]);
 
   async function submit(e) {
     e.preventDefault();
@@ -95,24 +123,63 @@ export default function Customers() {
           {q ? "Müşteri bulunamadı" : "Henüz müşteri eklenmedi"}
         </div>
       ) : (
-        customers.map((c) => (
-          <div key={c.id} className="list-item" onClick={() => navigate(`/customers/${c.id}`)}>
-            <div style={{ position: "relative", zIndex: 1, display: "flex" }}>
-              {c.is_vip
-                ? <Star size={22} stroke="var(--gold)" fill="var(--gold)" strokeWidth={1.5} />
-                : <User size={22} stroke="var(--hint)" strokeWidth={1.7} />}
-            </div>
-            <div className="list-item-body">
-              <div className="list-item-title">{c.name}</div>
-              <div className="list-item-sub">{c.phone || "Telefon yok"} · {c.visit_count} ziyaret</div>
-            </div>
-            {c.is_blacklisted ? (
-              <span className="badge" style={{ background: "rgba(248,113,113,0.15)", color: "var(--red)", position: "relative", zIndex: 1, display: "flex" }}>
-                <Ban size={13} strokeWidth={2} />
-              </span>
-            ) : null}
+        <>
+          <div className="mobile-list">
+            {customers.map((c) => (
+              <div key={c.id} className="list-item" onClick={() => navigate(`/customers/${c.id}`)}>
+                <div style={{ position: "relative", zIndex: 1, display: "flex" }}>
+                  {c.is_vip
+                    ? <Star size={22} stroke="var(--gold)" fill="var(--gold)" strokeWidth={1.5} />
+                    : <User size={22} stroke="var(--hint)" strokeWidth={1.7} />}
+                </div>
+                <div className="list-item-body">
+                  <div className="list-item-title">{c.name}</div>
+                  <div className="list-item-sub">{c.phone || "Telefon yok"} · {c.visit_count} ziyaret</div>
+                </div>
+                {c.is_blacklisted ? (
+                  <span className="badge" style={{ background: "rgba(248,113,113,0.15)", color: "var(--red)", position: "relative", zIndex: 1, display: "flex" }}>
+                    <Ban size={13} strokeWidth={2} />
+                  </span>
+                ) : null}
+              </div>
+            ))}
           </div>
-        ))
+
+          <div className="desktop-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  <SortTh label="Ad Soyad" col="name" sort={sort} setSort={setSort} />
+                  <SortTh label="Telefon" col="phone" sort={sort} setSort={setSort} />
+                  <SortTh label="Ziyaret" col="visit_count" sort={sort} setSort={setSort} />
+                  <th>Durum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedCustomers.map(c => (
+                  <tr key={c.id} onClick={() => navigate(`/customers/${c.id}`)}>
+                    <td style={{ display: "flex" }}>
+                      {c.is_vip
+                        ? <Star size={16} stroke="var(--gold)" fill="var(--gold)" strokeWidth={1.5} />
+                        : <User size={16} stroke="var(--hint)" strokeWidth={1.7} />}
+                    </td>
+                    <td>{c.name}</td>
+                    <td>{c.phone || "—"}</td>
+                    <td>{c.visit_count || 0}</td>
+                    <td>
+                      {c.is_blacklisted ? (
+                        <span className="badge" style={{ background: "rgba(248,113,113,0.15)", color: "var(--red)", display: "inline-flex" }}>
+                          <Ban size={13} strokeWidth={2} />
+                        </span>
+                      ) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

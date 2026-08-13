@@ -1,9 +1,11 @@
+import logging
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 from database import get_db
 from auth import get_current_user, get_dukkan_id
 from datetime import date
 
+log = logging.getLogger("shopping")
 router = APIRouter(prefix="/shopping", tags=["shopping"])
 
 
@@ -144,7 +146,7 @@ async def mark_bought(
                     miktar2, birim, fiyat2, date.today().isoformat(),
                 )
         except Exception:
-            pass
+            log.warning("Toptancı alış geçmişi kaydı yazılamadı", exc_info=True)
 
     return {"ok": True, "stok_mesaj": stok_mesaj}
 

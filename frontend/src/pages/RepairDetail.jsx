@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { api } from "../api";
+import { api, fotoUrl } from "../api";
 import { PatternPreview } from "../components/PatternLock";
 import {
   Pencil, Home, CheckCircle2, Receipt, Copy, Check, MessageCircle,
@@ -374,7 +374,7 @@ export default function RepairDetail({ user }) {
       {fotoView && (
         <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}
           onClick={() => setFotoView(null)}>
-          <img src={fotoView.foto} alt="" style={{ maxWidth: "95%", maxHeight: "80vh", borderRadius: 8, objectFit: "contain" }} onClick={e => e.stopPropagation()} />
+          <img src={fotoUrl(fotoView.foto)} alt="" style={{ maxWidth: "95%", maxHeight: "80vh", borderRadius: 8, objectFit: "contain" }} onClick={e => e.stopPropagation()} />
           <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
             <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); deleteFoto(fotoView.id); }} style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <Trash2 size={13} strokeWidth={2} /> Sil
@@ -736,7 +736,7 @@ export default function RepairDetail({ user }) {
                 {fotolar.map(f => (
                   <div key={f.id} style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", cursor: "pointer" }}
                     onClick={() => setFotoView(f)}>
-                    <img src={f.foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <img src={fotoUrl(f.foto)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </div>
                 ))}
               </div>

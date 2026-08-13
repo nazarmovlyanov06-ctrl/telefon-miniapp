@@ -16,6 +16,7 @@ from routers import (
     arama, sablonlar, geri_bildirim,
 )
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("startup")
 
 
@@ -74,6 +75,10 @@ app.include_router(sifir_cihaz.router)
 app.include_router(arama.router)
 app.include_router(sablonlar.router)
 app.include_router(geri_bildirim.router)
+
+_uploads_dir = os.path.join(os.path.dirname(__file__), "..", "data", "uploads")
+os.makedirs(_uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
 
 
 @app.get("/health")

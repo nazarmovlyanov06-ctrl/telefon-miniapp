@@ -1,3 +1,4 @@
+import logging
 import asyncpg
 import httpx
 from fastapi import APIRouter, Depends
@@ -6,7 +7,19 @@ from auth import get_current_user, get_dukkan_id
 from config import GEMINI_API_KEY
 from datetime import date, timedelta
 
+log = logging.getLogger("ai_chat")
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+def _mask_phone(phone: str | None) -> str:
+    """Telefon numarasını dış LLM'e (Gemini) ham gitmeden önce maskeler —
+    orta haneleri gizler, ilk 3 ve son 2 haneyi bırakır."""
+    if not phone:
+        return "-"
+    digits = phone.strip()
+    if len(digits) <= 5:
+        return "***"
+    return f"{digits[:3]}***{digits[-2:]}"
 
 
 async def _servis_verisi(db: asyncpg.Connection, dukkan_id: int) -> str:
@@ -82,7 +95,7 @@ async def _servis_verisi(db: asyncpg.Connection, dukkan_id: int) -> str:
     satirlar.append(f"Toplam kayıtlı müşteri: {musteri_toplam}")
     satirlar.append("Son eklenen müşteriler:")
     for m in son_musteriler:
-        satirlar.append(f"  {m['name']} | {m['phone'] or '-'} | {str(m['created_at'])[:10]}")
+        satirlar.append(f"  {m['name']} | {_mask_phone(m['phone'])} | {str(m['created_at'])[:10]}")
 
     # ── KASA ──────────────────────────────────────────────────
     bugun_kasa = {r["tur"]: float(r["t"]) for r in await db.fetch(
@@ -254,7 +267,7 @@ async def _servis_verisi(db: asyncpg.Connection, dukkan_id: int) -> str:
     )]
     satirlar.append("\n## TOPTANCILAR")
     for t in toptancilar:
-        satirlar.append(f"  {t['ad']} | {t['telefon'] or '-'} | {t['sehir'] or '-'}")
+        satirlar.append(f"  {t['ad']} | {_mask_phone(t['telefon'])} | {t['sehir'] or '-'}")
 
     # ── ÇALIŞANLAR / MAAŞ ─────────────────────────────────────
     calisanlar = [dict(r) for r in await db.fetch(
@@ -294,7 +307,7 @@ async def _servis_verisi(db: asyncpg.Connection, dukkan_id: int) -> str:
     if kara:
         satirlar.append("\n## KARA LİSTE")
         for k in kara:
-            satirlar.append(f"  {k['ad'] or '-'} | {k['telefon'] or '-'} | {k['sebep']}")
+            satirlar.append(f"  {k['ad'] or '-'} | {_mask_phone(k['telefon'])} | {k['sebep']}")
 
     return "\n".join(satirlar)
 
@@ -337,6 +350,7 @@ async def stt(
                     continue
         return {"text": ""}
     except Exception:
+        log.warning("STT (ses->metin) isteği başarısız", exc_info=True)
         return {"text": ""}
 
 

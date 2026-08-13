@@ -1,3 +1,4 @@
+import logging
 import re
 import httpx
 import asyncpg
@@ -6,6 +7,7 @@ from database import get_db
 from auth import get_current_user, get_dukkan_id
 from config import IMEI_API_KEY
 
+log = logging.getLogger("imei")
 router = APIRouter(prefix="/imei", tags=["imei"])
 
 
@@ -51,7 +53,8 @@ async def btk_query(
                     data = resp.json()
                     return {"kaynak": "btk", "durum": data.get("durum") or data.get("status"), "detay": data}
                 except Exception:
-                    pass
+                    # BTK API'si JSON dönmeyebilir — HTML scrape yoluna düşülüyor, bu beklenen bir durum.
+                    log.debug("BTK direkt API JSON değil, scrape'e düşülüyor", exc_info=True)
 
             session_resp = await client.get("https://imei.btk.gov.tr/", headers=headers)
             csrf = ""
@@ -84,7 +87,7 @@ async def btk_query(
                 return {"kaynak": "btk_scrape", "durum": durum, "renk": renk, "ham": ""}
 
     except Exception:
-        pass
+        log.warning("BTK IMEI sorgusu başarısız", exc_info=True)
 
     return {"kaynak": "hata", "durum": "btk_erisim_hatasi", "mesaj": "BTK'ya erişilemedi, lütfen siteyi manuel ziyaret edin"}
 
@@ -130,7 +133,7 @@ async def query_imei(
                 if resp.status_code == 200:
                     api_result = resp.json().get("properties", {})
         except Exception:
-            pass
+            log.warning("imeicheck.net API sorgusu başarısız", exc_info=True)
 
     try:
         await db.execute(
@@ -138,7 +141,7 @@ async def query_imei(
             dukkan_id, imei,
         )
     except Exception:
-        pass
+        log.warning("imei_history kaydı yazılamadı", exc_info=True)
 
     return {
         "imei": imei,

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../api";
-import { Wrench, Search, MessageCircle, Plus } from "lucide-react";
+import { Wrench, Search, MessageCircle, Plus, ChevronUp, ChevronDown } from "lucide-react";
 
 const TABS = [
   { key: "", label: "Tümü" },
@@ -50,6 +50,18 @@ function ServisGun({ gun, status }) {
   );
 }
 
+function SortTh({ label, col, sort, setSort }) {
+  const active = sort.col === col;
+  return (
+    <th className="sortable" onClick={() => setSort(s => ({ col, dir: s.col === col && s.dir === "asc" ? "desc" : "asc" }))}>
+      <span className="th-inner">
+        {label}
+        {active && (sort.dir === "asc" ? <ChevronUp size={12} strokeWidth={2.4} /> : <ChevronDown size={12} strokeWidth={2.4} />)}
+      </span>
+    </th>
+  );
+}
+
 function openWA(phone, model) {
   const raw = (phone || "").replace(/\D/g, "");
   if (!raw) { alert("Müşteri telefon numarası kayıtlı değil"); return; }
@@ -63,6 +75,7 @@ export default function Repairs() {
   const [tab, setTab] = useState("");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState({ col: "created_at", dir: "desc" });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -79,6 +92,21 @@ export default function Repairs() {
     if (q) params.q = q;
     api.repairs(params).then(setRepairs).finally(() => setLoading(false));
   }, [tab, q]);
+
+  const sortedRepairs = useMemo(() => {
+    const list = [...repairs];
+    const { col, dir } = sort;
+    const mul = dir === "asc" ? 1 : -1;
+    list.sort((a, b) => {
+      let av = a[col], bv = b[col];
+      if (col === "created_at") { av = new Date(av || 0).getTime(); bv = new Date(bv || 0).getTime(); }
+      else { av = (av || "").toString().toLowerCase(); bv = (bv || "").toString().toLowerCase(); }
+      if (av < bv) return -1 * mul;
+      if (av > bv) return 1 * mul;
+      return 0;
+    });
+    return list;
+  }, [repairs, sort]);
 
   return (
     <div className="page">
@@ -119,42 +147,94 @@ export default function Repairs() {
           Tamir bulunamadı
         </div>
       ) : (
-        repairs.map(r => {
-          const gun = servisSuresi(r.created_at, r.status);
-          return (
-            <div key={r.id} className="list-item" onClick={() => navigate(`/repairs/${r.id}`)}>
-              <div style={{
-                width: 4, borderRadius: 4, alignSelf: "stretch", flexShrink: 0,
-                background: STATUS_RENK[r.status] || "var(--divider)",
-                marginRight: 4, position: "relative", zIndex: 1,
-              }} />
-              <div className="list-item-body">
-                <div className="list-item-title">
-                  {r.customer_name || "—"} · {r.device_model}
+        <>
+          <div className="mobile-list">
+            {repairs.map(r => {
+              const gun = servisSuresi(r.created_at, r.status);
+              return (
+                <div key={r.id} className="list-item" onClick={() => navigate(`/repairs/${r.id}`)}>
+                  <div style={{
+                    width: 4, borderRadius: 4, alignSelf: "stretch", flexShrink: 0,
+                    background: STATUS_RENK[r.status] || "var(--divider)",
+                    marginRight: 4, position: "relative", zIndex: 1,
+                  }} />
+                  <div className="list-item-body">
+                    <div className="list-item-title">
+                      {r.customer_name || "—"} · {r.device_model}
+                    </div>
+                    <div className="list-item-sub">
+                      #{r.repair_no} · {r.fault_desc || "—"}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0, position: "relative", zIndex: 1 }}>
+                    <span className={`badge badge-${r.status}`}>{STATUS_LABEL[r.status]}</span>
+                    <ServisGun gun={gun} status={r.status} />
+                    {r.status === "hazir" && (
+                      <button
+                        onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model); }}
+                        style={{
+                          background: "#25D366", color: "#fff", border: "none",
+                          borderRadius: 8, padding: "4px 8px", fontSize: 12,
+                          cursor: "pointer", fontWeight: 700, lineHeight: 1.4,
+                          display: "flex", alignItems: "center", gap: 4,
+                        }}
+                        title="WhatsApp ile bildir"
+                      ><MessageCircle size={12} strokeWidth={2.2} /> WA</button>
+                    )}
+                  </div>
                 </div>
-                <div className="list-item-sub">
-                  #{r.repair_no} · {r.fault_desc || "—"}
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0, position: "relative", zIndex: 1 }}>
-                <span className={`badge badge-${r.status}`}>{STATUS_LABEL[r.status]}</span>
-                <ServisGun gun={gun} status={r.status} />
-                {r.status === "hazir" && (
-                  <button
-                    onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model); }}
-                    style={{
-                      background: "#25D366", color: "#fff", border: "none",
-                      borderRadius: 8, padding: "4px 8px", fontSize: 12,
-                      cursor: "pointer", fontWeight: 700, lineHeight: 1.4,
-                      display: "flex", alignItems: "center", gap: 4,
-                    }}
-                    title="WhatsApp ile bildir"
-                  ><MessageCircle size={12} strokeWidth={2.2} /> WA</button>
-                )}
-              </div>
-            </div>
-          );
-        })
+              );
+            })}
+          </div>
+
+          <div className="desktop-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <SortTh label="Tamir No" col="repair_no" sort={sort} setSort={setSort} />
+                  <SortTh label="Müşteri" col="customer_name" sort={sort} setSort={setSort} />
+                  <SortTh label="Cihaz" col="device_model" sort={sort} setSort={setSort} />
+                  <SortTh label="Arıza" col="fault_desc" sort={sort} setSort={setSort} />
+                  <SortTh label="Durum" col="status" sort={sort} setSort={setSort} />
+                  <SortTh label="Tarih" col="created_at" sort={sort} setSort={setSort} />
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRepairs.map(r => {
+                  const gun = servisSuresi(r.created_at, r.status);
+                  return (
+                    <tr key={r.id} onClick={() => navigate(`/repairs/${r.id}`)}>
+                      <td>#{r.repair_no}</td>
+                      <td>{r.customer_name || "—"}</td>
+                      <td>{r.device_model}</td>
+                      <td>{r.fault_desc || "—"}</td>
+                      <td>
+                        <span className={`badge badge-${r.status}`}>{STATUS_LABEL[r.status]}</span>
+                        {" "}<ServisGun gun={gun} status={r.status} />
+                      </td>
+                      <td>{r.created_at ? new Date(r.created_at).toLocaleDateString("tr-TR") : "—"}</td>
+                      <td>
+                        {r.status === "hazir" && (
+                          <button
+                            onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model); }}
+                            style={{
+                              background: "#25D366", color: "#fff", border: "none",
+                              borderRadius: 8, padding: "4px 8px", fontSize: 12,
+                              cursor: "pointer", fontWeight: 700, lineHeight: 1.4,
+                              display: "flex", alignItems: "center", gap: 4,
+                            }}
+                            title="WhatsApp ile bildir"
+                          ><MessageCircle size={12} strokeWidth={2.2} /> WA</button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

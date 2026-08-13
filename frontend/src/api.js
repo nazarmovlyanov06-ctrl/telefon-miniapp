@@ -1,6 +1,14 @@
 const BASE = import.meta.env.VITE_API_URL || "";
 const TOKEN_KEY = "telefon_servis_token";
 
+// /uploads/... gibi göreli dosya yollarını API origin'iyle birleştirir —
+// prod'da frontend+API aynı origin, local dev'de VITE_API_URL prod'u işaret eder.
+export function fotoUrl(path) {
+  if (!path) return path;
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) return path;
+  return `${BASE}${path}`;
+}
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY) || "";
 }

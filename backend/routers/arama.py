@@ -1,8 +1,10 @@
+import logging
 import asyncpg
 from fastapi import APIRouter, Depends, Query
 from database import get_db
 from auth import get_current_user, get_dukkan_id
 
+log = logging.getLogger("arama")
 router = APIRouter(prefix="/arama", tags=["arama"])
 
 
@@ -36,7 +38,7 @@ async def evrensel_arama(
                 "link": f"/repairs/{r['id']}", "id": r["id"],
             })
     except Exception:
-        pass
+        log.warning("Arama: tamirler sorgusu basarisiz", exc_info=True)
 
     try:
         rows = await db.fetch(
@@ -53,7 +55,7 @@ async def evrensel_arama(
                 "link": f"/customers/{r['id']}", "id": r["id"],
             })
     except Exception:
-        pass
+        log.warning("Arama: musteriler sorgusu basarisiz", exc_info=True)
 
     try:
         rows = await db.fetch(
@@ -72,7 +74,7 @@ async def evrensel_arama(
                 "link": "/parts", "id": r["id"],
             })
     except Exception:
-        pass
+        log.warning("Arama: parca sorgusu basarisiz", exc_info=True)
 
     try:
         rows = await db.fetch(
@@ -92,7 +94,7 @@ async def evrensel_arama(
                 "link": "/ikinciel", "id": r["id"],
             })
     except Exception:
-        pass
+        log.warning("Arama: ikinci el sorgusu basarisiz", exc_info=True)
 
     try:
         rows = await db.fetch(
@@ -115,7 +117,7 @@ async def evrensel_arama(
                 "link": "/debts", "id": r["id"],
             })
     except Exception:
-        pass
+        log.warning("Arama: borc sorgusu basarisiz", exc_info=True)
 
     try:
         rows = await db.fetch(
@@ -133,6 +135,6 @@ async def evrensel_arama(
                 "link": "/aksesuar", "id": r["id"],
             })
     except Exception:
-        pass
+        log.warning("Arama: aksesuar sorgusu basarisiz", exc_info=True)
 
     return sonuclar[:25]
