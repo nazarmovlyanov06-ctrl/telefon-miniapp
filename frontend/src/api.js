@@ -43,6 +43,7 @@ async function request(path, options = {}) {
 const get = (path) => request(path);
 const post = (path, body) => request(path, { method: "POST", body: JSON.stringify(body) });
 const put = (path, body) => request(path, { method: "PUT", body: JSON.stringify(body) });
+const patch = (path, body) => request(path, { method: "PATCH", body: JSON.stringify(body) });
 const del = (path) => request(path, { method: "DELETE" });
 
 export const api = {
@@ -247,4 +248,9 @@ export const api = {
   // AI
   aiSor: (soru) => post("/ai/sor", { soru }),
   aiStt: (audio, mime) => post("/ai/stt", { audio, mime }),
+
+  // Super Admin
+  adminDukkanlar: () => get("/admin/dukkanlar"),
+  adminSetAbonelik: (id, durum) => patch(`/admin/dukkanlar/${id}/abonelik`, { durum }),
+  adminIstatistik: () => get("/admin/istatistik"),
 };

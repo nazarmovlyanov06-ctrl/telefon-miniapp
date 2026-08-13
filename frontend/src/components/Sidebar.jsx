@@ -4,7 +4,7 @@ import {
   Landmark, TrendingDown, Target, CreditCard,
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
-  Banknote, BarChart3, ScanLine, Settings,
+  Banknote, BarChart3, ScanLine, Settings, ShieldAlert,
 } from "lucide-react";
 
 const ANA = [
@@ -66,7 +66,7 @@ function Grup({ label, items, pathname, navigate }) {
   );
 }
 
-export default function Sidebar({ dukkanAdi }) {
+export default function Sidebar({ dukkanAdi, user }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -81,6 +81,9 @@ export default function Sidebar({ dukkanAdi }) {
       <Grup label="Satış & Stok" items={SATIS_STOK} pathname={pathname} navigate={navigate} />
       <Grup label="Müşteri" items={MUSTERI} pathname={pathname} navigate={navigate} />
       <Grup label="Araçlar" items={ARACLAR} pathname={pathname} navigate={navigate} />
+      {user?.rol === "super_admin" && (
+        <Grup label="Yönetim" items={[{ path: "/admin", icon: ShieldAlert, label: "Süper Admin" }]} pathname={pathname} navigate={navigate} />
+      )}
     </nav>
   );
 }

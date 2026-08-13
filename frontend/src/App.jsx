@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { Clock, User, TriangleAlert, Wrench } from "lucide-react";
 import { api, getToken, setToken } from "./api";
 import Login from "./pages/Login";
 import Kayit from "./pages/Kayit";
@@ -8,13 +9,13 @@ function BekleyenEkran({ user }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center",
       height: "100vh", padding: 24, flexDirection: "column", gap: 16, textAlign: "center" }}>
-      <div style={{ fontSize: 52 }}>⏳</div>
+      <Clock size={44} stroke="var(--hint)" strokeWidth={1.5} />
       <div style={{ fontWeight: 700, fontSize: 18 }}>Patron Onayı Bekleniyor</div>
       <div style={{ fontSize: 14, color: "var(--hint)", maxWidth: 300 }}>
         Hesabın henüz onaylanmadı. Patron seni onayladıktan sonra giriş yapabilirsin.
       </div>
-      <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 8 }}>
-        👤 {user?.ad}
+      <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+        <User size={13} strokeWidth={2} /> {user?.ad}
       </div>
       <button className="btn" onClick={() => { setToken(null); window.location.href = "/giris"; }}>
         Çıkış Yap
@@ -51,13 +52,14 @@ import CustomerDetail from "./pages/CustomerDetail";
 import SifirCihaz from "./pages/SifirCihaz";
 import Stats from "./pages/Stats";
 import Search from "./pages/Search";
+import SuperAdmin from "./pages/SuperAdmin";
 import "./index.css";
 
 // Kenar kaydırma (sol kenardan sağa → geri) + geri butonu
 // Bu sayfalarda geri butonu ve paddingTop gösterilmez (kendi header'ları var)
 const ROOT_PATHS = ["/", "/repairs", "/customers", "/parts", "/more", "/search", "/ai"];
 
-function NavShell({ children }) {
+function NavShell({ children, user }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const touchStartX = useRef(null);
@@ -90,7 +92,7 @@ function NavShell({ children }) {
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      <Sidebar />
+      <Sidebar user={user} />
       {/* Geri butonu — kök sayfalarda gizli */}
       {!isRoot && (
         <button
@@ -118,7 +120,7 @@ function NavShell({ children }) {
 
 function AppRoutes({ user }) {
   return (
-    <NavShell>
+    <NavShell user={user}>
       <Routes>
         <Route path="/" element={<Dashboard user={user} />} />
         <Route path="/repairs" element={<Repairs />} />
@@ -147,6 +149,7 @@ function AppRoutes({ user }) {
         <Route path="/stats" element={<Stats />} />
         <Route path="/search" element={<Search />} />
         <Route path="/geri-bildirim" element={<GeriBildirim user={user} />} />
+        <Route path="/admin" element={user?.rol === "super_admin" ? <SuperAdmin /> : <Navigate to="/" replace />} />
       </Routes>
       <BottomNav />
     </NavShell>
@@ -159,7 +162,7 @@ function Yukleniyor() {
       display: "flex", alignItems: "center", justifyContent: "center",
       height: "100vh", flexDirection: "column", gap: 16, color: "var(--hint)"
     }}>
-      <div style={{ fontSize: 48 }}>🔧</div>
+      <Wrench size={40} strokeWidth={1.5} />
       <div>Yükleniyor...</div>
     </div>
   );
@@ -191,7 +194,9 @@ function Korumali({ children }) {
   if (error) {
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>❌</div>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+          <TriangleAlert size={40} stroke="var(--danger)" strokeWidth={1.5} />
+        </div>
         <div style={{ color: "var(--danger)", marginBottom: 8 }}>Bağlantı hatası</div>
         <div style={{ fontSize: 13, color: "var(--hint)" }}>{error}</div>
         <button className="btn btn-primary" style={{ marginTop: 16, width: "auto", padding: "10px 24px" }}

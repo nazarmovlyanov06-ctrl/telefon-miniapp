@@ -5,7 +5,7 @@ import {
   Landmark, TrendingDown, Target, CreditCard,
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
-  Banknote, BarChart3, ScanLine, Settings,
+  Banknote, BarChart3, ScanLine, Settings, ShieldAlert,
 } from "lucide-react";
 
 const ITEMS = [
@@ -35,12 +35,15 @@ const ITEMS = [
 
 const ROLE_LABELS = {
   patron: "Patron", teknisyen: "Teknisyen",
-  satis: "Satış", cirak: "Çırak",
+  satis: "Satış", cirak: "Çırak", super_admin: "Süper Admin",
 };
 
 export default function More({ user }) {
   const navigate = useNavigate();
   const [bildirimSayisi, setBildirimSayisi] = useState(0);
+  const items = user?.rol === "super_admin"
+    ? [...ITEMS, { icon: ShieldAlert, label: "Süper Admin", path: "/admin", color: "var(--red)" }]
+    : ITEMS;
 
   useEffect(() => {
     api.geriBildirimBekleyen().then(r => setBildirimSayisi(r.bekleyen || 0)).catch(() => {});
@@ -69,7 +72,7 @@ export default function More({ user }) {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        {ITEMS.map(item => {
+        {items.map(item => {
           const Icon = item.icon;
           return (
             <div key={item.path} onClick={() => navigate(item.path)}

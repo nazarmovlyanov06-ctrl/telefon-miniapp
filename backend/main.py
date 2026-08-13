@@ -13,7 +13,7 @@ from routers import auth_router, users, customers, repairs, parts, shopping, ime
 from routers import (
     toptanci, ikinciel, garanti, kasa, gider, loaner,
     aksesuar, hedef, maas, karalist, parca_iade, ai_chat, sifir_cihaz,
-    arama, sablonlar, geri_bildirim,
+    arama, sablonlar, geri_bildirim, admin,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -45,7 +45,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Accept", "Authorization"],
     max_age=3600,
 )
@@ -75,6 +75,7 @@ app.include_router(sifir_cihaz.router)
 app.include_router(arama.router)
 app.include_router(sablonlar.router)
 app.include_router(geri_bildirim.router)
+app.include_router(admin.router)
 
 _uploads_dir = os.path.join(os.path.dirname(__file__), "..", "data", "uploads")
 os.makedirs(_uploads_dir, exist_ok=True)
