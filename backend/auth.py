@@ -21,7 +21,7 @@ def dogrula_sifre(sifre: str, hash_: str) -> bool:
 
 def olustur_token(kullanici_id: int, dukkan_id: int | None, rol: str) -> str:
     payload = {
-        "sub": kullanici_id,
+        "sub": str(kullanici_id),
         "dukkan_id": dukkan_id,
         "rol": rol,
         "exp": int(time.time()) + JWT_ACCESS_MIN * 60,
@@ -51,7 +51,7 @@ async def get_current_user(
 
     row = await db.fetchrow(
         "SELECT id, dukkan_id, email, ad, rol, durum, aktif FROM kullanicilar WHERE id = $1",
-        payload["sub"],
+        int(payload["sub"]),
     )
     if not row:
         raise HTTPException(status_code=401, detail="Kullanici bulunamadi")
