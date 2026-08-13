@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { Ban, CircleX, User, Phone } from "lucide-react";
 
 export default function KaraListe() {
   const navigate = useNavigate();
@@ -63,7 +64,7 @@ export default function KaraListe() {
     <div className="page">
       <div className="card-row" style={{ marginBottom: 14 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
-        <h1 className="page-title" style={{ margin: 0 }}>🚫 Kara Liste</h1>
+        <h1 className="page-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}><Ban size={18} strokeWidth={2} /> Kara Liste</h1>
         <button className="btn btn-danger btn-sm" onClick={() => setShowForm(true)}>+ Ekle</button>
       </div>
 
@@ -74,7 +75,7 @@ export default function KaraListe() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
 
             {/* Ad Soyad — müşteri autocomplete */}
             <div className="form-group" style={{ position: "relative" }}>
@@ -92,7 +93,7 @@ export default function KaraListe() {
                     <div key={m.id} onMouseDown={() => secMusteri(m)}
                       style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
                         borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-                      <span>👤 {m.name}</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
                       {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
                     </div>
                   ))}
@@ -134,8 +135,8 @@ export default function KaraListe() {
         <div key={k.id} className="card" style={{ borderLeft: "3px solid var(--danger)" }}>
           <div className="card-row">
             <div>
-              {k.ad && <div style={{ fontWeight: 600 }}>🚫 {k.ad}</div>}
-              {k.telefon && <div style={{ fontSize: 13, color: "var(--hint)" }}>📞 {k.telefon}</div>}
+              {k.ad && <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Ban size={13} strokeWidth={2} /> {k.ad}</div>}
+              {k.telefon && <div style={{ fontSize: 13, color: "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}><Phone size={11} strokeWidth={2} /> {k.telefon}</div>}
               {k.imei && <div style={{ fontSize: 13, color: "var(--hint)" }}>IMEI: {k.imei}</div>}
               <div style={{ fontSize: 13, color: "var(--danger)", marginTop: 4 }}>{k.sebep}</div>
               {k.notlar && <div style={{ fontSize: 12, color: "var(--hint)" }}>{k.notlar}</div>}

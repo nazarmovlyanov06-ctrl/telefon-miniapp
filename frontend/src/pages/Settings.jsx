@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { Crown, Wrench, ShoppingBag, GraduationCap, Settings2, CircleX, Plus, ClipboardList, User, Pause, Play, Trash2 } from "lucide-react";
 
 const ROLES = [
-  { key: "patron", label: "👑 Patron" },
-  { key: "teknisyen", label: "🔧 Teknisyen" },
-  { key: "satis", label: "🛍️ Satış" },
-  { key: "cirak", label: "🧑‍🔧 Çırak" },
+  { key: "patron", label: "Patron", icon: Crown },
+  { key: "teknisyen", label: "Teknisyen", icon: Wrench },
+  { key: "satis", label: "Satış", icon: ShoppingBag },
+  { key: "cirak", label: "Çırak", icon: GraduationCap },
 ];
+
+function RoleLabel({ role }) {
+  const r = ROLES.find(x => x.key === role);
+  if (!r) return role;
+  const Icon = r.icon;
+  return <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon size={11} strokeWidth={2} /> {r.label}</span>;
+}
 
 export default function Settings({ user }) {
   const [users, setUsers] = useState([]);
@@ -62,7 +70,9 @@ export default function Settings({ user }) {
     <div className="page">
       <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate("/more")}>← Geri</button>
-        <div className="page-title" style={{ margin: 0 }}>⚙️ Ayarlar</div>
+        <div className="page-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: 9 }}>
+          <Settings2 size={19} strokeWidth={2} /> Ayarlar
+        </div>
       </div>
 
       {user?.rol !== "patron" ? (
@@ -75,15 +85,15 @@ export default function Settings({ user }) {
         <>
           <div className="card-row" style={{ marginBottom: 12 }}>
             <div className="section-title" style={{ margin: 0 }}>Çalışanlar</div>
-            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(v => !v); setErr(""); }}>
-              + Yeni Çalışan
+            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(v => !v); setErr(""); }} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Plus size={13} strokeWidth={2.4} /> Yeni Çalışan
             </button>
           </div>
 
           {showForm && (
             <div className="card" style={{ marginBottom: 12 }}>
               <form onSubmit={ekle}>
-                {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>❌ {err}</div>}
+                {err && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 8, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
                 <div className="form-group">
                   <label className="form-label">Ad Soyad</label>
                   <input className="form-input" required value={form.ad}
@@ -118,7 +128,9 @@ export default function Settings({ user }) {
 
           {feed.length > 0 && (
             <>
-              <div className="section-title">📋 Bugünkü Değişiklikler</div>
+              <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <ClipboardList size={12} strokeWidth={2} /> Bugünkü Değişiklikler
+              </div>
               {feed.map(f => (
                 <div key={f.id} className="card" style={{ padding: "8px 14px", marginBottom: 6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -127,7 +139,7 @@ export default function Settings({ user }) {
                         {f.guncelleyen || "?"} → #{f.repair_no} {f.device_model}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--hint)" }}>
-                        {f.musteri_adi ? `👤 ${f.musteri_adi} · ` : ""}{f.status}
+                        {f.musteri_adi ? `${f.musteri_adi} · ` : ""}{f.status}
                       </div>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--hint)", whiteSpace: "nowrap" }}>
@@ -147,7 +159,7 @@ export default function Settings({ user }) {
                   <div style={{ fontSize: 12, color: "var(--hint)" }}>{u.email}</div>
                 </div>
                 <span className={`badge badge-${u.rol}`}>
-                  {ROLES.find((r) => r.key === u.rol)?.label || u.rol}
+                  <RoleLabel role={u.rol} />
                 </span>
               </div>
               {u.rol !== "patron" && (
@@ -166,11 +178,11 @@ export default function Settings({ user }) {
                     ))}
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button className="btn btn-sm" style={{ padding: "6px 14px" }} onClick={() => toggleAktif(u)}>
-                      {u.aktif ? "⏸ Pasifleştir" : "▶️ Aktifleştir"}
+                    <button className="btn btn-sm" style={{ padding: "6px 14px", display: "flex", alignItems: "center", gap: 6 }} onClick={() => toggleAktif(u)}>
+                      {u.aktif ? <><Pause size={12} strokeWidth={2} /> Pasifleştir</> : <><Play size={12} strokeWidth={2} /> Aktifleştir</>}
                     </button>
-                    <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "6px 14px" }}
-                      onClick={() => sil(u)}>🗑️ Sil</button>
+                    <button className="btn btn-sm" style={{ background: "var(--red)", color: "#191b20", padding: "6px 14px", display: "flex", alignItems: "center", gap: 6 }}
+                      onClick={() => sil(u)}><Trash2 size={12} strokeWidth={2} /> Sil</button>
                   </div>
                 </>
               )}

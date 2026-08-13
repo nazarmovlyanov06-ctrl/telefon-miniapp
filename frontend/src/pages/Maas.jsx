@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { CircleX, User, Phone, Calendar, CheckCircle2, Banknote } from "lucide-react";
 
 export default function Maas() {
   const navigate = useNavigate();
@@ -89,7 +90,7 @@ export default function Maas() {
           {showCalisan && (
             <div className="card">
               <form onSubmit={submitCalisan}>
-                {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+                {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
                 <div className="form-group">
                   <label className="form-label">Ad Soyad *</label>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -97,7 +98,7 @@ export default function Maas() {
                     {botUsers.length > 0 && (
                       <button type="button" className="btn btn-ghost btn-sm" style={{ whiteSpace: "nowrap" }}
                         onClick={() => setShowBotPicker(v => !v)}>
-                        📲
+                        <User size={14} strokeWidth={2} />
                       </button>
                     )}
                   </div>
@@ -108,7 +109,7 @@ export default function Maas() {
                           setCForm(f => ({ ...f, ad: u.name }));
                           setShowBotPicker(false);
                         }} style={{ padding: "9px 12px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span>👤 {u.name}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {u.name}</span>
                           <span className={`badge badge-${u.role}`}>{u.role}</span>
                         </div>
                       ))}
@@ -134,7 +135,7 @@ export default function Maas() {
           {showAvans && (
             <div className="card">
               <form onSubmit={submitAvans}>
-                {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+                {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
                 <div className="form-group">
                   <label className="form-label">Çalışan *</label>
                   <select className="form-select" required value={aForm.calisan_id} onChange={e => setAForm({ ...aForm, calisan_id: e.target.value })}>
@@ -176,8 +177,8 @@ export default function Maas() {
                   }
                 }}>
                 <div>
-                  <div style={{ fontWeight: 600 }}>👤 {c.ad}</div>
-                  {c.telefon && <div style={{ fontSize: 13, color: "var(--hint)" }}>📞 {c.telefon}</div>}
+                  <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {c.ad}</div>
+                  {c.telefon && <div style={{ fontSize: 13, color: "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}><Phone size={11} strokeWidth={2} /> {c.telefon}</div>}
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontWeight: 700 }}>{(c.aylik_maas || 0).toLocaleString("tr-TR")} ₺</div>
@@ -192,7 +193,7 @@ export default function Maas() {
                   ) : avansDetay[c.id].map(a => (
                     <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, padding: "5px 0", borderBottom: "1px solid var(--border)" }}>
                       <div>
-                        <span style={{ color: "var(--hint)" }}>📅 {a.tarih}</span>
+                        <span style={{ color: "var(--hint)" }}>{a.tarih}</span>
                         {a.notlar && <span style={{ fontSize: 11, color: "var(--hint)", marginLeft: 8 }}>{a.notlar}</span>}
                       </div>
                       <span style={{ fontWeight: 700, color: "var(--danger)" }}>-{(a.tutar || 0).toLocaleString("tr-TR")} ₺</span>
@@ -239,7 +240,7 @@ export default function Maas() {
               </div>
               {o.odendi
                 ? <div style={{ fontSize: 12, color: "var(--success)", marginTop: 4 }}>
-                    ✅ Ödendi {o.odeme_tarihi ? `· 📅 ${new Date(o.odeme_tarihi).toLocaleDateString("tr-TR")}` : ""}
+                    Ödendi {o.odeme_tarihi ? `· ${new Date(o.odeme_tarihi).toLocaleDateString("tr-TR")}` : ""}
                   </div>
                 : maasOdeTarih[o.calisan_id]
                   ? <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
@@ -260,7 +261,7 @@ export default function Maas() {
                     </div>
                   : <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }}
                       onClick={() => setMaasOdeTarih(s => ({ ...s, [o.calisan_id]: true }))}>
-                      💵 Maaş Öde
+                      <Banknote size={13} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />Maaş Öde
                     </button>
               }
               {o.alinan_avans > 0 && (
@@ -280,7 +281,7 @@ export default function Maas() {
                 <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
                   {avansDetay[o.calisan_id].map(a => (
                     <div key={a.id} className="card-row" style={{ fontSize: 13, padding: "4px 0" }}>
-                      <span style={{ color: "var(--hint)" }}>📅 {a.tarih}</span>
+                      <span style={{ color: "var(--hint)" }}>{a.tarih}</span>
                       <span style={{ color: "var(--danger)", fontWeight: 600 }}>-{(a.tutar || 0).toLocaleString("tr-TR")} ₺</span>
                     </div>
                   ))}

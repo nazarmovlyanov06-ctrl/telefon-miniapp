@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { Users, Search, CircleX, Star, User, Ban, Plus } from "lucide-react";
 
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
@@ -35,16 +36,22 @@ export default function Customers() {
   return (
     <div className="page">
       <div className="card-row" style={{ marginBottom: 12 }}>
-        <div className="page-title" style={{ margin: 0 }}>👥 Müşteriler</div>
+        <div className="page-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: 9 }}>
+          <Users size={19} strokeWidth={2} /> Müşteriler
+        </div>
         <button className="btn btn-primary btn-sm" onClick={() => setShowForm(v => !v)}>
-          {showForm ? "İptal" : "+ Yeni Müşteri"}
+          {showForm ? "İptal" : <><Plus size={14} strokeWidth={2.4} /> Yeni Müşteri</>}
         </button>
       </div>
 
       {showForm && (
         <div className="card" style={{ marginBottom: 12 }}>
           <form onSubmit={submit}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+            {err && (
+              <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                <CircleX size={14} strokeWidth={2} /> {err}
+              </div>
+            )}
             <div className="form-group">
               <label className="form-label">Ad Soyad *</label>
               <input className="form-input" required value={form.name}
@@ -69,25 +76,41 @@ export default function Customers() {
       )}
 
       <div className="search-bar">
-        <input className="search-input" placeholder="🔍 Ad veya telefon ara..."
-          value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="inset search-input" style={{ borderRadius: 13, display: "flex", alignItems: "center", gap: 9, flex: 1 }}>
+          <Search size={16} stroke="var(--hint)" strokeWidth={2} />
+          <input
+            style={{ background: "none", border: "none", outline: "none", color: "var(--text)", font: "inherit", fontSize: 15, flex: 1 }}
+            placeholder="Ad veya telefon ara..."
+            value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
       </div>
 
       {loading ? (
         <div className="loading">Yükleniyor...</div>
       ) : customers.length === 0 ? (
-        <div className="empty"><div className="empty-icon">👥</div>
+        <div className="empty">
+          <div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}>
+            <Users size={40} stroke="var(--dim)" strokeWidth={1.5} />
+          </div>
           {q ? "Müşteri bulunamadı" : "Henüz müşteri eklenmedi"}
         </div>
       ) : (
         customers.map((c) => (
           <div key={c.id} className="list-item" onClick={() => navigate(`/customers/${c.id}`)}>
-            <div style={{ fontSize: 28 }}>{c.is_vip ? "⭐" : "👤"}</div>
+            <div style={{ position: "relative", zIndex: 1, display: "flex" }}>
+              {c.is_vip
+                ? <Star size={22} stroke="var(--gold)" fill="var(--gold)" strokeWidth={1.5} />
+                : <User size={22} stroke="var(--hint)" strokeWidth={1.7} />}
+            </div>
             <div className="list-item-body">
               <div className="list-item-title">{c.name}</div>
               <div className="list-item-sub">{c.phone || "Telefon yok"} · {c.visit_count} ziyaret</div>
             </div>
-            {c.is_blacklisted ? <span className="badge" style={{ background: "#fee2e2", color: "#991b1b" }}>🚫</span> : null}
+            {c.is_blacklisted ? (
+              <span className="badge" style={{ background: "rgba(248,113,113,0.15)", color: "var(--red)", position: "relative", zIndex: 1, display: "flex" }}>
+                <Ban size={13} strokeWidth={2} />
+              </span>
+            ) : null}
           </div>
         ))
       )}

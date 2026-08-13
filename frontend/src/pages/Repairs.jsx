@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../api";
+import { Wrench, Search, MessageCircle, Plus } from "lucide-react";
 
 const TABS = [
   { key: "", label: "Tümü" },
-  { key: "bekliyor", label: "⏳ Bekliyor" },
-  { key: "tamirde", label: "🔧 Tamirde" },
-  { key: "parca_bekleniyor", label: "📦 Parça" },
-  { key: "hazir", label: "✅ Hazır" },
-  { key: "teslim", label: "🏠 Teslim" },
+  { key: "bekliyor", label: "Bekliyor" },
+  { key: "tamirde", label: "Tamirde" },
+  { key: "parca_bekleniyor", label: "Parça" },
+  { key: "hazir", label: "Hazır" },
+  { key: "teslim", label: "Teslim" },
 ];
 
 const STATUS_LABEL = {
@@ -17,8 +18,8 @@ const STATUS_LABEL = {
 };
 
 const STATUS_RENK = {
-  bekliyor: "#f59e0b", tamirde: "#3b82f6",
-  parca_bekleniyor: "#8b5cf6", hazir: "#10b981", teslim: "#6b7280",
+  bekliyor: "var(--orange)", tamirde: "var(--blue)",
+  parca_bekleniyor: "var(--purple)", hazir: "var(--green)", teslim: "var(--gray)",
 };
 
 function servisSuresi(created_at, status) {
@@ -27,15 +28,22 @@ function servisSuresi(created_at, status) {
   return gun;
 }
 
+const GUN_BG = {
+  yesil: "rgba(74, 222, 128, 0.15)",
+  turuncu: "rgba(246, 162, 74, 0.15)",
+  kirmizi: "rgba(248, 113, 113, 0.15)",
+};
+
 function ServisGun({ gun, status }) {
   if (gun === null || status === "teslim") return null;
-  let renk = "#10b981";
-  if (gun >= 3) renk = "#f59e0b";
-  if (gun >= 7) renk = "#ef4444";
+  let renk = "var(--green)", key = "yesil";
+  if (gun >= 3) { renk = "var(--orange)"; key = "turuncu"; }
+  if (gun >= 7) { renk = "var(--red)"; key = "kirmizi"; }
   return (
     <span style={{
       fontSize: 11, fontWeight: 700, color: renk,
-      background: renk + "18", padding: "2px 6px", borderRadius: 6,
+      background: GUN_BG[key],
+      padding: "2px 7px", borderRadius: 6,
     }}>
       {gun === 0 ? "Bugün" : `${gun}g`}
     </span>
@@ -75,13 +83,22 @@ export default function Repairs() {
   return (
     <div className="page">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div className="page-title" style={{ margin: 0 }}>🔧 Tamirler</div>
-        <button className="btn btn-primary btn-sm" onClick={() => navigate("/repairs/new")}>+ Yeni</button>
+        <div className="page-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: 9 }}>
+          <Wrench size={19} strokeWidth={2} /> Tamirler
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={() => navigate("/repairs/new")}>
+          <Plus size={14} strokeWidth={2.4} /> Yeni
+        </button>
       </div>
 
       <div className="search-bar">
-        <input className="search-input" placeholder="🔍 Müşteri, model, tamir no..."
-          value={q} onChange={e => setQ(e.target.value)} />
+        <div className="inset search-input" style={{ borderRadius: 13, display: "flex", alignItems: "center", gap: 9, flex: 1 }}>
+          <Search size={16} stroke="var(--hint)" strokeWidth={2} />
+          <input
+            style={{ background: "none", border: "none", outline: "none", color: "var(--text)", font: "inherit", fontSize: 15, flex: 1 }}
+            placeholder="Müşteri, model, tamir no..."
+            value={q} onChange={e => setQ(e.target.value)} />
+        </div>
       </div>
 
       <div className="tabs">
@@ -95,7 +112,12 @@ export default function Repairs() {
       {loading ? (
         <div className="loading">Yükleniyor...</div>
       ) : repairs.length === 0 ? (
-        <div className="empty"><div className="empty-icon">🔧</div>Tamir bulunamadı</div>
+        <div className="empty">
+          <div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}>
+            <Wrench size={40} stroke="var(--dim)" strokeWidth={1.5} />
+          </div>
+          Tamir bulunamadı
+        </div>
       ) : (
         repairs.map(r => {
           const gun = servisSuresi(r.created_at, r.status);
@@ -103,8 +125,8 @@ export default function Repairs() {
             <div key={r.id} className="list-item" onClick={() => navigate(`/repairs/${r.id}`)}>
               <div style={{
                 width: 4, borderRadius: 4, alignSelf: "stretch", flexShrink: 0,
-                background: STATUS_RENK[r.status] || "var(--bg2)",
-                marginRight: 4,
+                background: STATUS_RENK[r.status] || "var(--divider)",
+                marginRight: 4, position: "relative", zIndex: 1,
               }} />
               <div className="list-item-body">
                 <div className="list-item-title">
@@ -114,7 +136,7 @@ export default function Repairs() {
                   #{r.repair_no} · {r.fault_desc || "—"}
                 </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0, position: "relative", zIndex: 1 }}>
                 <span className={`badge badge-${r.status}`}>{STATUS_LABEL[r.status]}</span>
                 <ServisGun gun={gun} status={r.status} />
                 {r.status === "hazir" && (
@@ -122,11 +144,12 @@ export default function Repairs() {
                     onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model); }}
                     style={{
                       background: "#25D366", color: "#fff", border: "none",
-                      borderRadius: 8, padding: "3px 7px", fontSize: 13,
+                      borderRadius: 8, padding: "4px 8px", fontSize: 12,
                       cursor: "pointer", fontWeight: 700, lineHeight: 1.4,
+                      display: "flex", alignItems: "center", gap: 4,
                     }}
                     title="WhatsApp ile bildir"
-                  >📲 WA</button>
+                  ><MessageCircle size={12} strokeWidth={2.2} /> WA</button>
                 )}
               </div>
             </div>

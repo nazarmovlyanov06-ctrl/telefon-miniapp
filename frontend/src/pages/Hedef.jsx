@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { PartyPopper, CircleX } from "lucide-react";
 
 export default function Hedef() {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export default function Hedef() {
         </div>
         {hedef > 0 && (
           <div style={{ marginTop: 12, fontSize: 13, color: gercek >= hedef ? "var(--success)" : "var(--hint)" }}>
-            {gercek >= hedef ? "🎉 Hedefe ulaşıldı!" : `Hedefe ${(hedef - gercek).toLocaleString("tr-TR")} ₺ kaldı`}
+            {gercek >= hedef ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><PartyPopper size={14} strokeWidth={2} /> Hedefe ulaşıldı!</span> : `Hedefe ${(hedef - gercek).toLocaleString("tr-TR")} ₺ kaldı`}
           </div>
         )}
       </div>
@@ -73,7 +74,7 @@ export default function Hedef() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
             <div className="form-group">
               <label className="form-label">Bu Ay Hedef (₺)</label>
               <input className="form-input" type="number" required value={hedefTutar} onChange={e => setHedefTutar(e.target.value)} placeholder="Örn: 50000" />

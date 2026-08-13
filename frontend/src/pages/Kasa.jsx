@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import {
+  Wrench, Smartphone, Package, Headphones, Undo2, Briefcase,
+  Banknote, CreditCard, Wallet,
+} from "lucide-react";
 
 const PERIYOT = [
   { key: "bugun", label: "Bugün" },
@@ -8,13 +12,13 @@ const PERIYOT = [
   { key: "ay", label: "Bu Ay" },
 ];
 
-const KAYNAK_EMOJI = {
-  tamir: "🔧",
-  "2el_satis": "📱",
-  sifir_satis: "📦",
-  aksesuar: "🎧",
-  parca_iade: "↩️",
-  diger: "💼",
+const KAYNAK_ICON = {
+  tamir: Wrench,
+  "2el_satis": Smartphone,
+  sifir_satis: Package,
+  aksesuar: Headphones,
+  parca_iade: Undo2,
+  diger: Briefcase,
 };
 
 function fmt(n) {
@@ -111,14 +115,14 @@ export default function Kasa() {
               <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 4 }}>Toplam Gelir</div>
               <div style={{ fontWeight: 700, fontSize: 20, color: "var(--success)" }}>{fmt(ozet.gelir)} ₺</div>
               <div style={{ fontSize: 10, color: "var(--hint)", marginTop: 3 }}>
-                💵 {fmt(ozet.gelir_nakit)} · 💳 {fmt(ozet.gelir_kart)}
+                Nakit {fmt(ozet.gelir_nakit)} · Kart {fmt(ozet.gelir_kart)}
               </div>
             </div>
             <div className="card" style={{ margin: 0 }}>
               <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 4 }}>Toplam Gider</div>
               <div style={{ fontWeight: 700, fontSize: 20, color: "var(--danger)" }}>{fmt(ozet.gider)} ₺</div>
               <div style={{ fontSize: 10, color: "var(--hint)", marginTop: 3 }}>
-                💵 {fmt(ozet.gider_nakit)} · 💳 {fmt(ozet.gider_kart)}
+                Nakit {fmt(ozet.gider_nakit)} · Kart {fmt(ozet.gider_kart)}
               </div>
             </div>
           </div>
@@ -190,7 +194,7 @@ export default function Kasa() {
                 {ozet.gelir_kaynaklar.map((g) => (
                   <div key={g.kaynak}>
                     <div className="card-row" style={{ padding: "6px 0" }}>
-                      <span style={{ fontSize: 13 }}>{KAYNAK_EMOJI[g.kaynak] || "💼"} {g.label}</span>
+                      <span style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}>{(() => { const I = KAYNAK_ICON[g.kaynak] || Briefcase; return <I size={13} strokeWidth={2} />; })()} {g.label}</span>
                       <span style={{ fontWeight: 600, fontSize: 13, color: "var(--success)" }}>{fmt(g.tutar)} ₺</span>
                     </div>
                     <div style={{ height: 5, background: "var(--bg2)", borderRadius: 3, margin: "0 0 6px", overflow: "hidden" }}>
@@ -220,7 +224,7 @@ export default function Kasa() {
                           {h.aciklama || h.kaynak || (isGelir ? "Gelir" : "Gider")}
                         </div>
                         <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>
-                          {h.odeme_yontemi === "kart" ? "💳" : "💵"} {h.odeme_yontemi} · {h.tarih}
+                          {h.odeme_yontemi} · {h.tarih}
                         </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
@@ -251,7 +255,7 @@ export default function Kasa() {
           <div className="card">
             <div style={{ fontWeight: 600, marginBottom: 10 }}>Gider Ekle</div>
             <form onSubmit={submitGider}>
-              {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "6px 0", fontWeight: 600 }}>❌ {err}</div>}
+              {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "6px 0", fontWeight: 600 }}>{err}</div>}
               <div className="form-group">
                 <label className="form-label">Tutar (₺)</label>
                 <input className="form-input" type="number" required min="0.01" step="0.01"
@@ -283,9 +287,11 @@ export default function Kasa() {
       {showDuzelt && (
         <div style={{ position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)", width: "calc(100% - 24px)", maxWidth: 456, zIndex: 100 }}>
           <div className="card" style={{ border: "2px solid var(--warn, #f59e0b)" }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--warn, #f59e0b)", marginBottom: 10 }}>🔧 Manuel Düzeltme</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--orange)", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+              <Wrench size={14} strokeWidth={2} /> Manuel Düzeltme
+            </div>
             <form onSubmit={submitDuzelt}>
-              {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "4px 0", fontWeight: 600 }}>❌ {err}</div>}
+              {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "4px 0", fontWeight: 600 }}>{err}</div>}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
                 {[{ v: "giris", l: "Gelir Ekle" }, { v: "cikis", l: "Gider Ekle" }].map(t => (
                   <button key={t.v} type="button"

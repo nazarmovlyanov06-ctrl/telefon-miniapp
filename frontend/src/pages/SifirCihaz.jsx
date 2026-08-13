@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import ImeiInput from "../components/ImeiInput";
+import {
+  Store, Package, CheckCircle2, CircleX, Smartphone, Trash2, Banknote,
+  User, Phone, Radio, History, X, Inbox, Send, Clock,
+} from "lucide-react";
 
 export default function SifirCihaz({ user }) {
   const navigate = useNavigate();
@@ -112,7 +116,9 @@ export default function SifirCihaz({ user }) {
     <div className="page">
       <div className="card-row" style={{ marginBottom: 14 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
-        <h1 className="page-title" style={{ margin: 0 }}>📦 Sıfır Cihaz</h1>
+        <h1 className="page-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: 9 }}>
+          <Package size={18} strokeWidth={2} /> Sıfır Cihaz
+        </h1>
         {tab === "stok" && <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Ekle</button>}
       </div>
 
@@ -139,19 +145,23 @@ export default function SifirCihaz({ user }) {
       {/* Kaynak filtresi */}
       <div className="tabs" style={{ marginBottom: 8 }}>
         {[
-          { key: "hepsi", label: "Hepsi" },
-          { key: "dukkan", label: "🏪 Dükkan" },
-          { key: "getmobile", label: "📦 Getmobil" },
+          { key: "hepsi", label: "Hepsi", icon: null },
+          { key: "dukkan", label: "Dükkan", icon: Store },
+          { key: "getmobile", label: "Getmobil", icon: Package },
         ].map(k => (
           <button key={k.key} className={`tab ${kaynak === k.key ? "active" : ""}`}
-            onClick={() => setKaynak(k.key)}>{k.label}</button>
+            onClick={() => setKaynak(k.key)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {k.icon && <k.icon size={13} strokeWidth={2} />}{k.label}
+          </button>
         ))}
       </div>
 
       <div className="tabs" style={{ marginBottom: 12 }}>
-        <button className={`tab ${tab === "stok" ? "active" : ""}`} onClick={() => setTab("stok")}>📦 Stok</button>
-        <button className={`tab ${tab === "satilanlar" ? "active" : ""}`} onClick={() => setTab("satilanlar")}>
-          ✅ Satılanlar ({filteredSatilanlar.length})
+        <button className={`tab ${tab === "stok" ? "active" : ""}`} onClick={() => setTab("stok")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Package size={13} strokeWidth={2} /> Stok
+        </button>
+        <button className={`tab ${tab === "satilanlar" ? "active" : ""}`} onClick={() => setTab("satilanlar")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <CheckCircle2 size={13} strokeWidth={2} /> Satılanlar ({filteredSatilanlar.length})
         </button>
       </div>
 
@@ -161,7 +171,7 @@ export default function SifirCihaz({ user }) {
             <div className="card">
               <div style={{ fontWeight: 600, marginBottom: 10 }}>Yeni Cihaz Ekle</div>
               <form onSubmit={submitAlim}>
-                {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0" }}>❌ {err}</div>}
+                {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0", display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
                 <div className="form-group">
                   <label className="form-label">Model *</label>
                   <input className="form-input" required value={form.model}
@@ -187,7 +197,7 @@ export default function SifirCihaz({ user }) {
                   <ImeiInput
                     value={form.imei}
                     onChange={v => setForm({ ...form, imei: v })}
-                    placeholder="15 haneli veya 📷 okut"
+                    placeholder="15 haneli veya kamerayla okut"
                   />
                 </div>
                 <div className="form-group">
@@ -209,8 +219,8 @@ export default function SifirCihaz({ user }) {
                   <label className="form-label">Kaynak</label>
                   <select className="form-select" value={form.kaynak}
                     onChange={e => setForm({ ...form, kaynak: e.target.value })}>
-                    <option value="dukkan">🏪 Dükkan</option>
-                    <option value="getmobile">📦 Getmobil</option>
+                    <option value="dukkan">Dükkan</option>
+                    <option value="getmobile">Getmobil</option>
                   </select>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -247,7 +257,9 @@ export default function SifirCihaz({ user }) {
                 <div className="card" onClick={() => { setSelected(isSelected ? null : c); setShowSat(false); }} style={{ cursor: "pointer" }}>
                   <div className="card-row">
                     <div>
-                      <div style={{ fontWeight: 600 }}>📱 {c.model}</div>
+                      <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 7 }}>
+                        <Smartphone size={15} strokeWidth={2} /> {c.model}
+                      </div>
                       {(c.renk || c.depolama) && (
                         <div style={{ fontSize: 12, color: "var(--hint)" }}>
                           {[c.renk, c.depolama].filter(Boolean).join(" · ")}
@@ -255,7 +267,11 @@ export default function SifirCihaz({ user }) {
                       )}
                       {c.imei && <div style={{ fontSize: 12, color: "var(--hint)" }}>IMEI: {c.imei}</div>}
                       {c.kimden && <div style={{ fontSize: 12, color: "var(--hint)" }}>Kimden: {c.kimden}</div>}
-                      {c.kaynak === "getmobile" && <div style={{ fontSize: 11, color: "var(--hint)" }}>📦 Getmobil</div>}
+                      {c.kaynak === "getmobile" && (
+                        <div style={{ fontSize: 11, color: "var(--hint)", display: "flex", alignItems: "center", gap: 4 }}>
+                          <Package size={10} strokeWidth={2} /> Getmobil
+                        </div>
+                      )}
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontWeight: 700 }}>
@@ -269,25 +285,27 @@ export default function SifirCihaz({ user }) {
                 {isSelected && (
                   <div className="card" style={{ marginTop: -8, borderRadius: "0 0 12px 12px", background: "var(--bg2)" }}>
                     <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                      <button className="btn btn-primary btn-sm" onClick={() => setShowSat(true)}>💰 Sat</button>
+                      <button className="btn btn-primary btn-sm" onClick={() => setShowSat(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Banknote size={13} strokeWidth={2} /> Sat
+                      </button>
                       {user?.rol === "patron" && (
                         deleteId === c.id ? (
                           <>
-                            <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 12px", fontSize: 13 }}
+                            <button className="btn btn-sm" style={{ background: "var(--red)", color: "#191b20", padding: "4px 12px", fontSize: 13 }}
                               onClick={() => deleteCihaz(c.id)}>Sil</button>
                             <button className="btn btn-ghost btn-sm"
                               onClick={() => setDeleteId(null)}>İptal</button>
                           </>
                         ) : (
-                          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}
-                            onClick={() => setDeleteId(c.id)}>🗑 Sil</button>
+                          <button className="btn btn-ghost btn-sm" style={{ color: "var(--red)", display: "flex", alignItems: "center", gap: 6 }}
+                            onClick={() => setDeleteId(c.id)}><Trash2 size={13} strokeWidth={2} /> Sil</button>
                         )
                       )}
                     </div>
 
                     {showSat && (
                       <form onSubmit={submitSat} style={{ marginTop: 10 }}>
-                        {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0" }}>❌ {err}</div>}
+                        {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0" }}>{err}</div>}
 
                         {/* Müşteri autocomplete */}
                         <div className="form-group" style={{ position: "relative" }}>
@@ -304,10 +322,9 @@ export default function SifirCihaz({ user }) {
                                     setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon }));
                                     setShowSatMusteriOner(false);
                                   }}
-
                                   style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
-                                    borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-                                  <span>👤 {m.name}</span>
+                                    borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
                                   {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
                                 </div>
                               ))}
@@ -351,9 +368,9 @@ export default function SifirCihaz({ user }) {
                             <label className="form-label">Ödeme</label>
                             <select className="form-select" value={satForm.odeme_yontemi}
                               onChange={e => setSatForm({ ...satForm, odeme_yontemi: e.target.value })}>
-                              <option value="nakit">💵 Nakit</option>
-                              <option value="kart">💳 Kart</option>
-                              <option value="taksit">📅 Taksit</option>
+                              <option value="nakit">Nakit</option>
+                              <option value="kart">Kart</option>
+                              <option value="taksit">Taksit</option>
                             </select>
                           </div>
                         </div>
@@ -377,7 +394,7 @@ export default function SifirCihaz({ user }) {
                         )}
                         {satForm.odeme_yontemi === "taksit" && satForm.satis_fiyati && (
                           <div style={{ fontSize: 13, background: "var(--bg2)", borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>
-                            <div style={{ color: "var(--hint)" }}>Kalan borç: <b style={{ color: "var(--danger)" }}>
+                            <div style={{ color: "var(--hint)" }}>Kalan borç: <b style={{ color: "var(--red)" }}>
                               {(parseFloat(satForm.satis_fiyati) - (parseFloat(satForm.pesinat) || 0)).toLocaleString("tr-TR")} ₺
                             </b> → müşteri borcuna kaydedilecek</div>
                           </div>
@@ -404,25 +421,27 @@ export default function SifirCihaz({ user }) {
           <div key={c.id} className="card">
             <div className="card-row">
               <div>
-                <div style={{ fontWeight: 600 }}>📱 {c.model}</div>
+                <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 7 }}>
+                  <Smartphone size={15} strokeWidth={2} /> {c.model}
+                </div>
                 {(c.renk || c.depolama) && (
                   <div style={{ fontSize: 12, color: "var(--hint)" }}>{[c.renk, c.depolama].filter(Boolean).join(" · ")}</div>
                 )}
-                {c.musteri_adi && <div style={{ fontSize: 13, color: "var(--text)" }}>👤 {c.musteri_adi}</div>}
-                {c.musteri_telefon && <div style={{ fontSize: 12, color: "var(--hint)" }}>📞 {c.musteri_telefon}</div>}
-                <div style={{ fontSize: 12, color: "var(--hint)" }}>📡 {c.satis_kanali || "Dükkan"}</div>
+                {c.musteri_adi && <div style={{ fontSize: 13, color: "var(--text)", display: "flex", alignItems: "center", gap: 5 }}><User size={12} strokeWidth={2} /> {c.musteri_adi}</div>}
+                {c.musteri_telefon && <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", alignItems: "center", gap: 5 }}><Phone size={11} strokeWidth={2} /> {c.musteri_telefon}</div>}
+                <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", alignItems: "center", gap: 5 }}><Radio size={11} strokeWidth={2} /> {c.satis_kanali || "Dükkan"}</div>
                 {c.imei && (
                   <span onClick={e => { e.stopPropagation(); openImeiModal(c.imei, c.model); }}
-                    style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, textDecoration: "underline", cursor: "pointer" }}>
-                    📋 IMEI Geçmişi
+                    style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, textDecoration: "underline", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                    <History size={11} strokeWidth={2} /> IMEI Geçmişi
                   </span>
                 )}
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontWeight: 700, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0)) >= 0 ? "var(--success)" : "var(--danger)" }}>
+                <div style={{ fontWeight: 700, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0)) >= 0 ? "var(--success)" : "var(--red)" }}>
                   {priceHidden ? "••••" : (c.satis_fiyati || 0).toLocaleString("tr-TR") + " ₺"}
                 </div>
-                <div style={{ fontSize: 12, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0)) >= 0 ? "var(--success)" : "var(--danger)" }}>
+                <div style={{ fontSize: 12, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0)) >= 0 ? "var(--success)" : "var(--red)" }}>
                   Kâr: {priceHidden ? "••••" : ((c.satis_fiyati || 0) - (c.alis_fiyati || 0)).toLocaleString("tr-TR") + " ₺"}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--hint)" }}>{c.satis_tarihi || "—"}</div>
@@ -441,10 +460,12 @@ export default function SifirCihaz({ user }) {
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 16 }}>📱 {imeiModal.model}</div>
+                <div style={{ fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 7 }}>
+                  <Smartphone size={16} strokeWidth={2} /> {imeiModal.model}
+                </div>
                 <div style={{ fontSize: 12, color: "var(--hint)" }}>IMEI: {imeiModal.imei}</div>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setImeiModal(null)}>✕</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setImeiModal(null)}><X size={15} strokeWidth={2} /></button>
             </div>
 
             {imeiModalLoading ? (
@@ -459,12 +480,12 @@ export default function SifirCihaz({ user }) {
                 <>
                   {imeiModalData.length > 1 && (
                     <div style={{
-                      background: toplam_kar >= 0 ? "rgba(52,199,89,0.12)" : "rgba(255,59,48,0.1)",
+                      background: toplam_kar >= 0 ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.1)",
                       borderRadius: 10, padding: "10px 14px", marginBottom: 14,
                       display: "flex", justifyContent: "space-between", alignItems: "center",
                     }}>
                       <span style={{ fontWeight: 600 }}>{imeiModalData.filter(r => r.durum === "satildi").length} kez satıldı</span>
-                      <span style={{ fontWeight: 700, color: toplam_kar >= 0 ? "var(--success)" : "var(--danger)" }}>
+                      <span style={{ fontWeight: 700, color: toplam_kar >= 0 ? "var(--success)" : "var(--red)" }}>
                         Toplam Kâr: ₺{toplam_kar.toLocaleString("tr-TR")}
                       </span>
                     </div>
@@ -472,39 +493,39 @@ export default function SifirCihaz({ user }) {
                   {imeiModalData.map((r, i) => {
                     const kar = (r.satis_fiyati || 0) - (r.alis_fiyati || 0);
                     return (
-                      <div key={r.id} style={{ border: "1px solid var(--border)", borderRadius: 12, marginBottom: 10, overflow: "hidden" }}>
+                      <div key={r.id} style={{ border: "1px solid var(--divider)", borderRadius: 12, marginBottom: 10, overflow: "hidden" }}>
                         <div style={{ background: "var(--bg2)", padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "var(--hint)" }}>
                           {i + 1}. Döngü
                         </div>
                         <div style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between" }}>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>📥 Alındı</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Inbox size={13} strokeWidth={2} /> Alındı</div>
                             <div style={{ fontSize: 12, color: "var(--hint)" }}>{r.kimden || "—"} {r.kimden_telefon ? `· ${r.kimden_telefon}` : ""}</div>
-                            <div style={{ fontSize: 11, color: "var(--hint)" }}>📅 {r.alis_tarihi || r.created_at?.slice(0,10) || "—"}</div>
+                            <div style={{ fontSize: 11, color: "var(--hint)" }}>{r.alis_tarihi || r.created_at?.slice(0,10) || "—"}</div>
                           </div>
                           <div style={{ fontWeight: 700 }}>₺{(r.alis_fiyati || 0).toLocaleString("tr-TR")}</div>
                         </div>
                         {r.durum === "satildi" ? (
                           <div style={{
                             padding: "10px 12px", display: "flex", justifyContent: "space-between",
-                            borderTop: "1px solid var(--border)",
-                            background: kar >= 0 ? "rgba(52,199,89,0.05)" : "rgba(255,59,48,0.05)",
+                            borderTop: "1px solid var(--divider)",
+                            background: kar >= 0 ? "rgba(74,222,128,0.05)" : "rgba(248,113,113,0.05)",
                           }}>
                             <div>
-                              <div style={{ fontSize: 13, fontWeight: 600 }}>📤 Satıldı</div>
+                              <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Send size={13} strokeWidth={2} /> Satıldı</div>
                               <div style={{ fontSize: 12, color: "var(--hint)" }}>{r.musteri_adi || "—"} {r.musteri_telefon ? `· ${r.musteri_telefon}` : ""}</div>
-                              <div style={{ fontSize: 11, color: "var(--hint)" }}>📅 {r.satis_tarihi || "—"} · {r.satis_kanali || "Dükkan"}</div>
+                              <div style={{ fontSize: 11, color: "var(--hint)" }}>{r.satis_tarihi || "—"} · {r.satis_kanali || "Dükkan"}</div>
                             </div>
                             <div style={{ textAlign: "right" }}>
                               <div style={{ fontWeight: 700 }}>₺{(r.satis_fiyati || 0).toLocaleString("tr-TR")}</div>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: kar >= 0 ? "var(--success)" : "var(--danger)" }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: kar >= 0 ? "var(--success)" : "var(--red)" }}>
                                 {kar >= 0 ? "+" : ""}₺{kar.toLocaleString("tr-TR")} kâr
                               </div>
                             </div>
                           </div>
                         ) : (
-                          <div style={{ padding: "10px 12px", borderTop: "1px solid var(--border)", color: "var(--hint)", fontSize: 13 }}>
-                            ⏳ Hâlâ stokta
+                          <div style={{ padding: "10px 12px", borderTop: "1px solid var(--divider)", color: "var(--hint)", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                            <Clock size={13} strokeWidth={2} /> Hâlâ stokta
                           </div>
                         )}
                       </div>

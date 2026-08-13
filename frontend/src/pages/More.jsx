@@ -1,32 +1,42 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { api } from "../api";
+import {
+  Landmark, TrendingDown, Target, CreditCard,
+  Smartphone, Headphones, Factory, Undo2,
+  ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
+  Banknote, BarChart3, ScanLine, Settings,
+} from "lucide-react";
 
 const ITEMS = [
   // Finans
-  { icon: "🏦", label: "Kasa",      path: "/kasa",       color: "#dcfce7", iconBg: "#16a34a" },
-  { icon: "📉", label: "Giderler",  path: "/gider",      color: "#fef2f2", iconBg: "#dc2626" },
-  { icon: "🎯", label: "Hedef",     path: "/hedef",      color: "#eff6ff", iconBg: "#2563eb" },
-  { icon: "💳", label: "Borçlar",   path: "/debts",      color: "#fdf4ff", iconBg: "#9333ea" },
+  { icon: Landmark, label: "Kasa", path: "/kasa", color: "var(--green)" },
+  { icon: TrendingDown, label: "Giderler", path: "/gider", color: "var(--red)" },
+  { icon: Target, label: "Hedef", path: "/hedef", color: "var(--blue)" },
+  { icon: CreditCard, label: "Borçlar", path: "/debts", color: "var(--purple)" },
   // Satış & Stok
-  { icon: "📱", label: "2. El",     path: "/ikinciel",   color: "#f0fdf4", iconBg: "#059669" },
-  { icon: "🎧", label: "Aksesuar",  path: "/aksesuar",   color: "#fff7ed", iconBg: "#ea580c" },
+  { icon: Smartphone, label: "2. El", path: "/ikinciel", color: "var(--green)" },
+  { icon: Headphones, label: "Aksesuar", path: "/aksesuar", color: "var(--orange)" },
   // Tedarik & İade
-  { icon: "🏭", label: "Toptancı",  path: "/toptanci",   color: "#f0f9ff", iconBg: "#0284c7" },
-  { icon: "↩️", label: "Parça İade",path: "/parca-iade", color: "#fefce8", iconBg: "#ca8a04" },
+  { icon: Factory, label: "Toptancı", path: "/toptanci", color: "var(--blue)" },
+  { icon: Undo2, label: "Parça İade", path: "/parca-iade", color: "var(--gold)" },
   // Müşteri
-  { icon: "🛡️", label: "Garanti",   path: "/garanti",    color: "#f0fdf4", iconBg: "#16a34a" },
-  { icon: "📲", label: "Yedek Tel", path: "/loaner",     color: "#eff6ff", iconBg: "#3b82f6" },
-  { icon: "🚫", label: "Kara Liste",path: "/karalist",   color: "#fef2f2", iconBg: "#dc2626" },
-  { icon: "💬", label: "Şikayet/Övgü", path: "/geri-bildirim", color: "#fff7ed", iconBg: "#f97316", badge: true },
+  { icon: ShieldCheck, label: "Garanti", path: "/garanti", color: "var(--green)" },
+  { icon: PhoneCall, label: "Yedek Tel", path: "/loaner", color: "var(--blue)" },
+  { icon: Ban, label: "Kara Liste", path: "/karalist", color: "var(--red)" },
+  { icon: MessageSquareWarning, label: "Şikayet/Övgü", path: "/geri-bildirim", color: "var(--orange)", badge: true },
   // Çalışan
-  { icon: "💵", label: "Maaş",      path: "/maas",       color: "#fdf4ff", iconBg: "#7c3aed" },
+  { icon: Banknote, label: "Maaş", path: "/maas", color: "var(--purple)" },
   // Araçlar
-  { icon: "📊", label: "İstatistik",path: "/stats",      color: "#fdf4ff", iconBg: "#9333ea" },
-  { icon: "✨", label: "Yardımcı",   path: "/ai",         color: "#f0f9ff", iconBg: "#0ea5e9" },
-  { icon: "📱", label: "IMEI",      path: "/imei",       color: "#f8fafc", iconBg: "#475569" },
-  { icon: "⚙️", label: "Ayarlar",   path: "/settings",   color: "#f8fafc", iconBg: "#64748b" },
+  { icon: BarChart3, label: "İstatistik", path: "/stats", color: "var(--gold)" },
+  { icon: ScanLine, label: "IMEI", path: "/imei", color: "var(--gray)" },
+  { icon: Settings, label: "Ayarlar", path: "/settings", color: "var(--gray)" },
 ];
+
+const ROLE_LABELS = {
+  patron: "Patron", teknisyen: "Teknisyen",
+  satis: "Satış", cirak: "Çırak",
+};
 
 export default function More({ user }) {
   const navigate = useNavigate();
@@ -39,65 +49,69 @@ export default function More({ user }) {
   return (
     <div className="page" style={{ paddingBottom: 90 }}>
       {user && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, padding: "4px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, padding: "4px 0" }}>
           <div style={{
-            width: 44, height: 44, borderRadius: "50%", background: "var(--accent)",
+            width: 46, height: 46, borderRadius: "50%",
+            background: "linear-gradient(135deg, var(--surf-hi), var(--surf-lo))",
+            boxShadow: "var(--edge-lit), var(--edge-dark), var(--lift)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontWeight: 800, fontSize: 18, flexShrink: 0,
+            color: "var(--gold)", fontWeight: 800, fontSize: 17, flexShrink: 0,
           }}>
             {(user.ad || "?")[0].toUpperCase()}
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{user.ad}</div>
-            <span className={`badge badge-${user.rol}`} style={{ fontSize: 11 }}>{roleLabel(user.rol)}</span>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-strong)" }}>{user.ad}</div>
+            <span className={`badge badge-${user.rol}`} style={{ fontSize: 11, marginTop: 2, display: "inline-block" }}>
+              {ROLE_LABELS[user.rol] || user.rol}
+            </span>
           </div>
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-        {ITEMS.map(item => (
-          <div key={item.path} onClick={() => navigate(item.path)}
-            style={{
-              display: "flex", flexDirection: "column", alignItems: "center",
-              gap: 6, padding: "12px 4px", borderRadius: 12, cursor: "pointer",
-              background: "var(--bg)", userSelect: "none",
-              WebkitTapHighlightColor: "transparent", position: "relative",
-            }}
-            onTouchStart={e => e.currentTarget.style.opacity = "0.7"}
-            onTouchEnd={e => e.currentTarget.style.opacity = "1"}
-          >
-            <div style={{
-              width: 48, height: 48, borderRadius: 14, background: item.color,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 24, position: "relative",
-            }}>
-              {item.icon}
-              {item.badge && bildirimSayisi > 0 && (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+        {ITEMS.map(item => {
+          const Icon = item.icon;
+          return (
+            <div key={item.path} onClick={() => navigate(item.path)}
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "center",
+                gap: 7, cursor: "pointer", userSelect: "none",
+              }}
+            >
+              <div style={{ position: "relative", width: 50, height: 50 }}>
                 <div style={{
-                  position: "absolute", top: -4, right: -4,
-                  background: "var(--danger)", color: "#fff",
-                  borderRadius: "50%", width: 18, height: 18,
-                  fontSize: 10, fontWeight: 800,
+                  position: "absolute", inset: 0, borderRadius: 14,
+                  background: item.color, filter: "blur(12px)", opacity: 0.3,
+                  transform: "translateY(5px) scale(1.06)",
+                }} />
+                <div style={{
+                  position: "relative", width: 50, height: 50, borderRadius: 14,
+                  background: "linear-gradient(135deg, var(--surf-hi), var(--surf-lo))",
+                  boxShadow: "var(--edge-lit), var(--edge-dark), var(--lift)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
-                  {bildirimSayisi}
+                  <Icon size={20} stroke={item.color} strokeWidth={1.8} />
+                  {item.badge && bildirimSayisi > 0 && (
+                    <div style={{
+                      position: "absolute", top: -4, right: -4,
+                      background: "var(--red)", color: "#191b20",
+                      borderRadius: "50%", width: 17, height: 17,
+                      fontSize: 10, fontWeight: 800,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      boxShadow: "0 0 0 2px var(--bg)",
+                    }}>
+                      {bildirimSayisi}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--title)", textAlign: "center", lineHeight: 1.2 }}>
+                {item.label}
+              </span>
             </div>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", textAlign: "center", lineHeight: 1.2 }}>
-              {item.label}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
-}
-
-function roleLabel(role) {
-  const labels = {
-    patron: "👑 Patron", teknisyen: "🔧 Teknisyen",
-    satis: "🛍️ Satış", cirak: "🧑‍🔧 Çırak",
-  };
-  return labels[role] || role;
 }

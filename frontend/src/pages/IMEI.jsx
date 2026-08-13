@@ -2,15 +2,26 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import ImeiInput from "../components/ImeiInput";
+import {
+  ScanLine, Search, Landmark, Lightbulb, Copy, ClipboardList, Smartphone,
+  CheckCircle2, Ban, Globe, TriangleAlert, CircleHelp, Zap,
+} from "lucide-react";
 
 const BTK_DURUM = {
-  kayitli:          { label: "✅ Kayıtlı",               color: "#16a34a", bg: "#dcfce7", aciklama: "Türkiye'de yasal yollarla satılmış, sorun yok." },
-  calinitli_engelli:{ label: "🚫 Çalıntı / Engelli",     color: "#dc2626", bg: "#fef2f2", aciklama: "BTK tarafından engellenmiş. Bu cihazı alma!" },
-  yurt_disi:        { label: "🌍 Yurt Dışından Getirilmiş",color: "#d97706", bg: "#fff7ed", aciklama: "120 gün kullanım hakkı var. Kayıt yaptırılmamış." },
-  kayitsiz:         { label: "⚠️ Kayıtsız",               color: "#d97706", bg: "#fefce8", aciklama: "Yurt dışından gelmiş, kayıt yaptırılmamış." },
-  bilinmiyor:       { label: "❓ Bilinmiyor",              color: "#6b7280", bg: "#f9fafb", aciklama: "Durum belirlenemedi." },
-  btk_erisim_hatasi:{ label: "⚡ BTK'ya Erişilemedi",      color: "#6b7280", bg: "#f9fafb", aciklama: "Lütfen BTK sitesini manuel ziyaret edin." },
+  kayitli:          { icon: CheckCircle2, label: "Kayıtlı",               color: "var(--green)", aciklama: "Türkiye'de yasal yollarla satılmış, sorun yok." },
+  calinitli_engelli:{ icon: Ban,          label: "Çalıntı / Engelli",     color: "var(--red)",   aciklama: "BTK tarafından engellenmiş. Bu cihazı alma!" },
+  yurt_disi:        { icon: Globe,        label: "Yurt Dışından Getirilmiş", color: "var(--orange)", aciklama: "120 gün kullanım hakkı var. Kayıt yaptırılmamış." },
+  kayitsiz:         { icon: TriangleAlert,label: "Kayıtsız",              color: "var(--orange)", aciklama: "Yurt dışından gelmiş, kayıt yaptırılmamış." },
+  bilinmiyor:       { icon: CircleHelp,   label: "Bilinmiyor",            color: "var(--gray)",  aciklama: "Durum belirlenemedi." },
+  btk_erisim_hatasi:{ icon: Zap,          label: "BTK'ya Erişilemedi",    color: "var(--gray)",  aciklama: "Lütfen BTK sitesini manuel ziyaret edin." },
 };
+
+const BILGI_KUTUSU = [
+  { icon: CheckCircle2, color: "var(--green)", title: "Kayıtlı", desc: "Türkiye'de yasal satılmış, sorun yok" },
+  { icon: Globe, color: "var(--orange)", title: "Yurt Dışından Getirilmiş", desc: "120 gün kullanım hakkı var" },
+  { icon: Ban, color: "var(--red)", title: "Çalıntı / Engelli", desc: "Şebekeye giremez — alma!" },
+  { icon: TriangleAlert, color: "var(--orange)", title: "Kayıtsız", desc: "Yurt dışından gelmiş, kayıt yaptırılmamış" },
+];
 
 function tacBrand(tac) {
   if (!tac) return null;
@@ -80,12 +91,15 @@ export default function IMEI() {
   }
 
   const durumInfo = btkResult ? (BTK_DURUM[btkResult.durum] || BTK_DURUM.bilinmiyor) : null;
+  const DurumIcon = durumInfo?.icon;
 
   return (
     <div className="page">
       <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
-        <div className="page-title" style={{ margin: 0 }}>📱 IMEI Sorgula</div>
+        <div className="page-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: 9 }}>
+          <ScanLine size={19} strokeWidth={2} /> IMEI Sorgula
+        </div>
       </div>
 
       {/* IMEI giriş */}
@@ -95,33 +109,38 @@ export default function IMEI() {
           <ImeiInput
             value={imei}
             onChange={(v) => { setImei(v); setResult(null); setBtkResult(null); setError(""); }}
-            placeholder="Örn: 352099001761481 veya 📷 okut"
+            placeholder="Örn: 352099001761481 veya kamerayla okut"
             style={{ fontSize: 18, letterSpacing: 2 }}
           />
         </div>
-        {brand && <div style={{ fontSize: 13, color: "var(--accent)", marginBottom: 8 }}>📱 {brand} cihazı</div>}
+        {brand && (
+          <div style={{ fontSize: 13, color: "var(--accent)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+            <Smartphone size={13} strokeWidth={2} /> {brand} cihazı
+          </div>
+        )}
         {error && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <button className="btn btn-ghost" onClick={sorgulaDB} disabled={loading || imei.length !== 15}>
-            {loading ? "..." : "🔍 Kayıtlarımız"}
+          <button className="btn btn-ghost" onClick={sorgulaDB} disabled={loading || imei.length !== 15} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+            {loading ? "..." : <><Search size={14} strokeWidth={2} /> Kayıtlarımız</>}
           </button>
-          <button className="btn btn-primary" onClick={() => openEdevlet(imei)} disabled={imei.length !== 15}>
-            🇹🇷 e-Devlet Sorgula
+          <button className="btn btn-primary" onClick={() => openEdevlet(imei)} disabled={imei.length !== 15} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+            <Landmark size={14} strokeWidth={2} /> e-Devlet Sorgula
           </button>
         </div>
         {imei.length === 15 && (
-          <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 8 }}>
-            💡 e-Devlet butonuna tıklayınca IMEI panoya kopyalanır, sitede yapıştırın
+          <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 8, display: "flex", alignItems: "flex-start", gap: 6 }}>
+            <Lightbulb size={13} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+            e-Devlet butonuna tıklayınca IMEI panoya kopyalanır, sitede yapıştırın
           </div>
         )}
       </div>
 
       {/* BTK Sonucu */}
       {btkResult && durumInfo && (
-        <div className="card" style={{ background: durumInfo.bg, border: `2px solid ${durumInfo.color}20` }}>
-          <div style={{ fontWeight: 800, fontSize: 17, color: durumInfo.color, marginBottom: 4 }}>
-            {durumInfo.label}
+        <div className="card" style={{ background: "var(--bg2)", borderLeft: `3px solid ${durumInfo.color}` }}>
+          <div style={{ fontWeight: 800, fontSize: 17, color: durumInfo.color, marginBottom: 4, display: "flex", alignItems: "center", gap: 9 }}>
+            {DurumIcon && <DurumIcon size={20} strokeWidth={2} />} {durumInfo.label}
           </div>
           <div style={{ fontSize: 13, color: "var(--hint)" }}>{durumInfo.aciklama}</div>
           {btkResult.durum === "btk_erisim_hatasi" && (
@@ -130,8 +149,12 @@ export default function IMEI() {
                 e-Devlet üzerinden sorgulayabilirsin:
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn btn-ghost btn-sm" onClick={copyImei}>📋 Kopyala</button>
-                <button className="btn btn-primary btn-sm" onClick={() => openEdevlet(imei)}>🇹🇷 e-Devlet →</button>
+                <button className="btn btn-ghost btn-sm" onClick={copyImei} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Copy size={13} strokeWidth={2} /> Kopyala
+                </button>
+                <button className="btn btn-primary btn-sm" onClick={() => openEdevlet(imei)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Landmark size={13} strokeWidth={2} /> e-Devlet →
+                </button>
               </div>
             </div>
           )}
@@ -143,7 +166,9 @@ export default function IMEI() {
         <>
           {result.local_repairs?.length > 0 ? (
             <>
-              <div style={{ fontWeight: 700, fontSize: 14, margin: "12px 0 6px" }}>📋 Servis Geçmişimizde</div>
+              <div style={{ fontWeight: 700, fontSize: 14, margin: "12px 0 6px", display: "flex", alignItems: "center", gap: 7 }}>
+                <ClipboardList size={14} strokeWidth={2} /> Servis Geçmişimizde
+              </div>
               {result.local_repairs.map((r, i) => (
                 <div key={i} className="card">
                   <div style={{ fontWeight: 600 }}>#{r.repair_no} · {r.device_model}</div>
@@ -161,7 +186,9 @@ export default function IMEI() {
 
           {result.second_hand?.length > 0 && (
             <>
-              <div style={{ fontWeight: 700, fontSize: 14, margin: "12px 0 6px" }}>📱 2. El Geçmişi</div>
+              <div style={{ fontWeight: 700, fontSize: 14, margin: "12px 0 6px", display: "flex", alignItems: "center", gap: 7 }}>
+                <Smartphone size={14} strokeWidth={2} /> 2. El Geçmişi
+              </div>
               {result.second_hand.map((s, i) => (
                 <div key={i} className="card">
                   <div className="card-row">
@@ -178,15 +205,12 @@ export default function IMEI() {
       {/* Bilgi kutusu - BTK ne gösterir */}
       {!btkResult && !result && (
         <div className="card" style={{ marginTop: 4 }}>
-          <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13 }}>🇹🇷 e-Devlet IMEI Sorgusu Ne Gösterir?</div>
-          {[
-            { icon: "✅", title: "Kayıtlı", desc: "Türkiye'de yasal satılmış, sorun yok" },
-            { icon: "🌍", title: "Yurt Dışından Getirilmiş", desc: "120 gün kullanım hakkı var" },
-            { icon: "🚫", title: "Çalıntı / Engelli", desc: "Şebekeye giremez — alma!" },
-            { icon: "⚠️", title: "Kayıtsız", desc: "Yurt dışından gelmiş, kayıt yaptırılmamış" },
-          ].map(item => (
+          <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}>
+            <Landmark size={14} strokeWidth={2} /> e-Devlet IMEI Sorgusu Ne Gösterir?
+          </div>
+          {BILGI_KUTUSU.map(item => (
             <div key={item.title} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
-              <span style={{ fontSize: 18, lineHeight: 1.3 }}>{item.icon}</span>
+              <item.icon size={17} stroke={item.color} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
               <div style={{ fontSize: 13 }}>
                 <strong>{item.title}</strong> — {item.desc}
               </div>

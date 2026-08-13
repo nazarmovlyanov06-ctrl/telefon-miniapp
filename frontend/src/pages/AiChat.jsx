@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { Sparkles, Bot } from "lucide-react";
 
 const ONERILER = [
   "Bugün kaç tamir var?",
@@ -16,7 +17,7 @@ const ONERILER = [
 export default function AiChat() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState([
-    { role: "ai", text: "Merhaba! Ben servis asistanınım 🤖\n\nTamirler, kasa, 2.el cihazlar, stok, borçlar, garanti, müşteriler, aksesuar ve daha fazlası hakkında sorabilirsin." }
+    { role: "ai", text: "Merhaba! Ben servis asistanınım.\n\nTamirler, kasa, 2.el cihazlar, stok, borçlar, garanti, müşteriler, aksesuar ve daha fazlası hakkında sorabilirsin." }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,7 +37,7 @@ export default function AiChat() {
       const res = await api.aiSor(s);
       setMessages(m => [...m, { role: "ai", text: res.cevap }]);
     } catch (e) {
-      setMessages(m => [...m, { role: "ai", text: "❌ " + e.message }]);
+      setMessages(m => [...m, { role: "ai", text: e.message }]);
     } finally {
       setLoading(false);
     }
@@ -46,7 +47,7 @@ export default function AiChat() {
     <div className="page" style={{ display: "flex", flexDirection: "column", height: "100dvh", padding: 0, overflow: "hidden" }}>
       <div className="card-row" style={{ margin: "12px 16px 8px", flexShrink: 0 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
-        <div style={{ fontWeight: 700, fontSize: 17 }}>✨ Yardımcı</div>
+        <div style={{ fontWeight: 700, fontSize: 17, display: "flex", alignItems: "center", gap: 7 }}><Sparkles size={16} strokeWidth={2} /> Yardımcı</div>
         <div />
       </div>
 
@@ -59,7 +60,7 @@ export default function AiChat() {
             marginBottom: 10,
           }}>
             {m.role === "ai" && (
-              <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0, marginRight: 8, marginTop: 2 }}>🤖</div>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0, marginRight: 8, marginTop: 2 }}><Bot size={15} strokeWidth={2} /></div>
             )}
             <div style={{
               maxWidth: "78%",
@@ -79,7 +80,7 @@ export default function AiChat() {
 
         {loading && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>🤖</div>
+            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><Bot size={15} strokeWidth={2} /></div>
             <div style={{ padding: "10px 16px", background: "var(--card)", borderRadius: "18px 18px 18px 4px", fontSize: 20 }}>
               <span style={{ animation: "pulse 1s infinite" }}>●</span>
               <span style={{ animation: "pulse 1s infinite 0.2s" }}> ●</span>

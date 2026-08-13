@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { CircleX, Trash2 } from "lucide-react";
 
 const KATEGORILER = ["Kira", "Elektrik", "Su", "İnternet", "Vergi", "Sigorta", "Malzeme", "Diğer"];
 
@@ -62,7 +63,7 @@ export default function Gider() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
             <div className="form-group">
               <label className="form-label">Kategori</label>
               <select className="form-select" value={form.kategori} onChange={e => setForm({ ...form, kategori: e.target.value })}>
@@ -101,7 +102,7 @@ export default function Gider() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontWeight: 700, color: "var(--danger)" }}>{(g.tutar || 0).toLocaleString("tr-TR")} ₺</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => sil(g.id)} style={{ padding: "4px 8px" }}>🗑</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => sil(g.id)} style={{ padding: "4px 8px", display: "flex" }}><Trash2 size={13} strokeWidth={2} /></button>
             </div>
           </div>
         </div>

@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import ImeiInput from "../components/ImeiInput";
+import {
+  Store, Package, CheckCircle2, Search, CircleX, User, Smartphone,
+  HardDrive, Cpu, Wrench, Trash2, Banknote, Phone, Radio, History,
+  X, Inbox, Send, Clock,
+} from "lucide-react";
 
 export default function IkinciEl({ user }) {
   const navigate = useNavigate();
@@ -179,19 +184,27 @@ export default function IkinciEl({ user }) {
       {/* Kaynak filtresi */}
       <div className="tabs" style={{ marginBottom: 8 }}>
         {[
-          { key: "hepsi", label: "Hepsi" },
-          { key: "dukkan", label: "🏪 Dükkan" },
-          { key: "getmobile", label: "📦 Getmobil" },
+          { key: "hepsi", label: "Hepsi", icon: null },
+          { key: "dukkan", label: "Dükkan", icon: Store },
+          { key: "getmobile", label: "Getmobil", icon: Package },
         ].map(k => (
           <button key={k.key} className={`tab ${kaynak === k.key ? "active" : ""}`}
-            onClick={() => setKaynak(k.key)}>{k.label}</button>
+            onClick={() => setKaynak(k.key)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {k.icon && <k.icon size={13} strokeWidth={2} />}{k.label}
+          </button>
         ))}
       </div>
 
       <div className="tabs" style={{ marginBottom: 12 }}>
-        <button className={`tab ${tab === "stok" ? "active" : ""}`} onClick={() => setTab("stok")}>📦 Stok</button>
-        <button className={`tab ${tab === "satilanlar" ? "active" : ""}`} onClick={() => setTab("satilanlar")}>✅ Satılanlar ({filteredSatilanlar.length})</button>
-        <button className={`tab ${tab === "imei" ? "active" : ""}`} onClick={() => setTab("imei")}>🔍 IMEI</button>
+        <button className={`tab ${tab === "stok" ? "active" : ""}`} onClick={() => setTab("stok")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Package size={13} strokeWidth={2} /> Stok
+        </button>
+        <button className={`tab ${tab === "satilanlar" ? "active" : ""}`} onClick={() => setTab("satilanlar")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <CheckCircle2 size={13} strokeWidth={2} /> Satılanlar ({filteredSatilanlar.length})
+        </button>
+        <button className={`tab ${tab === "imei" ? "active" : ""}`} onClick={() => setTab("imei")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Search size={13} strokeWidth={2} /> IMEI
+        </button>
       </div>
 
       {tab === "stok" && (
@@ -200,7 +213,7 @@ export default function IkinciEl({ user }) {
             <div className="card">
               <div style={{ fontWeight: 600, marginBottom: 10 }}>Yeni Alım</div>
               <form onSubmit={submitAlim}>
-                {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+                {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
                 <div className="form-group">
                   <label className="form-label">Model *</label>
                   <input className="form-input" required value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} placeholder="iPhone 13, Samsung A54..." />
@@ -230,7 +243,7 @@ export default function IkinciEl({ user }) {
                   <ImeiInput
                     value={form.imei}
                     onChange={v => setForm({ ...form, imei: v })}
-                    placeholder="15 haneli veya 📷 okut"
+                    placeholder="15 haneli veya kamerayla okut"
                   />
                 </div>
                 <div className="form-group" style={{ position: "relative" }}>
@@ -240,16 +253,13 @@ export default function IkinciEl({ user }) {
                     onBlur={() => setTimeout(() => setShowKimdenOner(false), 150)}
                     placeholder="Kişi/firma adı" autoComplete="off" />
                   {showKimdenOner && (
-                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
-                      background: "rgba(255,255,255,0.88)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                    <div className="ac-dropdown">
                       {kimdenOner.map(m => (
                         <div key={m.id}
                           onMouseDown={() => { setForm(f => ({ ...f, kimden: m.name, kimden_telefon: m.phone || f.kimden_telefon })); setShowKimdenOner(false); }}
                           style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
-                            borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-                          <span>👤 {m.name}</span>
+                            borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
                           {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
                         </div>
                       ))}
@@ -268,8 +278,8 @@ export default function IkinciEl({ user }) {
                 <div className="form-group">
                   <label className="form-label">Kaynak</label>
                   <select className="form-select" value={form.kaynak} onChange={e => setForm({ ...form, kaynak: e.target.value })}>
-                    <option value="dukkan">🏪 Dükkan</option>
-                    <option value="getmobile">📦 Getmobil</option>
+                    <option value="dukkan">Dükkan</option>
+                    <option value="getmobile">Getmobil</option>
                   </select>
                 </div>
                 <div className="form-group">
@@ -297,7 +307,9 @@ export default function IkinciEl({ user }) {
               <div key={c.id}>
                 <div className="card" onClick={() => selectCihaz(c)} style={{ cursor: "pointer" }}>
                   <div className="card-row" style={{ marginBottom: 6, alignItems: "flex-start" }}>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>📱 {c.model}</div>
+                    <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 7 }}>
+                      <Smartphone size={16} strokeWidth={2} /> {c.model}
+                    </div>
                     <div style={{ textAlign: "right", minWidth: 80 }}>
                       <div style={{ fontWeight: 700 }}>
                         {priceHidden ? "••••" : ((c.alis_fiyati || 0) + (c.toplam_masraf || 0)).toLocaleString("tr-TR") + " ₺"}
@@ -305,7 +317,7 @@ export default function IkinciEl({ user }) {
                       <div style={{ fontSize: 11, color: "var(--hint)" }}>maliyet</div>
                       {(c.toplam_masraf || 0) > 0 && (
                         <>
-                          <div style={{ fontWeight: 600, color: "var(--danger)", fontSize: 13, marginTop: 2 }}>
+                          <div style={{ fontWeight: 600, color: "var(--red)", fontSize: 13, marginTop: 2 }}>
                             {priceHidden ? "••••" : (c.toplam_masraf || 0).toLocaleString("tr-TR") + " ₺"}
                           </div>
                           <div style={{ fontSize: 11, color: "var(--hint)" }}>masraf</div>
@@ -320,15 +332,15 @@ export default function IkinciEl({ user }) {
                   {/* Özellik chipler */}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 4 }}>
                     {c.renk && <Chip>{c.renk}</Chip>}
-                    {c.depolama && <Chip>💾 {c.depolama}</Chip>}
-                    {c.ram && <Chip>🧠 {c.ram}</Chip>}
+                    {c.depolama && <Chip icon={HardDrive}>{c.depolama}</Chip>}
+                    {c.ram && <Chip icon={Cpu}>{c.ram}</Chip>}
                     {c.ozellikler && <Chip color="orange">{c.ozellikler}</Chip>}
-                    {c.kaynak === "getmobile" && <Chip color="blue">📦 Getmobil</Chip>}
+                    {c.kaynak === "getmobile" && <Chip color="blue" icon={Package}>Getmobil</Chip>}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", gap: 10, flexWrap: "wrap" }}>
                     {c.imei && <span>IMEI: {c.imei}</span>}
-                    {c.kimden && <span>👤 {c.kimden}</span>}
-                    {c.alis_tarihi && <span>📅 {c.alis_tarihi}</span>}
+                    {c.kimden && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><User size={11} strokeWidth={2} /> {c.kimden}</span>}
+                    {c.alis_tarihi && <span>{c.alis_tarihi}</span>}
                   </div>
                 </div>
                 {isSelected && (
@@ -336,18 +348,18 @@ export default function IkinciEl({ user }) {
                     {/* Masraf listesi */}
                     {cMasraflar.length > 0 && (
                       <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--hint)" }}>
-                          🔧 Masraflar (toplam: {(c.toplam_masraf || 0).toLocaleString("tr-TR")}₺)
+                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}>
+                          <Wrench size={12} strokeWidth={2} /> Masraflar (toplam: {(c.toplam_masraf || 0).toLocaleString("tr-TR")}₺)
                         </div>
                         {cMasraflar.map(m => (
                           <div key={m.id} style={{
                             display: "flex", justifyContent: "space-between", alignItems: "center",
                             fontSize: 13, padding: "6px 0",
-                            borderBottom: "1px solid var(--border)",
+                            borderBottom: "1px solid var(--divider)",
                           }}>
                             <div>
                               <div>{m.aciklama}</div>
-                              <div style={{ fontSize: 11, color: "var(--hint)" }}>📅 {m.tarih || "—"}</div>
+                              <div style={{ fontSize: 11, color: "var(--hint)" }}>{m.tarih || "—"}</div>
                             </div>
                             <span style={{ fontWeight: 700 }}>₺{(m.tutar || 0).toLocaleString("tr-TR")}</span>
                           </div>
@@ -356,24 +368,26 @@ export default function IkinciEl({ user }) {
                     )}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button className="btn btn-ghost btn-sm" onClick={() => { setShowMasraf(true); setShowSat(false); }}>+ Masraf</button>
-                      <button className="btn btn-primary btn-sm" onClick={() => { setShowSat(true); setShowMasraf(false); }}>💰 Sat</button>
+                      <button className="btn btn-primary btn-sm" onClick={() => { setShowSat(true); setShowMasraf(false); }} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Banknote size={13} strokeWidth={2} /> Sat
+                      </button>
                       {user?.rol === "patron" && (
                         deleteId === c.id ? (
                           <>
-                            <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 12px", fontSize: 13 }}
+                            <button className="btn btn-sm" style={{ background: "var(--red)", color: "#191b20", padding: "4px 12px", fontSize: 13 }}
                               onClick={() => deleteCihaz(c.id)}>Sil</button>
                             <button className="btn btn-ghost btn-sm"
                               onClick={() => setDeleteId(null)}>İptal</button>
                           </>
                         ) : (
-                          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}
-                            onClick={() => setDeleteId(c.id)}>🗑 Sil</button>
+                          <button className="btn btn-ghost btn-sm" style={{ color: "var(--red)", display: "flex", alignItems: "center", gap: 6 }}
+                            onClick={() => setDeleteId(c.id)}><Trash2 size={13} strokeWidth={2} /> Sil</button>
                         )
                       )}
                     </div>
                     {showMasraf && (
                       <form onSubmit={submitMasraf} style={{ marginTop: 10 }}>
-                        {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0" }}>❌ {err}</div>}
+                        {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0" }}>{err}</div>}
                         <div className="form-group">
                           <label className="form-label">Masraf Açıklaması</label>
                           <input className="form-input" required value={masrafForm.aciklama} onChange={e => setMasrafForm({ ...masrafForm, aciklama: e.target.value })} placeholder="Ekran, temizlik, batarya..." />
@@ -396,7 +410,7 @@ export default function IkinciEl({ user }) {
                     )}
                     {showSat && (
                       <form onSubmit={submitSat} style={{ marginTop: 10 }}>
-                        {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0" }}>❌ {err}</div>}
+                        {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0" }}>{err}</div>}
                         <div className="form-group" style={{ position: "relative" }}>
                           <label className="form-label">Müşteri Adı *</label>
                           <input className="form-input" required value={satForm.musteri_adi}
@@ -404,15 +418,13 @@ export default function IkinciEl({ user }) {
                             onBlur={() => setTimeout(() => setShowSatMusteriOner(false), 150)}
                             placeholder="Ad Soyad" autoComplete="off" />
                           {showSatMusteriOner && (
-                            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
-                              background: "var(--card)", border: "1px solid var(--border)",
-                              borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                            <div className="ac-dropdown">
                               {satMusteriOner.map(m => (
                                 <div key={m.id}
                                   onMouseDown={() => { setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon })); setShowSatMusteriOner(false); }}
                                   style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
-                                    borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-                                  <span>👤 {m.name}</span>
+                                    borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
                                   {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
                                 </div>
                               ))}
@@ -442,9 +454,9 @@ export default function IkinciEl({ user }) {
                         <div className="form-group">
                           <label className="form-label">Ödeme</label>
                           <select className="form-select" value={satForm.odeme_yontemi} onChange={e => setSatForm({ ...satForm, odeme_yontemi: e.target.value })}>
-                            <option value="nakit">💵 Nakit</option>
-                            <option value="kart">💳 Kart</option>
-                            <option value="taksit">📅 Taksit</option>
+                            <option value="nakit">Nakit</option>
+                            <option value="kart">Kart</option>
+                            <option value="taksit">Taksit</option>
                           </select>
                         </div>
                         </div>
@@ -467,7 +479,7 @@ export default function IkinciEl({ user }) {
                         )}
                         {satForm.odeme_yontemi === "taksit" && satForm.satis_fiyati && (
                           <div style={{ fontSize: 13, background: "var(--bg2)", borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>
-                            <div style={{ color: "var(--hint)" }}>Kalan borç: <b style={{ color: "var(--danger)" }}>
+                            <div style={{ color: "var(--hint)" }}>Kalan borç: <b style={{ color: "var(--red)" }}>
                               {(parseFloat(satForm.satis_fiyati) - (parseFloat(satForm.pesinat) || 0)).toLocaleString("tr-TR")} ₺
                             </b> → müşteri borcuna kaydedilecek</div>
                           </div>
@@ -500,48 +512,50 @@ export default function IkinciEl({ user }) {
             return (
             <div key={c.id} className="card">
               <div className="card-row" style={{ marginBottom: 6 }}>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>📱 {c.model}</div>
+                <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 7 }}>
+                  <Smartphone size={16} strokeWidth={2} /> {c.model}
+                </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 700, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)) >= 0 ? "var(--success)" : "var(--danger)" }}>
+                  <div style={{ fontWeight: 700, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)) >= 0 ? "var(--success)" : "var(--red)" }}>
                     {priceHidden ? "••••" : (c.satis_fiyati || 0).toLocaleString("tr-TR") + " ₺"}
                   </div>
-                  <div style={{ fontSize: 12, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)) >= 0 ? "var(--success)" : "var(--danger)" }}>
+                  <div style={{ fontSize: 12, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)) >= 0 ? "var(--success)" : "var(--red)" }}>
                     Kâr: {((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺
                   </div>
                 </div>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 6 }}>
                 {c.renk && <Chip>{c.renk}</Chip>}
-                {c.depolama && <Chip>💾 {c.depolama}</Chip>}
-                {c.ram && <Chip>🧠 {c.ram}</Chip>}
+                {c.depolama && <Chip icon={HardDrive}>{c.depolama}</Chip>}
+                {c.ram && <Chip icon={Cpu}>{c.ram}</Chip>}
               </div>
               <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", gap: 10, flexWrap: "wrap", marginBottom: satMasraflar.length > 0 ? 8 : 0 }}>
-                {c.musteri_adi && <span>👤 {c.musteri_adi}</span>}
-                {c.musteri_telefon && <span>📞 {c.musteri_telefon}</span>}
-                <span>📡 {c.satis_kanali || "Dükkan"}</span>
-                <span>📅 {c.satis_tarihi || "—"}</span>
+                {c.musteri_adi && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><User size={11} strokeWidth={2} /> {c.musteri_adi}</span>}
+                {c.musteri_telefon && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Phone size={11} strokeWidth={2} /> {c.musteri_telefon}</span>}
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Radio size={11} strokeWidth={2} /> {c.satis_kanali || "Dükkan"}</span>
+                <span>{c.satis_tarihi || "—"}</span>
                 {c.imei && (
                   <span
                     onClick={e => { e.stopPropagation(); openImeiModal(c.imei, c.model); }}
-                    style={{ cursor: "pointer", color: "var(--primary)", fontWeight: 600, textDecoration: "underline" }}
-                  >📋 IMEI Geçmişi</span>
+                    style={{ cursor: "pointer", color: "var(--primary)", fontWeight: 600, textDecoration: "underline", display: "flex", alignItems: "center", gap: 4 }}
+                  ><History size={11} strokeWidth={2} /> IMEI Geçmişi</span>
                 )}
               </div>
               {/* Masraflar */}
               {satMasraflar.length > 0 && (
-                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hint)", marginBottom: 5 }}>
-                    🔧 MASRAFLAR · toplam {(c.toplam_masraf || 0).toLocaleString("tr-TR")}₺
+                <div style={{ borderTop: "1px solid var(--divider)", paddingTop: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hint)", marginBottom: 5, display: "flex", alignItems: "center", gap: 5 }}>
+                    <Wrench size={11} strokeWidth={2} /> MASRAFLAR · toplam {(c.toplam_masraf || 0).toLocaleString("tr-TR")}₺
                   </div>
                   {satMasraflar.map(m => (
                     <div key={m.id} style={{
                       display: "flex", justifyContent: "space-between", alignItems: "center",
                       fontSize: 13, padding: "4px 0",
-                      borderBottom: "1px solid var(--border)",
+                      borderBottom: "1px solid var(--divider)",
                     }}>
                       <div>
                         <span style={{ fontWeight: 500 }}>{m.aciklama}</span>
-                        <span style={{ fontSize: 11, color: "var(--hint)", marginLeft: 6 }}>📅 {m.tarih || "—"}</span>
+                        <span style={{ fontSize: 11, color: "var(--hint)", marginLeft: 6 }}>{m.tarih || "—"}</span>
                       </div>
                       <span style={{ fontWeight: 700 }}>₺{(m.tutar || 0).toLocaleString("tr-TR")}</span>
                     </div>
@@ -566,10 +580,12 @@ export default function IkinciEl({ user }) {
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 16 }}>📱 {imeiModal.model}</div>
+                <div style={{ fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 7 }}>
+                  <Smartphone size={16} strokeWidth={2} /> {imeiModal.model}
+                </div>
                 <div style={{ fontSize: 12, color: "var(--hint)" }}>IMEI: {imeiModal.imei}</div>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setImeiModal(null)}>✕</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setImeiModal(null)}><X size={15} strokeWidth={2} /></button>
             </div>
 
             {imeiModalLoading ? (
@@ -585,12 +601,12 @@ export default function IkinciEl({ user }) {
                   {/* Toplam kâr kutusu */}
                   {imeiModalData.length > 1 && (
                     <div style={{
-                      background: toplam_kar >= 0 ? "rgba(52,199,89,0.12)" : "rgba(255,59,48,0.1)",
+                      background: toplam_kar >= 0 ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.1)",
                       borderRadius: 10, padding: "10px 14px", marginBottom: 14,
                       display: "flex", justifyContent: "space-between", alignItems: "center",
                     }}>
                       <span style={{ fontWeight: 600 }}>{imeiModalData.filter(r => r.durum === "satildi").length} kez satıldı</span>
-                      <span style={{ fontWeight: 700, color: toplam_kar >= 0 ? "var(--success)" : "var(--danger)" }}>
+                      <span style={{ fontWeight: 700, color: toplam_kar >= 0 ? "var(--success)" : "var(--red)" }}>
                         Toplam Kâr: ₺{toplam_kar.toLocaleString("tr-TR")}
                       </span>
                     </div>
@@ -601,7 +617,7 @@ export default function IkinciEl({ user }) {
                     const kar = (r.satis_fiyati || 0) - (r.alis_fiyati || 0) - (r.toplam_masraf || 0);
                     return (
                       <div key={r.id} style={{
-                        border: "1px solid var(--border)", borderRadius: 12,
+                        border: "1px solid var(--divider)", borderRadius: 12,
                         marginBottom: 10, overflow: "hidden",
                       }}>
                         {/* Başlık */}
@@ -611,25 +627,25 @@ export default function IkinciEl({ user }) {
                         {/* Alış satırı */}
                         <div style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>📥 Alındı</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Inbox size={13} strokeWidth={2} /> Alındı</div>
                             <div style={{ fontSize: 12, color: "var(--hint)" }}>
                               {r.kimden || "—"} {r.kimden_telefon ? `· ${r.kimden_telefon}` : ""}
                             </div>
-                            <div style={{ fontSize: 11, color: "var(--hint)" }}>📅 {r.alis_tarihi || r.created_at?.slice(0,10) || "—"}</div>
+                            <div style={{ fontSize: 11, color: "var(--hint)" }}>{r.alis_tarihi || r.created_at?.slice(0,10) || "—"}</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ fontWeight: 700 }}>₺{(r.alis_fiyati || 0).toLocaleString("tr-TR")}</div>
                             {(r.toplam_masraf || 0) > 0 && (
-                              <div style={{ fontSize: 11, color: "var(--danger)" }}>+₺{r.toplam_masraf.toLocaleString("tr-TR")} masraf</div>
+                              <div style={{ fontSize: 11, color: "var(--red)" }}>+₺{r.toplam_masraf.toLocaleString("tr-TR")} masraf</div>
                             )}
                           </div>
                         </div>
                         {/* Masraflar */}
                         {r.masraflar?.length > 0 && (
-                          <div style={{ padding: "0 12px 8px", borderTop: "1px dashed var(--border)" }}>
+                          <div style={{ padding: "0 12px 8px", borderTop: "1px dashed var(--divider)" }}>
                             {r.masraflar.map(m => (
                               <div key={m.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0", color: "var(--hint)" }}>
-                                <span>🔧 {m.aciklama}</span>
+                                <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Wrench size={10} strokeWidth={2} /> {m.aciklama}</span>
                                 <span>₺{(m.tutar||0).toLocaleString("tr-TR")}</span>
                               </div>
                             ))}
@@ -639,26 +655,26 @@ export default function IkinciEl({ user }) {
                         {r.durum === "satildi" ? (
                           <div style={{
                             padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center",
-                            borderTop: "1px solid var(--border)",
-                            background: kar >= 0 ? "rgba(52,199,89,0.05)" : "rgba(255,59,48,0.05)",
+                            borderTop: "1px solid var(--divider)",
+                            background: kar >= 0 ? "rgba(74,222,128,0.05)" : "rgba(248,113,113,0.05)",
                           }}>
                             <div>
-                              <div style={{ fontSize: 13, fontWeight: 600 }}>📤 Satıldı</div>
+                              <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Send size={13} strokeWidth={2} /> Satıldı</div>
                               <div style={{ fontSize: 12, color: "var(--hint)" }}>
                                 {r.musteri_adi || "—"} {r.musteri_telefon ? `· ${r.musteri_telefon}` : ""}
                               </div>
-                              <div style={{ fontSize: 11, color: "var(--hint)" }}>📅 {r.satis_tarihi || "—"} · {r.satis_kanali || "Dükkan"}</div>
+                              <div style={{ fontSize: 11, color: "var(--hint)" }}>{r.satis_tarihi || "—"} · {r.satis_kanali || "Dükkan"}</div>
                             </div>
                             <div style={{ textAlign: "right" }}>
                               <div style={{ fontWeight: 700 }}>₺{(r.satis_fiyati || 0).toLocaleString("tr-TR")}</div>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: kar >= 0 ? "var(--success)" : "var(--danger)" }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: kar >= 0 ? "var(--success)" : "var(--red)" }}>
                                 {kar >= 0 ? "+" : ""}₺{kar.toLocaleString("tr-TR")} kâr
                               </div>
                             </div>
                           </div>
                         ) : (
-                          <div style={{ padding: "10px 12px", borderTop: "1px solid var(--border)", color: "var(--hint)", fontSize: 13 }}>
-                            ⏳ Hâlâ stokta
+                          <div style={{ padding: "10px 12px", borderTop: "1px solid var(--divider)", color: "var(--hint)", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                            <Clock size={13} strokeWidth={2} /> Hâlâ stokta
                           </div>
                         )}
                       </div>
@@ -689,10 +705,10 @@ export default function IkinciEl({ user }) {
           {imeiGecmis === null ? (
             <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center" }}>IMEI son 4 hanesini girin</div>
           ) : imeiGecmis.length === 0 ? (
-            <div className="empty"><div className="empty-icon">🔍</div>Kayıt bulunamadı</div>
+            <div className="empty"><div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}><Search size={40} stroke="var(--dim)" strokeWidth={1.5} /></div>Kayıt bulunamadı</div>
           ) : imeiGecmis.map(c => (
             <div key={c.id} className="card">
-              <div style={{ fontWeight: 600 }}>📱 {c.model}</div>
+              <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 7 }}><Smartphone size={15} strokeWidth={2} /> {c.model}</div>
               <div style={{ fontSize: 12, color: "var(--hint)" }}>IMEI: {c.imei}</div>
               {c.kimden && <div style={{ fontSize: 12, color: "var(--hint)" }}>Kimden: {c.kimden}</div>}
               <div style={{ fontSize: 12, color: "var(--hint)" }}>
@@ -723,16 +739,20 @@ export default function IkinciEl({ user }) {
 
 function today() { return new Date().toISOString().split("T")[0]; }
 
-function Chip({ children, color }) {
+function Chip({ children, color, icon: Icon }) {
   const colors = {
-    orange: { bg: "#fff7ed", text: "#c2410c" },
-    blue: { bg: "#eff6ff", text: "#1d4ed8" },
+    orange: { bg: "rgba(246,162,74,0.15)", text: "var(--orange)" },
+    blue: { bg: "rgba(94,168,255,0.15)", text: "var(--blue)" },
   };
   const c = colors[color] || { bg: "var(--bg2)", text: "var(--hint)" };
   return (
     <span style={{
-      fontSize: 11, padding: "2px 7px", borderRadius: 6,
+      fontSize: 11, padding: "2px 8px", borderRadius: 6,
       background: c.bg, color: c.text, fontWeight: 600,
-    }}>{children}</span>
+      display: "inline-flex", alignItems: "center", gap: 4,
+    }}>
+      {Icon && <Icon size={11} strokeWidth={2} />}
+      {children}
+    </span>
   );
 }

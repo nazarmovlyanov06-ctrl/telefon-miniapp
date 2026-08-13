@@ -1,21 +1,25 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import {
+  BarChart3, Users, Wrench, Smartphone, Package, Cog, Headphones,
+  Star, Frown,
+} from "lucide-react";
 
 const DURUM_LABEL = {
-  bekliyor: "⏳ Bekliyor",
-  tamirde: "🔧 Tamirde",
-  parca_bekleniyor: "📦 Parça",
-  hazir: "✅ Hazır",
-  teslim: "🏠 Teslim",
+  bekliyor: "Bekliyor",
+  tamirde: "Tamirde",
+  parca_bekleniyor: "Parça",
+  hazir: "Hazır",
+  teslim: "Teslim",
 };
 
 const DURUM_RENK = {
-  bekliyor: "#f59e0b",
-  tamirde: "#3b82f6",
-  parca_bekleniyor: "#8b5cf6",
-  hazir: "#10b981",
-  teslim: "#6b7280",
+  bekliyor: "var(--orange)",
+  tamirde: "var(--blue)",
+  parca_bekleniyor: "var(--purple)",
+  hazir: "var(--green)",
+  teslim: "var(--gray)",
 };
 
 function fmt(n) {
@@ -50,17 +54,19 @@ export default function Stats() {
     <div className="page" style={{ paddingBottom: 90 }}>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
-        <div style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>📊 İstatistikler</div>
+        <div style={{ flex: 1, fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          <BarChart3 size={17} strokeWidth={2} /> İstatistikler
+        </div>
       </div>
 
       {/* Genel sayılar */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 4 }}>
-        <StatCard label="Müşteri" value={s.musteri || 0} icon="👥" color="#3b82f6" />
-        <StatCard label="Toplam Tamir" value={s.tamir_toplam || 0} icon="🔧" color="#f59e0b" />
-        <StatCard label="2.El Stok" value={s.ikinciel_stok || 0} icon="📱" color="#10b981" />
-        <StatCard label="Sıfır Stok" value={s.sifir_stok || 0} icon="📦" color="#8b5cf6" />
-        <StatCard label="Parça Çeşit" value={s.parca_cesit || 0} icon="🔩" color="#ef4444" />
-        <StatCard label="Aksesuar" value={s.aksesuar_cesit || 0} icon="🎧" color="#ec4899" />
+        <StatCard label="Müşteri" value={s.musteri || 0} icon={Users} color="var(--blue)" />
+        <StatCard label="Toplam Tamir" value={s.tamir_toplam || 0} icon={Wrench} color="var(--orange)" />
+        <StatCard label="2.El Stok" value={s.ikinciel_stok || 0} icon={Smartphone} color="var(--green)" />
+        <StatCard label="Sıfır Stok" value={s.sifir_stok || 0} icon={Package} color="var(--purple)" />
+        <StatCard label="Parça Çeşit" value={s.parca_cesit || 0} icon={Cog} color="var(--red)" />
+        <StatCard label="Aksesuar" value={s.aksesuar_cesit || 0} icon={Headphones} color="var(--gold)" />
       </div>
 
       {/* Tamir Durum Dağılımı */}
@@ -95,7 +101,7 @@ export default function Stats() {
                     <div style={{ flex: 1, height: h, background: "var(--accent)", borderRadius: "3px 3px 0 0" }} />
                   )}
                   {gId > 0 && (
-                    <div style={{ flex: 1, height: gId, background: "#ef4444", borderRadius: "3px 3px 0 0", opacity: 0.7 }} />
+                    <div style={{ flex: 1, height: gId, background: "var(--red)", borderRadius: "3px 3px 0 0", opacity: 0.7 }} />
                   )}
                   {h === 0 && gId === 0 && (
                     <div style={{ flex: 1, height: 3, background: "var(--bg2)", borderRadius: 3 }} />
@@ -114,7 +120,7 @@ export default function Stats() {
             <div style={{ width: 10, height: 10, background: "var(--accent)", borderRadius: 2 }} /> Gelir
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--hint)" }}>
-            <div style={{ width: 10, height: 10, background: "#ef4444", borderRadius: 2, opacity: 0.7 }} /> Gider
+            <div style={{ width: 10, height: 10, background: "var(--red)", borderRadius: 2, opacity: 0.7 }} /> Gider
           </div>
         </div>
       </div>
@@ -130,8 +136,8 @@ export default function Stats() {
             return (
               <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, height: "100%" }}>
                 <div style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 2, width: "100%" }}>
-                  {h > 0 && <div style={{ flex: 1, height: h, background: "#10b981", borderRadius: "3px 3px 0 0" }} />}
-                  {gId > 0 && <div style={{ flex: 1, height: gId, background: "#ef4444", borderRadius: "3px 3px 0 0", opacity: 0.7 }} />}
+                  {h > 0 && <div style={{ flex: 1, height: h, background: "var(--green)", borderRadius: "3px 3px 0 0" }} />}
+                  {gId > 0 && <div style={{ flex: 1, height: gId, background: "var(--red)", borderRadius: "3px 3px 0 0", opacity: 0.7 }} />}
                   {h === 0 && gId === 0 && <div style={{ flex: 1, height: 3, background: "var(--bg2)", borderRadius: 3 }} />}
                 </div>
                 {a.gelir > 0 && <div style={{ fontSize: 9, color: "var(--hint)", fontWeight: 600 }}>{fmt(a.gelir)}</div>}
@@ -179,8 +185,12 @@ export default function Stats() {
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 13 }}>
                     <span style={{ fontWeight: 600 }}>{s.name}</span>
                     <div style={{ display: "flex", gap: 10 }}>
-                      <span style={{ color: "var(--success)", fontWeight: 700 }}>⭐ {s.ovgu_sayisi || 0}</span>
-                      <span style={{ color: "var(--danger)", fontWeight: 700 }}>😤 {s.sikayet_sayisi || 0}</span>
+                      <span style={{ color: "var(--success)", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                        <Star size={12} strokeWidth={2} /> {s.ovgu_sayisi || 0}
+                      </span>
+                      <span style={{ color: "var(--danger)", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                        <Frown size={12} strokeWidth={2} /> {s.sikayet_sayisi || 0}
+                      </span>
                     </div>
                   </div>
                   <div style={{ display: "flex", height: 6, borderRadius: 4, overflow: "hidden", background: "var(--bg2)" }}>
@@ -210,13 +220,13 @@ export default function Stats() {
                     <span style={{ fontWeight: 700, color: "var(--hint)", marginRight: 6 }}>#{i + 1}</span>
                     {m.name}
                   </span>
-                  <span style={{ color: "#f59e0b", fontWeight: 700 }}>{fmt(m.toplam)}₺</span>
+                  <span style={{ color: "var(--gold)", fontWeight: 700 }}>{fmt(m.toplam)}₺</span>
                 </div>
                 <div style={{ height: 6, background: "var(--bg2)", borderRadius: 4 }}>
                   <div style={{
                     height: "100%",
                     width: `${(m.toplam / maxMusteri) * 100}%`,
-                    background: "#f59e0b",
+                    background: "var(--gold)",
                     borderRadius: 4,
                   }} />
                 </div>
@@ -229,10 +239,10 @@ export default function Stats() {
   );
 }
 
-function StatCard({ label, value, icon, color }) {
+function StatCard({ label, value, icon: Icon, color }) {
   return (
     <div className="card" style={{ padding: "12px 10px", textAlign: "center", marginBottom: 0 }}>
-      <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
+      <Icon size={20} stroke={color} strokeWidth={1.8} style={{ marginBottom: 4 }} />
       <div style={{ fontWeight: 800, fontSize: 20, color }}>{value}</div>
       <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>{label}</div>
     </div>

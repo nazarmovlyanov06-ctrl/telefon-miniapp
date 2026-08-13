@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { Tag, CircleX, TriangleAlert, Trash2 } from "lucide-react";
 
 const DEFAULT_CATS = ["Şarj Aleti", "Kılıf", "Kırılmaz Cam", "Kulaklık", "Powerbank", "Diğer"];
 
@@ -92,7 +93,7 @@ export default function Aksesuar({ user }) {
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
         <h1 className="page-title" style={{ margin: 0 }}>Aksesuar</h1>
         <div style={{ display: "flex", gap: 6 }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowKatYonet(!showKatYonet)}>🏷 Kategoriler</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowKatYonet(!showKatYonet)} style={{ display: "flex", alignItems: "center", gap: 6 }}><Tag size={14} strokeWidth={2} /> Kategoriler</button>
           <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Ekle</button>
         </div>
       </div>
@@ -138,7 +139,7 @@ export default function Aksesuar({ user }) {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
             <div className="form-group">
               <label className="form-label">Kategori</label>
               <select className="form-select" value={form.kategori} onChange={e => setForm({ ...form, kategori: e.target.value })}>
@@ -176,7 +177,7 @@ export default function Aksesuar({ user }) {
         <div className="card" style={{ background: "var(--bg2)" }}>
           <div style={{ fontWeight: 600, marginBottom: 8 }}>Satış: {satForm.ad}</div>
           <form onSubmit={submitSat}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
             <div className="form-group">
               <label className="form-label">Adet (max {satForm.stok})</label>
               <input className="form-input" type="number" min="1" max={satForm.stok} required value={satData.miktar} onChange={e => setSatData({ ...satData, miktar: e.target.value })} />
@@ -214,7 +215,7 @@ export default function Aksesuar({ user }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontWeight: 700, color: a.stok <= 5 ? "var(--danger)" : "var(--text)" }}>{a.stok} adet</div>
-                {a.stok <= 5 && <div style={{ fontSize: 11, color: "var(--danger)" }}>⚠ Düşük</div>}
+                {a.stok <= 5 && <div style={{ fontSize: 11, color: "var(--danger)", display: "flex", alignItems: "center", gap: 3, justifyContent: "flex-end" }}><TriangleAlert size={11} strokeWidth={2} /> Düşük</div>}
               </div>
               {a.stok > 0 && (
                 <button className="btn btn-primary btn-sm" onClick={() => setSatForm(a)}>Sat</button>
@@ -228,8 +229,8 @@ export default function Aksesuar({ user }) {
                       onClick={() => setDeleteId(null)}>✕</button>
                   </div>
                 ) : (
-                  <button className="btn btn-ghost btn-sm" style={{ padding: "4px 7px", fontSize: 14, color: "var(--danger)", opacity: 0.7 }}
-                    onClick={() => setDeleteId(a.id)}>🗑</button>
+                  <button className="btn btn-ghost btn-sm" style={{ padding: "4px 7px", color: "var(--danger)", opacity: 0.7, display: "flex" }}
+                    onClick={() => setDeleteId(a.id)}><Trash2 size={14} strokeWidth={2} /></button>
                 )
               )}
             </div>

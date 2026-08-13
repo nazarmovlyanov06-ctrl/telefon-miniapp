@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { Bell, CheckCircle2, CircleX, Frown, Star, Lock } from "lucide-react";
 
 function fmt(dt) {
   if (!dt) return "";
@@ -70,12 +71,12 @@ export default function GeriBildirim({ user }) {
       {/* Yeni şikayet/övgü bildirimi */}
       {!isPatron && bekleyen > 0 && (
         <div style={{
-          background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.35)",
+          background: "rgba(248,113,113,0.10)", border: "1px solid rgba(248,113,113,0.35)",
           borderRadius: 12, padding: "12px 16px", marginBottom: 12,
           display: "flex", alignItems: "center", gap: 10,
         }}>
-          <span style={{ fontSize: 20 }}>🔔</span>
-          <span style={{ fontWeight: 600, fontSize: 14, color: "var(--danger)" }}>
+          <Bell size={18} stroke="var(--red)" strokeWidth={2} />
+          <span style={{ fontWeight: 600, fontSize: 14, color: "var(--red)" }}>
             {bekleyen} yeni {bekleyen === 1 ? "bildirim" : "bildirim"} var
           </span>
         </div>
@@ -83,10 +84,11 @@ export default function GeriBildirim({ user }) {
 
       {submitted && (
         <div style={{
-          background: "rgba(34,197,94,0.10)", border: "1px solid rgba(34,197,94,0.35)",
+          background: "rgba(74,222,128,0.10)", border: "1px solid rgba(74,222,128,0.35)",
           borderRadius: 12, padding: "12px 16px", marginBottom: 12, fontWeight: 600, fontSize: 14, color: "var(--success)",
+          display: "flex", alignItems: "center", gap: 8,
         }}>
-          ✅ Gönderildi (anonim)
+          <CheckCircle2 size={15} strokeWidth={2} /> Gönderildi (anonim)
         </div>
       )}
 
@@ -95,21 +97,22 @@ export default function GeriBildirim({ user }) {
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Yeni Bildirim (Anonim)</div>
           <form onSubmit={submit}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 8, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
 
             <div className="form-group">
               <label className="form-label">Türü</label>
               <div style={{ display: "flex", gap: 8 }}>
-                {[{ v: "sikayet", l: "😤 Şikayet" }, { v: "ovgu", l: "⭐ Övgü" }].map(t => (
+                {[{ v: "sikayet", l: "Şikayet", icon: Frown }, { v: "ovgu", l: "Övgü", icon: Star }].map(t => (
                   <button key={t.v} type="button"
                     onClick={() => setForm(f => ({ ...f, tur: t.v }))}
                     style={{
                       flex: 1, padding: "9px 0", borderRadius: 10, border: "1.5px solid", cursor: "pointer",
                       fontWeight: 700, fontSize: 13,
-                      borderColor: form.tur === t.v ? (t.v === "sikayet" ? "var(--danger)" : "var(--success)") : "var(--border)",
-                      background: form.tur === t.v ? (t.v === "sikayet" ? "rgba(239,68,68,0.10)" : "rgba(34,197,94,0.10)") : "var(--bg2)",
-                      color: form.tur === t.v ? (t.v === "sikayet" ? "var(--danger)" : "var(--success)") : "var(--hint)",
-                    }}>{t.l}</button>
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                      borderColor: form.tur === t.v ? (t.v === "sikayet" ? "var(--red)" : "var(--success)") : "var(--divider)",
+                      background: form.tur === t.v ? (t.v === "sikayet" ? "rgba(248,113,113,0.10)" : "rgba(74,222,128,0.10)") : "var(--bg2)",
+                      color: form.tur === t.v ? (t.v === "sikayet" ? "var(--red)" : "var(--success)") : "var(--hint)",
+                    }}><t.icon size={14} strokeWidth={2} /> {t.l}</button>
                 ))}
               </div>
             </div>
@@ -134,8 +137,8 @@ export default function GeriBildirim({ user }) {
                 style={{ resize: "vertical", minHeight: 72 }} />
             </div>
 
-            <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 10 }}>
-              🔒 Kim gönderdiğin gizli kalır
+            <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <Lock size={11} strokeWidth={2} /> Kim gönderdiğin gizli kalır
             </div>
 
             <div style={{ display: "flex", gap: 8 }}>
@@ -152,14 +155,14 @@ export default function GeriBildirim({ user }) {
           <div className="section-title">Çalışan Skoru</div>
           <div className="card" style={{ marginBottom: 14 }}>
             {skor.map((s, i) => (
-              <div key={s.id} className="card-row" style={{ padding: "8px 0", borderBottom: i < skor.length - 1 ? "1px solid var(--bg2)" : "none" }}>
+              <div key={s.id} className="card-row" style={{ padding: "8px 0", borderBottom: i < skor.length - 1 ? "1px solid var(--divider)" : "none" }}>
                 <span style={{ fontWeight: 600, fontSize: 14 }}>{s.ad}</span>
                 <div style={{ display: "flex", gap: 10 }}>
-                  <span style={{ fontSize: 13, color: "var(--success)", fontWeight: 600 }}>
-                    ⭐ {s.ovgu_sayisi || 0}
+                  <span style={{ fontSize: 13, color: "var(--success)", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                    <Star size={12} strokeWidth={2} /> {s.ovgu_sayisi || 0}
                   </span>
-                  <span style={{ fontSize: 13, color: "var(--danger)", fontWeight: 600 }}>
-                    😤 {s.sikayet_sayisi || 0}
+                  <span style={{ fontSize: 13, color: "var(--red)", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                    <Frown size={12} strokeWidth={2} /> {s.sikayet_sayisi || 0}
                   </span>
                 </div>
               </div>
@@ -171,12 +174,12 @@ export default function GeriBildirim({ user }) {
       {/* Sekme */}
       <div className="tabs" style={{ marginBottom: 12 }}>
         <button className={`tab ${tab === "sikayet" ? "active" : ""}`}
-          onClick={() => setTab("sikayet")}>
-          😤 Şikayetler ({list.filter(i => i.tur === "sikayet").length})
+          onClick={() => setTab("sikayet")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Frown size={13} strokeWidth={2} /> Şikayetler ({list.filter(i => i.tur === "sikayet").length})
         </button>
         <button className={`tab ${tab === "ovgu" ? "active" : ""}`}
-          onClick={() => setTab("ovgu")}>
-          ⭐ Övgüler ({list.filter(i => i.tur === "ovgu").length})
+          onClick={() => setTab("ovgu")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Star size={13} strokeWidth={2} /> Övgüler ({list.filter(i => i.tur === "ovgu").length})
         </button>
       </div>
 
@@ -184,7 +187,9 @@ export default function GeriBildirim({ user }) {
         <div className="loading">Yükleniyor...</div>
       ) : activeList.length === 0 ? (
         <div className="empty">
-          <div className="empty-icon">{tab === "sikayet" ? "😤" : "⭐"}</div>
+          <div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}>
+            {tab === "sikayet" ? <Frown size={40} stroke="var(--dim)" strokeWidth={1.5} /> : <Star size={40} stroke="var(--dim)" strokeWidth={1.5} />}
+          </div>
           {tab === "sikayet" ? "Şikayet yok" : "Övgü yok"}
         </div>
       ) : (
@@ -192,8 +197,8 @@ export default function GeriBildirim({ user }) {
           <div key={item.id} className="card" style={{
             marginBottom: 8,
             borderLeft: `3px solid ${!item.goruldu
-              ? (tab === "sikayet" ? "var(--danger)" : "var(--success)")
-              : "var(--border)"}`,
+              ? (tab === "sikayet" ? "var(--red)" : "var(--success)")
+              : "var(--divider)"}`,
           }}>
             <div className="card-row" style={{ alignItems: "flex-start" }}>
               <div style={{ flex: 1 }}>
@@ -217,7 +222,7 @@ export default function GeriBildirim({ user }) {
               {!item.goruldu && (
                 <div style={{
                   flexShrink: 0, width: 8, height: 8, borderRadius: "50%",
-                  background: tab === "sikayet" ? "var(--danger)" : "var(--success)",
+                  background: tab === "sikayet" ? "var(--red)" : "var(--success)",
                   marginTop: 4,
                 }} />
               )}

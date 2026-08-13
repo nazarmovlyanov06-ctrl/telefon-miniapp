@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { Search, CheckCircle2, Clock, Lock, ClipboardList, CircleX, User, Phone, ShieldCheck } from "lucide-react";
 
 export default function Garanti() {
   const navigate = useNavigate();
@@ -104,16 +105,16 @@ export default function Garanti() {
           value={aramaQ}
           onChange={e => setAramaQ(e.target.value)}
           onKeyDown={e => e.key === "Enter" && search()} />
-        <button className="btn btn-ghost btn-sm" onClick={search}>🔍</button>
+        <button className="btn btn-ghost btn-sm" onClick={search} style={{ display: "flex" }}><Search size={15} strokeWidth={2} /></button>
       </div>
 
       {/* Sekmeler */}
       <div className="tabs" style={{ marginBottom: 12 }}>
         {[
-          { key: "aktif", label: "✅ Aktif" },
-          { key: "bitmis", label: "⏰ Süresi Doldu" },
-          { key: "kapali", label: "🔒 Kapalı" },
-          { key: "hepsi", label: "📋 Hepsi" },
+          { key: "aktif", label: "Aktif" },
+          { key: "bitmis", label: "Süresi Doldu" },
+          { key: "kapali", label: "Kapalı" },
+          { key: "hepsi", label: "Hepsi" },
         ].map(t => (
           <button key={t.key} className={`tab ${gosterTab === t.key ? "active" : ""}`}
             onClick={() => setGosterTab(t.key)}>{t.label}</button>
@@ -125,12 +126,12 @@ export default function Garanti() {
           {hazirTamirler.length > 0 && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowTamirPicker(true)}>
-                📋 Tamirden Doldur
+                Tamirden Doldur
               </button>
             </div>
           )}
           <form onSubmit={submit}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
             <div className="form-group" style={{ position: "relative" }}>
               <label className="form-label">Müşteri Adı *</label>
               <input
@@ -150,7 +151,7 @@ export default function Garanti() {
                   {oneriler.map(m => (
                     <div key={m.id} onMouseDown={() => secMusteri(m)}
                       style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-                      <span>👤 {m.name}</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
                       {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
                     </div>
                   ))}
@@ -195,7 +196,7 @@ export default function Garanti() {
           onClick={() => setShowTamirPicker(false)}>
           <div className="card" style={{ width: "100%", maxHeight: "60vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ fontWeight: 700, marginBottom: 10 }}>✅ Hazır Tamir Seç</div>
+            <div style={{ fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><CheckCircle2 size={15} strokeWidth={2} /> Hazır Tamir Seç</div>
             {hazirTamirler.map(t => (
               <div key={t.id} onMouseDown={() => {
                 setForm(f => ({
@@ -219,7 +220,7 @@ export default function Garanti() {
       {loading ? (
         <div className="loading">Yükleniyor...</div>
       ) : list.length === 0 ? (
-        <div className="empty"><div className="empty-icon">🛡️</div>Kayıt yok</div>
+        <div className="empty"><div className="empty-icon" style={{display:"flex",justifyContent:"center"}}><ShieldCheck size={40} stroke="var(--dim)" strokeWidth={1.5}/></div>Kayıt yok</div>
       ) : list.map(g => {
         const dl = daysLeft(g.bitis_tarihi);
         const warn = dl <= 7 && dl >= 0;
@@ -238,10 +239,10 @@ export default function Garanti() {
                 <div style={{ fontSize: 11, color: "var(--hint)" }}>Bitiş: {g.bitis_tarihi}</div>
               </div>
             </div>
-            {g.telefon && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>📞 {g.telefon}</div>}
+            {g.telefon && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}><Phone size={11} strokeWidth={2} /> {g.telefon}</div>}
             {!g.aktif || expired ? null : (
               <div style={{ marginTop: 8 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => kapat(g.id)}>✓ Kapat</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => kapat(g.id)}>Kapat</button>
               </div>
             )}
           </div>

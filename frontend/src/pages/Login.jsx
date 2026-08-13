@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api, setToken } from "../api";
+import { Wrench } from "lucide-react";
 
 export default function Login({ onGiris }) {
   const [email, setEmail] = useState("");
@@ -31,7 +32,7 @@ export default function Login({ onGiris }) {
       <form onSubmit={gonder} style={{ width: "100%", maxWidth: 340, display: "flex",
         flexDirection: "column", gap: 12 }}>
         <div style={{ textAlign: "center", marginBottom: 8 }}>
-          <div style={{ fontSize: 40 }}>🔧</div>
+          <Wrench size={38} strokeWidth={1.6} style={{ display: "inline-block" }} />
           <div style={{ fontWeight: 700, fontSize: 20, marginTop: 8 }}>Telefon Servis</div>
           <div style={{ fontSize: 13, color: "var(--hint)" }}>Panele giriş yap</div>
         </div>
@@ -39,7 +40,7 @@ export default function Login({ onGiris }) {
           value={email} onChange={e => setEmail(e.target.value)} autoFocus />
         <input className="form-input" type="password" placeholder="Şifre" required
           value={sifre} onChange={e => setSifre(e.target.value)} />
-        {err && <div style={{ color: "var(--danger)", fontSize: 13 }}>❌ {err}</div>}
+        {err && <div style={{ color: "var(--danger)", fontSize: 13 }}>{err}</div>}
         <button type="submit" className="btn btn-primary" disabled={loading}>
           {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
         </button>

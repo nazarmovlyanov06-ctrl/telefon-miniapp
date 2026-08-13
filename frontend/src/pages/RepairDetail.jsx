@@ -2,14 +2,26 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { PatternPreview } from "../components/PatternLock";
+import {
+  Pencil, Home, CheckCircle2, Receipt, Copy, Check, MessageCircle,
+  Trash2, Lock, Eye, EyeOff, SquareCheck, Calendar, ClipboardList,
+  Wrench, Camera, User, X, CircleX, Search, FileClock, Package,
+} from "lucide-react";
 
 const STATUSES = [
-  { key: "bekliyor", label: "⏳ Bekliyor" },
-  { key: "tamirde", label: "🔧 Tamirde" },
-  { key: "parca_bekleniyor", label: "📦 Parça Bekleniyor" },
-  { key: "hazir", label: "✅ Hazır" },
-  { key: "teslim", label: "🏠 Teslim Edildi" },
+  { key: "bekliyor", label: "Bekliyor" },
+  { key: "tamirde", label: "Tamirde" },
+  { key: "parca_bekleniyor", label: "Parça Bekleniyor" },
+  { key: "hazir", label: "Hazır" },
+  { key: "teslim", label: "Teslim Edildi" },
 ];
+
+const DATE_ICONS = {
+  acildi: FileClock,
+  tamirde: Wrench,
+  hazir: CheckCircle2,
+  teslim: Home,
+};
 
 function fmt(n) { return (n || 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 }); }
 
@@ -211,7 +223,7 @@ export default function RepairDetail({ user }) {
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(mesaj)}`, "_blank");
   }
 
-  // ── FİŞ ──────────────────────────────────────────────────────
+  // ── FİŞ (müşteriye giden düz metin — uygulama arayüzü değil) ──
 
   function generateFis() {
     if (!repair) return "";
@@ -266,8 +278,8 @@ export default function RepairDetail({ user }) {
       <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate("/repairs")}>← Geri</button>
         <div style={{ flex: 1, fontWeight: 700, fontSize: 16 }}>#{repair.repair_no}</div>
-        <button className="btn btn-ghost btn-sm" onClick={() => setEdit(!edit)}>
-          {edit ? "İptal" : "✏️ Düzenle"}
+        <button className="btn btn-ghost btn-sm" onClick={() => setEdit(!edit)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {edit ? "İptal" : <><Pencil size={13} strokeWidth={2} /> Düzenle</>}
         </button>
       </div>
 
@@ -289,7 +301,9 @@ export default function RepairDetail({ user }) {
       {teslimModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div className="card" style={{ width: "100%", maxWidth: 400 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>🏠 Teslim Et</div>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              <Home size={16} strokeWidth={2} /> Teslim Et
+            </div>
             <div className="form-group">
               <label className="form-label">Son Ücret (₺)</label>
               <input className="form-input" type="number" value={teslimForm.final_price}
@@ -300,10 +314,10 @@ export default function RepairDetail({ user }) {
               <label className="form-label">Ödeme Tipi</label>
               <select className="form-select" value={teslimForm.payment_type}
                 onChange={e => setTeslimForm(f => ({ ...f, payment_type: e.target.value }))}>
-                <option value="nakit">💵 Nakit</option>
-                <option value="kart">💳 Kart</option>
-                <option value="taksit">📅 Taksit</option>
-                <option value="borc">📝 Borç</option>
+                <option value="nakit">Nakit</option>
+                <option value="kart">Kart</option>
+                <option value="taksit">Taksit</option>
+                <option value="borc">Borç</option>
               </select>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -314,13 +328,13 @@ export default function RepairDetail({ user }) {
             </div>
             {teslimForm.final_price && (
               <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>
-                💵 {parseFloat(teslimForm.final_price).toLocaleString("tr-TR")}₺ · {teslimForm.payment_type}
+                {parseFloat(teslimForm.final_price).toLocaleString("tr-TR")}₺ · {teslimForm.payment_type}
                 {teslimForm.kasa_yazilsin && " · kasaya yazılacak"}
               </div>
             )}
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn btn-primary" onClick={teslimEt} disabled={saving}>
-                {saving ? "..." : "✅ Teslim Et"}
+              <button className="btn btn-primary" onClick={teslimEt} disabled={saving} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                {saving ? "..." : <><CheckCircle2 size={15} strokeWidth={2} /> Teslim Et</>}
               </button>
               <button className="btn btn-ghost" onClick={() => setTeslimModal(false)}>İptal</button>
             </div>
@@ -334,18 +348,20 @@ export default function RepairDetail({ user }) {
           onClick={() => setFisModal(false)}>
           <div className="card" style={{ width: "100%", maxWidth: 480, maxHeight: "80vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>🧾 Tamir Fişi</div>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+              <Receipt size={16} strokeWidth={2} /> Tamir Fişi
+            </div>
             <pre style={{ fontFamily: "monospace", fontSize: 12, lineHeight: 1.7, whiteSpace: "pre-wrap", background: "var(--bg2)", padding: 12, borderRadius: 8, marginBottom: 12 }}>
               {generateFis()}
             </pre>
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={copyFis}>
-                {copied ? "✅ Kopyalandı!" : "📋 Kopyala"}
+              <button className="btn btn-primary" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} onClick={copyFis}>
+                {copied ? <><Check size={14} strokeWidth={2.4} /> Kopyalandı!</> : <><Copy size={14} strokeWidth={2} /> Kopyala</>}
               </button>
               {repair.customer_phone && (
-                <button className="btn btn-ghost" style={{ flex: 1 }}
+                <button className="btn btn-ghost" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                   onClick={() => openWhatsApp(generateFis())}>
-                  💬 WhatsApp
+                  <MessageCircle size={14} strokeWidth={2} /> WhatsApp
                 </button>
               )}
               <button className="btn btn-ghost" onClick={() => setFisModal(false)}>Kapat</button>
@@ -360,8 +376,8 @@ export default function RepairDetail({ user }) {
           onClick={() => setFotoView(null)}>
           <img src={fotoView.foto} alt="" style={{ maxWidth: "95%", maxHeight: "80vh", borderRadius: 8, objectFit: "contain" }} onClick={e => e.stopPropagation()} />
           <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-            <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); deleteFoto(fotoView.id); }}>
-              🗑️ Sil
+            <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); deleteFoto(fotoView.id); }} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Trash2 size={13} strokeWidth={2} /> Sil
             </button>
             <button className="btn btn-ghost btn-sm" onClick={() => setFotoView(null)}>Kapat</button>
           </div>
@@ -396,10 +412,10 @@ export default function RepairDetail({ user }) {
             <label className="form-label">Ödeme Tipi</label>
             <select className="form-select" value={form.payment_type}
               onChange={(e) => setForm({ ...form, payment_type: e.target.value })}>
-              <option value="nakit">💵 Nakit</option>
-              <option value="kart">💳 Kart</option>
-              <option value="taksit">📅 Taksit</option>
-              <option value="borc">📝 Borç</option>
+              <option value="nakit">Nakit</option>
+              <option value="kart">Kart</option>
+              <option value="taksit">Taksit</option>
+              <option value="borc">Borç</option>
             </select>
           </div>
           <div className="form-group">
@@ -413,7 +429,7 @@ export default function RepairDetail({ user }) {
               onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
           <button className="btn btn-primary" onClick={save} disabled={saving}>
-            {saving ? "Kaydediliyor..." : "💾 Kaydet"}
+            {saving ? "Kaydediliyor..." : "Kaydet"}
           </button>
         </div>
       ) : (
@@ -433,7 +449,7 @@ export default function RepairDetail({ user }) {
               <>
                 <div className="divider" />
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: 12, color: "var(--hint)" }}>
-                  <span>✏️ Son düzenleyen</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Pencil size={11} strokeWidth={2} /> Son düzenleyen</span>
                   <span style={{ fontWeight: 600, color: "var(--text)" }}>{repair.son_guncelleyen_adi}</span>
                 </div>
               </>
@@ -442,10 +458,10 @@ export default function RepairDetail({ user }) {
 
           {/* Ekran kilidi */}
           {repair.screen_lock_type && (
-            <div className="card" style={{ background: "rgba(99,102,241,0.08)", borderLeft: "3px solid var(--accent)" }}>
+            <div className="card" style={{ background: "rgba(94,168,255,0.08)", borderLeft: "3px solid var(--blue)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 24 }}>🔒</span>
+                  <Lock size={22} stroke="var(--blue)" strokeWidth={1.8} />
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>Ekran Kilidi</div>
                     <div style={{ fontSize: 13, color: "var(--hint)" }}>
@@ -456,13 +472,14 @@ export default function RepairDetail({ user }) {
                 <button
                   onClick={() => setShowLock(v => !v)}
                   style={{
-                    padding: "7px 14px", borderRadius: 20, border: "1.5px solid var(--accent)",
-                    background: showLock ? "var(--accent)" : "transparent",
-                    color: showLock ? "#fff" : "var(--accent)",
+                    padding: "7px 14px", borderRadius: 20, border: "1.5px solid var(--blue)",
+                    background: showLock ? "var(--blue)" : "transparent",
+                    color: showLock ? "#191b20" : "var(--blue)",
                     fontSize: 13, fontWeight: 700, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 6,
                   }}
                 >
-                  {showLock ? "🙈 Gizle" : "👁 Göster"}
+                  {showLock ? <><EyeOff size={14} strokeWidth={2} /> Gizle</> : <><Eye size={14} strokeWidth={2} /> Göster</>}
                 </button>
               </div>
 
@@ -470,7 +487,7 @@ export default function RepairDetail({ user }) {
                 <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
                   {repair.screen_lock_type === "pin" ? (
                     <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: 8, color: "var(--accent)", fontFamily: "monospace" }}>
+                      <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: 8, color: "var(--blue)", fontFamily: "monospace" }}>
                         {repair.screen_lock_value}
                       </div>
                       <div style={{ fontSize: 13, color: "var(--hint)", marginTop: 4 }}>PIN Kodu</div>
@@ -502,7 +519,9 @@ export default function RepairDetail({ user }) {
 
           {/* Kontrol Listesi */}
           <div className="card">
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: "var(--hint)" }}>✅ KONTROL LİSTESİ</div>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: "var(--hint)", display: "flex", alignItems: "center", gap: 7 }}>
+              <SquareCheck size={14} strokeWidth={2} /> KONTROL LİSTESİ
+            </div>
             {[
               { key: "on_odeme", label: "Ön ödeme alındı" },
               { key: "musteri_onayi", label: "Müşteri onayı alındı" },
@@ -518,12 +537,12 @@ export default function RepairDetail({ user }) {
                   }}
                   style={{
                     width: 22, height: 22, borderRadius: 6, flexShrink: 0, cursor: "pointer",
-                    border: `2px solid ${repair[item.key] ? "var(--accent)" : "var(--border)"}`,
-                    background: repair[item.key] ? "var(--accent)" : "transparent",
+                    border: `2px solid ${repair[item.key] ? "var(--blue)" : "var(--divider)"}`,
+                    background: repair[item.key] ? "var(--blue)" : "transparent",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#fff", fontSize: 13,
+                    color: "#191b20",
                   }}>
-                  {repair[item.key] ? "✓" : ""}
+                  {repair[item.key] ? <Check size={14} strokeWidth={3} /> : null}
                 </div>
                 <span style={{ fontSize: 13, color: repair[item.key] ? "var(--text)" : "var(--hint)" }}>
                   {item.label}
@@ -534,35 +553,39 @@ export default function RepairDetail({ user }) {
 
           {/* Tarihler */}
           <div className="card">
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: "var(--hint)" }}>📅 TARİHLER</div>
-            <DateRow icon="📝" label="Kayıt Açıldı" val={repair.created_at} done />
-            <DateRow icon="🔧" label="Tamire Alındı" val={repair.tamirde_at} done={!!repair.tamirde_at} />
-            <DateRow icon="✅" label="Hazır Oldu" val={repair.completed_at} done={!!repair.completed_at} />
-            <DateRow icon="🏠" label="Teslim Edildi" val={repair.delivered_at} done={!!repair.delivered_at} />
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: "var(--hint)", display: "flex", alignItems: "center", gap: 7 }}>
+              <Calendar size={14} strokeWidth={2} /> TARİHLER
+            </div>
+            <DateRow icon={DATE_ICONS.acildi} label="Kayıt Açıldı" val={repair.created_at} done />
+            <DateRow icon={DATE_ICONS.tamirde} label="Tamire Alındı" val={repair.tamirde_at} done={!!repair.tamirde_at} />
+            <DateRow icon={DATE_ICONS.hazir} label="Hazır Oldu" val={repair.completed_at} done={!!repair.completed_at} />
+            <DateRow icon={DATE_ICONS.teslim} label="Teslim Edildi" val={repair.delivered_at} done={!!repair.delivered_at} />
           </div>
 
           {/* Aksiyonlar */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
             {(isHazir || isTeslim) && repair.customer_phone && (
               <button className="btn btn-ghost btn-sm"
-                style={{ background: "#25D366", color: "#fff", border: "none" }}
+                style={{ background: "#25D366", color: "#fff", border: "none", display: "flex", alignItems: "center", gap: 6 }}
                 onClick={() => openWhatsApp(
                   isHazir
-                    ? `Merhaba ${repair.customer_name || ""},\n\n${repair.device_model} cihazınızın tamiri tamamlandı. Servisimizden teslim alabilirsiniz. 🔧✅`
+                    ? `Merhaba ${repair.customer_name || ""},\n\n${repair.device_model} cihazınızın tamiri tamamlandı. Servisimizden teslim alabilirsiniz. ✅`
                     : `Merhaba ${repair.customer_name || ""},\n\nTamiriniz (#${repair.repair_no}) ile ilgili bilgi almak ister misiniz?`
                 )}>
-                💬 WhatsApp{isHazir ? " - Hazır" : ""}
+                <MessageCircle size={13} strokeWidth={2} /> WhatsApp{isHazir ? " - Hazır" : ""}
               </button>
             )}
-            <button className="btn btn-ghost btn-sm" onClick={() => setFisModal(true)}>
-              🧾 Fiş
+            <button className="btn btn-ghost btn-sm" onClick={() => setFisModal(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Receipt size={13} strokeWidth={2} /> Fiş
             </button>
           </div>
 
           {/* Kullanılan Parçalar */}
           <div className="card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hint)" }}>🔩 KULLANILAN PARÇALAR</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hint)", display: "flex", alignItems: "center", gap: 7 }}>
+                <Package size={14} strokeWidth={2} /> KULLANILAN PARÇALAR
+              </div>
               <button className="btn btn-ghost btn-sm" onClick={openParcaEkle}>
                 {parcaEkleOpen ? "İptal" : "+ Ekle"}
               </button>
@@ -578,8 +601,8 @@ export default function RepairDetail({ user }) {
                       const secP = partsList.find(p => p.id === parseInt(parcaForm.part_id));
                       if (secP) return (
                         <div style={{ display: "flex", alignItems: "center", gap: 8,
-                          background: "rgba(36,129,204,0.1)", borderRadius: 8, padding: "8px 10px",
-                          border: "1.5px solid var(--accent)" }}>
+                          background: "rgba(94,168,255,0.1)", borderRadius: 8, padding: "8px 10px",
+                          border: "1.5px solid var(--blue)" }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 700, fontSize: 13 }}>{secP.name}</div>
                             <div style={{ fontSize: 11, color: "var(--hint)" }}>
@@ -588,7 +611,9 @@ export default function RepairDetail({ user }) {
                           </div>
                           <button type="button"
                             onClick={() => { setParcaForm(f => ({ ...f, part_id: "" })); setParcaQ(""); setParcaHata(""); }}
-                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", fontSize: 16 }}>✕</button>
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex" }}>
+                            <X size={15} strokeWidth={2} />
+                          </button>
                         </div>
                       );
                       const filtered = partsList
@@ -599,12 +624,16 @@ export default function RepairDetail({ user }) {
                         .slice(0, 8);
                       return (
                         <>
-                          <input className="form-input" placeholder="🔍 Parça ara..."
-                            value={parcaQ}
-                            onChange={e => { setParcaQ(e.target.value); setShowParcaOner(true); }}
-                            onFocus={() => setShowParcaOner(true)}
-                            onBlur={() => setTimeout(() => setShowParcaOner(false), 150)}
-                            autoComplete="off" />
+                          <div className="inset" style={{ borderRadius: 10, display: "flex", alignItems: "center", gap: 8, padding: "9px 12px" }}>
+                            <Search size={14} stroke="var(--hint)" strokeWidth={2} />
+                            <input style={{ background: "none", border: "none", outline: "none", color: "var(--text)", font: "inherit", fontSize: 14, flex: 1 }}
+                              placeholder="Parça ara..."
+                              value={parcaQ}
+                              onChange={e => { setParcaQ(e.target.value); setShowParcaOner(true); }}
+                              onFocus={() => setShowParcaOner(true)}
+                              onBlur={() => setTimeout(() => setShowParcaOner(false), 150)}
+                              autoComplete="off" />
+                          </div>
                           {showParcaOner && (
                             <div className="ac-dropdown" style={{ zIndex: 50, maxHeight: 200, overflowY: "auto" }}>
                               {filtered.length === 0 ? (
@@ -617,7 +646,7 @@ export default function RepairDetail({ user }) {
                                     setParcaForm(f => ({ ...f, part_id: String(p.id), quantity: 1 }));
                                     setParcaQ(""); setShowParcaOner(false); setParcaHata("");
                                   }}
-                                  style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)" }}>
+                                  style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--divider)" }}>
                                   <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
                                   <div style={{ fontSize: 11, color: "var(--hint)" }}>
                                     {p.device_model ? `${p.device_model} · ` : ""}
@@ -646,8 +675,8 @@ export default function RepairDetail({ user }) {
                     </button>
                   </div>
                   {parcaHata && (
-                    <div style={{ color: "#ef4444", fontSize: 13, marginTop: 8, fontWeight: 600 }}>
-                      ❌ {parcaHata}
+                    <div style={{ color: "var(--red)", fontSize: 13, marginTop: 8, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                      <CircleX size={14} strokeWidth={2} /> {parcaHata}
                     </div>
                   )}
                 </div>
@@ -667,9 +696,9 @@ export default function RepairDetail({ user }) {
                       <div style={{ fontSize: 11, color: "var(--hint)" }}>{p.quantity} adet × {fmt(p.unit_price)}₺</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontWeight: 700, color: "var(--accent)" }}>{fmt(p.quantity * p.unit_price)}₺</span>
-                      <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)", padding: "2px 6px" }}
-                        onClick={() => removeParca(p.id)}>✕</button>
+                      <span style={{ fontWeight: 700, color: "var(--blue)" }}>{fmt(p.quantity * p.unit_price)}₺</span>
+                      <button className="btn btn-ghost btn-sm" style={{ color: "var(--red)", padding: "2px 6px", display: "flex" }}
+                        onClick={() => removeParca(p.id)}><X size={14} strokeWidth={2} /></button>
                     </div>
                   </div>
                 ))}
@@ -685,7 +714,9 @@ export default function RepairDetail({ user }) {
           {/* Fotoğraflar */}
           <div className="card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hint)" }}>📷 FOTOĞRAFLAR</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hint)", display: "flex", alignItems: "center", gap: 7 }}>
+                <Camera size={14} strokeWidth={2} /> FOTOĞRAFLAR
+              </div>
               <button className="btn btn-ghost btn-sm"
                 onClick={() => fotoInputRef.current?.click()}
                 disabled={uploadingFoto}>
@@ -718,20 +749,20 @@ export default function RepairDetail({ user }) {
             </div>
           )}
           {repair.customer_id && (
-            <button className="btn btn-ghost" style={{ marginTop: 8 }}
+            <button className="btn btn-ghost" style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}
               onClick={() => navigate(`/customers/${repair.customer_id}`)}>
-              👤 Müşteri Detayı
+              <User size={15} strokeWidth={2} /> Müşteri Detayı
             </button>
           )}
           {user?.rol === "patron" && (
-            <button className="btn btn-danger" style={{ marginTop: 8 }}
+            <button className="btn btn-danger" style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}
               onClick={async () => {
                 if (confirm("Bu tamiri silmek istediğinize emin misiniz?")) {
                   await api.deleteRepair(id);
                   navigate("/repairs");
                 }
               }}>
-              🗑️ Sil
+              <Trash2 size={14} strokeWidth={2} /> Sil
             </button>
           )}
         </>
@@ -749,15 +780,17 @@ function Row({ label, value }) {
   );
 }
 
-function DateRow({ icon, label, val, done }) {
+function DateRow({ icon: Icon, label, val, done }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", opacity: done ? 1 : 0.35 }}>
       <div style={{
         width: 32, height: 32, borderRadius: "50%",
-        background: done ? "var(--accent)" : "var(--bg2)",
+        background: done ? "var(--blue)" : "var(--bg2)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 15, flexShrink: 0,
-      }}>{icon}</div>
+        flexShrink: 0,
+      }}>
+        <Icon size={15} stroke={done ? "#191b20" : "var(--hint)"} strokeWidth={2} />
+      </div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
         <div style={{ fontSize: 12, color: done ? "var(--text)" : "var(--hint)" }}>

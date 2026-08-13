@@ -23,6 +23,7 @@ function BekleyenEkran({ user }) {
   );
 }
 import BottomNav from "./components/BottomNav";
+import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Repairs from "./pages/Repairs";
 import RepairDetail from "./pages/RepairDetail";
@@ -84,10 +85,12 @@ function NavShell({ children }) {
 
   return (
     <div
+      className="app-shell"
       style={{ minHeight: "100dvh", position: "relative" }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
+      <Sidebar />
       {/* Geri butonu — kök sayfalarda gizli */}
       {!isRoot && (
         <button
@@ -96,12 +99,9 @@ function NavShell({ children }) {
           style={{
             position: "fixed", bottom: 85, right: 16, zIndex: 200,
             width: 40, height: 40, borderRadius: "50%",
-            background: "rgba(36,129,204,0.5)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
             border: "none",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, fontWeight: 700, cursor: "pointer", color: "var(--btn-text)",
+            fontSize: 20, fontWeight: 700, cursor: "pointer", color: "var(--text)",
             lineHeight: 1,
           }}
           aria-label="Geri"

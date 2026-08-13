@@ -4,6 +4,7 @@ import { api } from "../api";
 import VoiceInput from "../components/VoiceInput";
 import ImeiInput from "../components/ImeiInput";
 import PatternLock from "../components/PatternLock";
+import { Star, Lock, Hash, Shapes, CheckCircle2, Ban } from "lucide-react";
 
 // PIN pad bileşeni
 function PinPad({ value, onChange }) {
@@ -202,7 +203,7 @@ export default function NewRepair() {
         <button className="btn btn-ghost btn-sm" onClick={() => navigate("/repairs")}>← Geri</button>
         <div className="page-title" style={{ margin: 0, flex: 1 }}>Yeni Tamir</div>
         {sablonlar.length > 0 && (
-          <button className="btn btn-ghost btn-sm" onClick={() => setSablonModal(true)}>⭐ Şablon</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setSablonModal(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}><Star size={14} strokeWidth={2} /> Şablon</button>
         )}
       </div>
 
@@ -212,7 +213,7 @@ export default function NewRepair() {
           onClick={() => setSablonModal(false)}>
           <div className="card" style={{ width: "100%", maxHeight: "70vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>⭐ Şablon Seç</div>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 7 }}><Star size={15} strokeWidth={2} /> Şablon Seç</div>
             {sablonlar.map(s => (
               <div key={s.id} onClick={() => sablonUygula(s)}
                 style={{ padding: "10px 12px", borderRadius: 10, background: "var(--bg2)", marginBottom: 8, cursor: "pointer" }}>
@@ -230,7 +231,7 @@ export default function NewRepair() {
       {error && <div className="error-msg">{error}</div>}
 
       <form onSubmit={submit}>
-        <div className="section-title">🔒 Ekran Kilidi</div>
+        <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}><Lock size={13} strokeWidth={2} /> Ekran Kilidi</div>
         <div className="card" style={{ marginBottom: 8 }}>
           {/* Açma/kapama */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: lockEnabled ? 16 : 0 }}>
@@ -258,7 +259,7 @@ export default function NewRepair() {
             <div>
               {/* Tip seçimi */}
               <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-                {[{ k: "pin", l: "🔢 PIN / Şifre" }, { k: "pattern", l: "🔷 Desen" }].map(t => (
+                {[{ k: "pin", l: "PIN / Şifre", Icon: Hash }, { k: "pattern", l: "Desen", Icon: Shapes }].map(t => (
                   <button key={t.k} type="button"
                     onClick={() => { setLockType(t.k); setLockPin(""); setLockPattern(""); }}
                     style={{
@@ -267,8 +268,9 @@ export default function NewRepair() {
                       background: lockType === t.k ? "rgba(var(--accent-rgb,99,102,241),0.12)" : "var(--bg2)",
                       color: lockType === t.k ? "var(--accent)" : "var(--text)",
                       fontWeight: 700, fontSize: 14, cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                     }}>
-                    {t.l}
+                    <t.Icon size={14} strokeWidth={2} /> {t.l}
                   </button>
                 ))}
               </div>
@@ -314,7 +316,7 @@ export default function NewRepair() {
               </div>
             )}
             {musteriSec && (
-              <div style={{ fontSize: 12, color: "var(--success)", marginTop: 4 }}>✅ Kayıtlı müşteri seçildi</div>
+              <div style={{ fontSize: 12, color: "var(--success)", marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}><CheckCircle2 size={12} strokeWidth={2} /> Kayıtlı müşteri seçildi</div>
             )}
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -324,7 +326,7 @@ export default function NewRepair() {
               onChange={e => set("customer_phone", e.target.value)} />
             {karaUyari.length > 0 && (
               <div style={{ background: "rgba(239,68,68,0.12)", borderRadius: 8, padding: "8px 12px", marginTop: 8, borderLeft: "3px solid #ef4444" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444" }}>⛔ Kara Listede!</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", display: "flex", alignItems: "center", gap: 6 }}><Ban size={14} strokeWidth={2} /> Kara Listede!</div>
                 {karaUyari.map(k => (
                   <div key={k.id} style={{ fontSize: 12, color: "var(--text)", marginTop: 2 }}>
                     {k.ad}{k.sebep ? ` — ${k.sebep}` : ""}
@@ -413,8 +415,8 @@ export default function NewRepair() {
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <button className="btn btn-primary" type="submit" disabled={saving} style={{ flex: 1 }}>
-            {saving ? "Kaydediliyor..." : "✅ Tamir Kaydı Oluştur"}
+          <button className="btn btn-primary" type="submit" disabled={saving} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+            {saving ? "Kaydediliyor..." : (<><CheckCircle2 size={15} strokeWidth={2} /> Tamir Kaydı Oluştur</>)}
           </button>
           {form.device_model && form.fault_desc && (
             <button type="button" className="btn btn-ghost"
@@ -430,11 +432,12 @@ export default function NewRepair() {
                   });
                   const s = await api.sablonlar();
                   setSablonlar(s);
-                  alert("⭐ Şablon kaydedildi!");
+                  alert("Şablon kaydedildi!");
                 } catch {}
               }}
-              title="Şablon olarak kaydet">
-              ⭐
+              title="Şablon olarak kaydet"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Star size={16} strokeWidth={2} />
             </button>
           )}
         </div>

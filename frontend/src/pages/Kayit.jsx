@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api, setToken } from "../api";
+import { Wrench } from "lucide-react";
 
 export default function Kayit({ onGiris }) {
   const [form, setForm] = useState({ dukkan_adi: "", ad: "", email: "", sifre: "", telefon: "" });
@@ -33,7 +34,7 @@ export default function Kayit({ onGiris }) {
       <form onSubmit={gonder} style={{ width: "100%", maxWidth: 360, display: "flex",
         flexDirection: "column", gap: 12 }}>
         <div style={{ textAlign: "center", marginBottom: 8 }}>
-          <div style={{ fontSize: 40 }}>🔧</div>
+          <Wrench size={38} strokeWidth={1.6} style={{ display: "inline-block" }} />
           <div style={{ fontWeight: 700, fontSize: 20, marginTop: 8 }}>Dükkânını Kaydet</div>
           <div style={{ fontSize: 13, color: "var(--hint)" }}>Ücretsiz denemeye başla</div>
         </div>
@@ -47,7 +48,7 @@ export default function Kayit({ onGiris }) {
           value={form.email} onChange={e => set("email", e.target.value)} />
         <input className="form-input" type="password" placeholder="Şifre (en az 6 karakter)" required
           value={form.sifre} onChange={e => set("sifre", e.target.value)} />
-        {err && <div style={{ color: "var(--danger)", fontSize: 13 }}>❌ {err}</div>}
+        {err && <div style={{ color: "var(--danger)", fontSize: 13 }}>{err}</div>}
         <button type="submit" className="btn btn-primary" disabled={loading}>
           {loading ? "Kaydediliyor..." : "Dükkânı Oluştur"}
         </button>

@@ -1,16 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import {
+  Clock, Truck, CheckCircle2, CircleX, TriangleAlert, Banknote, Package,
+} from "lucide-react";
 
-const DURUM_LABEL = {
-  bekliyor: "⏳ Bekliyor",
-  gönderildi: "🚚 Gönderildi",
-  para_iade_alindi: "✅ Para Alındı",
-};
-const DURUM_COLOR = {
-  bekliyor: { bg: "#fef3c7", color: "#92400e" },
-  gönderildi: { bg: "#dbeafe", color: "#1e40af" },
-  para_iade_alindi: { bg: "#dcfce7", color: "#166534" },
+const DURUM_META = {
+  bekliyor: { label: "Bekliyor", icon: Clock, bg: "rgba(246,162,74,0.15)", color: "var(--orange)" },
+  gönderildi: { label: "Gönderildi", icon: Truck, bg: "rgba(94,168,255,0.15)", color: "var(--blue)" },
+  para_iade_alindi: { label: "Para Alındı", icon: CheckCircle2, bg: "rgba(74,222,128,0.15)", color: "var(--green)" },
 };
 
 export default function ParcaIade() {
@@ -141,7 +139,7 @@ export default function ParcaIade() {
         <div className="card" style={{ marginBottom: 10 }}>
           <div className="card-row">
             <span style={{ color: "var(--hint)", fontSize: 13 }}>Bekleyen İade</span>
-            <span style={{ fontWeight: 700, color: "var(--warn, #f59e0b)" }}>{bekleyen.length} adet</span>
+            <span style={{ fontWeight: 700, color: "var(--orange)" }}>{bekleyen.length} adet</span>
           </div>
           {bekleyen.some(i => i.beklenen_tutar > 0) && (
             <div className="card-row" style={{ marginTop: 4 }}>
@@ -157,7 +155,7 @@ export default function ParcaIade() {
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
 
             <div className="form-group" style={{ position: "relative" }}>
               <label className="form-label">Parça (Stoktan Seç) *</label>
@@ -170,21 +168,17 @@ export default function ParcaIade() {
                 autoComplete="off"
               />
               {showParcaOner && (
-                <div style={{
-                  position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
-                  background: "var(--card)", border: "1px solid var(--border)",
-                  borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden", maxHeight: 220, overflowY: "auto"
-                }}>
+                <div className="ac-dropdown" style={{ maxHeight: 220, overflowY: "auto" }}>
                   {parcaOneriler.map(p => (
                     <div key={p.id} onMouseDown={() => secParca(p)}
                       style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
-                        borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <div>{p.name}</div>
                         {p.device_model && <div style={{ fontSize: 11, color: "var(--hint)" }}>{p.device_model}</div>}
                       </div>
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 12, color: p.quantity <= 2 ? "var(--danger)" : "var(--success)", fontWeight: 600 }}>
+                        <div style={{ fontSize: 12, color: p.quantity <= 2 ? "var(--red)" : "var(--success)", fontWeight: 600 }}>
                           {p.quantity} adet
                         </div>
                         {p.purchase_price > 0 && <div style={{ fontSize: 11, color: "var(--hint)" }}>₺{p.purchase_price}</div>}
@@ -196,8 +190,8 @@ export default function ParcaIade() {
             </div>
 
             {selectedParca && (
-              <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 10 }}>
-                ✅ <strong>{selectedParca.name}</strong> — Stokta: {selectedParca.quantity} adet
+              <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}>
+                <CheckCircle2 size={14} stroke="var(--green)" strokeWidth={2} /> <strong>{selectedParca.name}</strong> — Stokta: {selectedParca.quantity} adet
               </div>
             )}
 
@@ -217,8 +211,8 @@ export default function ParcaIade() {
                   value={form.miktar}
                   onChange={e => setForm({ ...form, miktar: e.target.value })} />
                 {selectedParca && parseInt(form.miktar) > selectedParca.quantity && (
-                  <div style={{ color: "var(--danger)", fontSize: 12, marginTop: 4 }}>
-                    ⚠️ Stokta sadece {selectedParca.quantity} adet var
+                  <div style={{ color: "var(--red)", fontSize: 12, marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                    <TriangleAlert size={11} strokeWidth={2} /> Stokta sadece {selectedParca.quantity} adet var
                   </div>
                 )}
               </div>
@@ -251,8 +245,8 @@ export default function ParcaIade() {
       {paraModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div className="card" style={{ width: "100%", maxWidth: 360 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
-              💰 Para İade Alındı
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+              <Banknote size={16} strokeWidth={2} /> Para İade Alındı
             </div>
             <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 12 }}>
               {paraModal.parca} — {paraModal.toptanci_adi || "Toptancı belirtilmedi"}
@@ -273,7 +267,9 @@ export default function ParcaIade() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn btn-primary" onClick={submitParaAlindi}>✅ Onayla</button>
+              <button className="btn btn-primary" onClick={submitParaAlindi} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                <CheckCircle2 size={15} strokeWidth={2} /> Onayla
+              </button>
               <button className="btn btn-ghost" onClick={() => setParaModal(null)}>İptal</button>
             </div>
           </div>
@@ -281,41 +277,51 @@ export default function ParcaIade() {
       )}
 
       {list.length === 0 ? (
-        <div className="empty"><div className="empty-icon">📦</div>İade kaydı yok</div>
+        <div className="empty">
+          <div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}><Package size={40} stroke="var(--dim)" strokeWidth={1.5} /></div>
+          İade kaydı yok
+        </div>
       ) : (
         <>
-          {bekleyen.map(i => (
-            <div key={i.id} className="card">
-              <div className="card-row">
-                <div>
-                  <div style={{ fontWeight: 600 }}>{i.parca}</div>
-                  <div style={{ fontSize: 13, color: "var(--hint)" }}>
-                    {i.toptanci_adi ? `📦 ${i.toptanci_adi} · ` : ""}{i.miktar} adet
-                    {i.beklenen_tutar > 0 ? ` · ₺${i.beklenen_tutar.toLocaleString("tr-TR")} bekleniyor` : ""}
+          {bekleyen.map(i => {
+            const meta = DURUM_META[i.durum] || { label: i.durum, icon: Package, bg: "var(--bg2)", color: "var(--hint)" };
+            const MetaIcon = meta.icon;
+            return (
+              <div key={i.id} className="card">
+                <div className="card-row">
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{i.parca}</div>
+                    <div style={{ fontSize: 13, color: "var(--hint)" }}>
+                      {i.toptanci_adi ? `${i.toptanci_adi} · ` : ""}{i.miktar} adet
+                      {i.beklenen_tutar > 0 ? ` · ₺${i.beklenen_tutar.toLocaleString("tr-TR")} bekleniyor` : ""}
+                    </div>
+                    {i.sebep && <div style={{ fontSize: 12, color: "var(--hint)" }}>{i.sebep}</div>}
                   </div>
-                  {i.sebep && <div style={{ fontSize: 12, color: "var(--hint)" }}>{i.sebep}</div>}
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{
+                      display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20,
+                      fontSize: 12, fontWeight: 600,
+                      background: meta.bg, color: meta.color,
+                    }}>
+                      <MetaIcon size={12} strokeWidth={2} /> {meta.label}
+                    </div>
+                  </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{
-                    display: "inline-block", padding: "3px 9px", borderRadius: 20,
-                    fontSize: 12, fontWeight: 600,
-                    background: DURUM_COLOR[i.durum]?.bg || "#f3f4f6",
-                    color: DURUM_COLOR[i.durum]?.color || "#374151",
-                  }}>
-                    {DURUM_LABEL[i.durum] || i.durum}
-                  </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  {i.durum === "bekliyor" && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "gönderildi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Truck size={13} strokeWidth={2} /> Gönderildi
+                    </button>
+                  )}
+                  {i.durum === "gönderildi" && (
+                    <button className="btn btn-primary btn-sm" onClick={() => updateDurum(i.id, "para_iade_alindi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Banknote size={13} strokeWidth={2} /> Para Alındı
+                    </button>
+                  )}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                {i.durum === "bekliyor" && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "gönderildi")}>🚚 Gönderildi</button>
-                )}
-                {i.durum === "gönderildi" && (
-                  <button className="btn btn-primary btn-sm" onClick={() => updateDurum(i.id, "para_iade_alindi")}>💰 Para Alındı</button>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {tamamlanan.length > 0 && (
             <>
               <div className="section-title" style={{ marginTop: 16 }}>Tamamlananlar ({tamamlanan.length})</div>
@@ -323,19 +329,21 @@ export default function ParcaIade() {
                 <div key={i.id} className="card" style={{ opacity: 0.75 }}>
                   <div className="card-row">
                     <div>
-                      <div style={{ fontWeight: 600 }}>✅ {i.parca}</div>
+                      <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                        <CheckCircle2 size={13} stroke="var(--green)" strokeWidth={2} /> {i.parca}
+                      </div>
                       <div style={{ fontSize: 12, color: "var(--hint)" }}>
                         {i.toptanci_adi ? `${i.toptanci_adi} · ` : ""}{i.miktar} adet
                         {i.beklenen_tutar > 0 ? ` · ₺${i.beklenen_tutar.toLocaleString("tr-TR")}` : ""}
                       </div>
                     </div>
                     <div style={{
-                      display: "inline-block", padding: "3px 9px", borderRadius: 20,
+                      display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20,
                       fontSize: 12, fontWeight: 600,
-                      background: DURUM_COLOR.para_iade_alindi.bg,
-                      color: DURUM_COLOR.para_iade_alindi.color,
+                      background: DURUM_META.para_iade_alindi.bg,
+                      color: DURUM_META.para_iade_alindi.color,
                     }}>
-                      {DURUM_LABEL.para_iade_alindi}
+                      <CheckCircle2 size={12} strokeWidth={2} /> {DURUM_META.para_iade_alindi.label}
                     </div>
                   </div>
                 </div>

@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import {
+  Banknote, Landmark, ClipboardList, CircleX, User, Ban, Phone, Calendar,
+  CreditCard, FileText, Wallet, X,
+} from "lucide-react";
 
 export default function Debts() {
   const [tab, setTab] = useState(() => {
@@ -135,9 +139,9 @@ export default function Debts() {
   const totalBorc = dukkanBorclari.reduce((s, d) => s + (d.remaining || 0), 0);
 
   const PAYMENT_TYPES = [
-    { value: "borc", label: "💳 Normal" },
-    { value: "taksit", label: "📅 Taksit" },
-    { value: "senet", label: "📄 Senet" },
+    { value: "borc", label: "Normal" },
+    { value: "taksit", label: "Taksit" },
+    { value: "senet", label: "Senet" },
   ];
 
   return (
@@ -145,7 +149,7 @@ export default function Debts() {
       <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate("/more")}>← Geri</button>
         <div className="page-title" style={{ margin: 0, flex: 1 }}>
-          {tab === "alacak" ? "💰 Alacaklar" : tab === "dukkan_borcu" ? "🏦 Dükkan Borçları" : "📋 Geçmiş"}
+          {tab === "alacak" ? "Alacaklar" : tab === "dukkan_borcu" ? "Dükkan Borçları" : "Geçmiş"}
         </div>
         {tab !== "gecmis" && <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setErr(""); resetForm(); }}>+ Yeni</button>}
       </div>
@@ -153,13 +157,13 @@ export default function Debts() {
       {/* Sekme */}
       <div className="tabs" style={{ marginBottom: 12 }}>
         <button className={`tab ${tab === "alacak" ? "active" : ""}`} onClick={() => { setTab("alacak"); setShowForm(false); setExpandedId(null); }}>
-          💰 Alacaklar {alacaklar.length > 0 && `(${alacaklar.length})`}
+          Alacaklar {alacaklar.length > 0 && `(${alacaklar.length})`}
         </button>
         <button className={`tab ${tab === "dukkan_borcu" ? "active" : ""}`} onClick={() => { setTab("dukkan_borcu"); setShowForm(false); setExpandedId(null); }}>
-          🏦 Borçlar {dukkanBorclari.length > 0 && `(${dukkanBorclari.length})`}
+          Borçlar {dukkanBorclari.length > 0 && `(${dukkanBorclari.length})`}
         </button>
         <button className={`tab ${tab === "gecmis" ? "active" : ""}`} onClick={() => { setTab("gecmis"); setShowForm(false); setExpandedId(null); }}>
-          📋 Geçmiş
+          Geçmiş
         </button>
       </div>
 
@@ -188,7 +192,7 @@ export default function Debts() {
             {tab === "alacak" ? "Yeni Alacak Kaydı" : "Yeni Dükkan Borcu"}
           </div>
           <form onSubmit={submitYeniBorc}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>{err}</div>}
 
             {tab === "alacak" ? (
               <div className="form-group" style={{ position: "relative" }}>
@@ -212,7 +216,7 @@ export default function Debts() {
                         }}
                         style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
                           borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-                        <span>👤 {m.name}</span>
+                        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
                         {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
                       </div>
                     ))}
@@ -220,7 +224,7 @@ export default function Debts() {
                 )}
               {karaUyari.length > 0 && (
                 <div style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600, marginTop: 4 }}>
-                  ⛔ Kara liste: {karaUyari.map(k => k.sebep || k.ad).join(", ")}
+                  Kara liste: {karaUyari.map(k => k.sebep || k.ad).join(", ")}
                 </div>
               )}
               </div>
@@ -291,7 +295,7 @@ export default function Debts() {
         <div className="loading">Yükleniyor...</div>
       ) : activeList.length === 0 ? (
         <div className="empty">
-          <div className="empty-icon">{tab === "alacak" ? "💰" : tab === "gecmis" ? "📋" : "🏦"}</div>
+          <div className="empty-icon" style={{display:"flex",justifyContent:"center"}}>{tab === "alacak" ? <Banknote size={40} stroke="var(--dim)" strokeWidth={1.5}/> : tab === "gecmis" ? <ClipboardList size={40} stroke="var(--dim)" strokeWidth={1.5}/> : <Landmark size={40} stroke="var(--dim)" strokeWidth={1.5}/>}</div>
           {tab === "alacak" ? "Açık alacak yok" : tab === "gecmis" ? "Geçmiş kayıt yok" : "Dükkan borcu yok"}
         </div>
       ) : (
@@ -301,7 +305,7 @@ export default function Debts() {
               <div>
                 <div style={{ fontWeight: 600 }}>{d.customer_name}</div>
                 <div style={{ fontSize: 13, color: "var(--hint)", marginTop: 2 }}>
-                  {d.customer_phone ? `📞 ${d.customer_phone}` : ""}
+                  {d.customer_phone ? d.customer_phone : ""}
                   {d.payment_type === "taksit" ? " · Taksit" : d.payment_type === "senet" ? " · Senet" : ""}
                   {d.due_date ? ` · Vade: ${new Date(d.due_date).toLocaleDateString("tr-TR")}` : ""}
                   {d.borc_turu === "alacak" && d.source_type === "parca_iade" ? " · Parça İade" : ""}
@@ -309,8 +313,8 @@ export default function Debts() {
                 {d.notes && <div style={{ fontSize: 12, color: "var(--hint)" }}>{d.notes}</div>}
                 {d.created_at && (
                   <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>
-                    📅 {new Date(d.created_at).toLocaleDateString("tr-TR")}
-                    {tab === "gecmis" && <span style={{ color: "var(--success)", fontWeight: 600, marginLeft: 6 }}>✅ Ödendi</span>}
+                    {new Date(d.created_at).toLocaleDateString("tr-TR")}
+                    {tab === "gecmis" && <span style={{ color: "var(--success)", fontWeight: 600, marginLeft: 6 }}>Ödendi</span>}
                   </div>
                 )}
               </div>
@@ -326,7 +330,7 @@ export default function Debts() {
                     <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>
                       <div>{odenenTaksit}/{d.installment_count} taksit ödendi</div>
                       <div style={{ color: kalanTaksit > 0 ? "var(--danger)" : "var(--success)" }}>
-                        {kalanTaksit > 0 ? `${kalanTaksit} taksit kaldı` : "✅ Tamamlandı"}
+                        {kalanTaksit > 0 ? `${kalanTaksit} taksit kaldı` : "Tamamlandı"}
                       </div>
                     </div>
                   );
@@ -340,7 +344,7 @@ export default function Debts() {
             {tab !== "gecmis" && (
             <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
               <button className="btn btn-ghost btn-sm" onClick={() => pay(d)}>
-                {tab === "alacak" ? "💵 Ödeme Al" : "✅ Ödedik"}
+                {tab === "alacak" ? "Ödeme Al" : "Ödedik"}
               </button>
               <button className="btn btn-ghost btn-sm" onClick={() => toggleExpand(d.id)}>
                 {expandedId === d.id ? "▲ Gizle" : "▼ Taksit/Geçmiş"}
@@ -356,7 +360,7 @@ export default function Debts() {
                   return (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "var(--text)" }}>
-                        📅 Taksit Planı
+                        Taksit Planı
                       </div>
                       {/* Özet */}
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
@@ -386,7 +390,7 @@ export default function Debts() {
                             background: paid ? "rgba(52,199,89,0.08)" : current ? "rgba(255,149,0,0.1)" : "var(--bg2)",
                           }}>
                             <span style={{ color: paid ? "var(--success)" : current ? "orange" : "var(--hint)" }}>
-                              {paid ? "✅" : current ? "⏳" : "○"} {i + 1}. taksit
+                              {i + 1}. taksit
                             </span>
                             <span style={{ fontWeight: 600, color: paid ? "var(--success)" : "var(--text)" }}>
                               ₺{taksitTutari.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
@@ -403,7 +407,7 @@ export default function Debts() {
                   <div style={{ fontSize: 12, color: "var(--hint)" }}>Henüz ödeme yok</div>
                 ) : odemeler[d.id].map(o => (
                   <div key={o.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
-                    <span style={{ color: "var(--hint)" }}>{o.paid_at ? new Date(o.paid_at).toLocaleDateString("tr-TR") : "—"} {o.payment_type === "kart" ? "💳" : "💵"}</span>
+                    <span style={{ color: "var(--hint)" }}>{o.paid_at ? new Date(o.paid_at).toLocaleDateString("tr-TR") : "—"}</span>
                     <span style={{ fontWeight: 600, color: "var(--success)" }}>+₺{(o.amount || 0).toLocaleString("tr-TR")}</span>
                   </div>
                 ))}
@@ -421,7 +425,7 @@ export default function Debts() {
             width: "100%", padding: "20px 16px 40px",
           }}>
             <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
-              {tab === "alacak" ? "💵 Ödeme Al" : "✅ Ödeme Yap"}
+              {tab === "alacak" ? "Ödeme Al" : "Ödeme Yap"}
             </div>
             <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 16 }}>
               {payModal.customer_name}
@@ -460,7 +464,7 @@ export default function Debts() {
                         fontWeight: 600, fontSize: 14, cursor: "pointer",
                         color: payForm.payment_type === t ? "var(--primary)" : "var(--text)",
                       }}>
-                      {t === "nakit" ? "💵 Nakit" : "💳 Kart"}
+                      {t === "nakit" ? "Nakit" : "Kart"}
                     </button>
                   ))}
                 </div>

@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../api";
+import {
+  Package, Truck, CheckCircle2, Search, Plus, X, History, TriangleAlert, Trash2, CircleX,
+  Pencil, Wrench, Banknote, Zap, Undo2, DollarSign, RefreshCw, User, Factory,
+} from "lucide-react";
 
 const TABS = [
-  { key: "stok", label: "📦 Stok" },
-  { key: "orders", label: "🚚 Siparişler" },
-  { key: "gecmis", label: "✅ Geçmiş" },
+  { key: "stok", label: "Stok" },
+  { key: "orders", label: "Siparişler" },
+  { key: "gecmis", label: "Geçmiş" },
 ];
 
 const MARKALAR = [
@@ -340,7 +344,9 @@ export default function Parts({ user }) {
 
   return (
     <div className="page">
-      <div className="page-title">📦 Stok & Siparişler</div>
+      <div className="page-title" style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <Package size={19} strokeWidth={2} /> Stok & Siparişler
+      </div>
 
       <div className="tabs">
         {TABS.map((t) => (
@@ -355,14 +361,21 @@ export default function Parts({ user }) {
         <>
           <div style={{ display: "flex", gap: 8, marginBottom: lowStock ? 6 : 10 }}>
             <div className="search-bar" style={{ flex: 1, margin: 0 }}>
-              <input className="search-input" placeholder="🔍 Parça ara..." value={q} onChange={(e) => setQ(e.target.value)} />
+              <div className="inset search-input" style={{ borderRadius: 13, display: "flex", alignItems: "center", gap: 9, flex: 1 }}>
+                <Search size={16} stroke="var(--hint)" strokeWidth={2} />
+                <input style={{ background: "none", border: "none", outline: "none", color: "var(--text)", font: "inherit", fontSize: 15, flex: 1 }}
+                  placeholder="Parça ara..." value={q} onChange={(e) => setQ(e.target.value)} />
+              </div>
             </div>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(v => !v)}>+ Ekle</button>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(v => !v)}><Plus size={14} strokeWidth={2.4} /> Ekle</button>
           </div>
           {lowStock && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, background: "rgba(245,158,11,0.12)", borderRadius: 8, padding: "7px 12px", border: "1px solid rgba(245,158,11,0.3)" }}>
-              <span style={{ color: "#f59e0b", fontWeight: 600, fontSize: 13, flex: 1 }}>⚠️ Azalan stok filtresi aktif</span>
-              <button onClick={() => setLowStock(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", fontSize: 18, lineHeight: 1, padding: 0 }}>✕</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, background: "rgba(246,162,74,0.12)", borderRadius: 10, padding: "9px 13px" }}>
+              <TriangleAlert size={15} stroke="var(--orange)" strokeWidth={2} />
+              <span style={{ color: "var(--orange)", fontWeight: 600, fontSize: 13, flex: 1 }}>Azalan stok filtresi aktif</span>
+              <button onClick={() => setLowStock(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex", padding: 0 }}>
+                <X size={16} strokeWidth={2} />
+              </button>
             </div>
           )}
 
@@ -384,11 +397,11 @@ export default function Parts({ user }) {
                       </div>
                       <button type="button" className="btn btn-ghost btn-sm"
                         onClick={() => { setAddEklePart(null); setAddForm(f => ({ ...f, name: "" })); }}>
-                        ✕
+                        <X size={15} strokeWidth={2} />
                       </button>
                     </div>
                     <form onSubmit={submitAddPart}>
-                      {addErr && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>❌ {addErr}</div>}
+                      {addErr && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 8, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {addErr}</div>}
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                         <div className="form-group" style={{ margin: 0 }}>
                           <label className="form-label">Eklenecek Adet</label>
@@ -403,7 +416,7 @@ export default function Parts({ user }) {
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                        <button type="submit" className="btn btn-primary btn-sm">➕ Stok Ekle</button>
+                        <button type="submit" className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}><Plus size={13} strokeWidth={2.4} /> Stok Ekle</button>
                         <button type="button" className="btn btn-ghost btn-sm"
                           onClick={() => { setShowAddForm(false); setAddEklePart(null); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" }); }}>
                           İptal
@@ -416,7 +429,7 @@ export default function Parts({ user }) {
                   <div>
                     <div style={{ fontWeight: 600, marginBottom: 10 }}>Yeni Parça</div>
                     <form onSubmit={submitAddPart}>
-                      {addErr && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>❌ {addErr}</div>}
+                      {addErr && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 8, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {addErr}</div>}
                       <div className="form-group" style={{ position: "relative" }}>
                         <label className="form-label">Parça Adı *</label>
                         <input className="form-input" required value={addForm.name}
@@ -493,7 +506,7 @@ export default function Parts({ user }) {
                       <div style={{ marginTop: 4 }}>
                         <button type="button" onClick={() => setTurDuzenle(v => !v)}
                           style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                          {turDuzenle ? "▲ Tür listesini kapat" : "✏️ Parça türü ekle/çıkar"}
+                          turDuzenle ? "▲ Tür listesini kapat" : "Parça türü ekle/çıkar"
                         </button>
                         {turDuzenle && (
                           <div style={{ marginTop: 8, background: "var(--bg)", borderRadius: 8, padding: 10, border: "1px solid var(--border)" }}>
@@ -553,9 +566,9 @@ export default function Parts({ user }) {
           <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
             <span style={{ fontSize: 11, color: "var(--hint)", fontWeight: 600, flexShrink: 0 }}>SIRALA:</span>
             {[
-              { key: "yeni", label: "🕐 Yeni" },
-              { key: "stok", label: "📦 Stok" },
-              { key: "isim", label: "🔤 İsim" },
+              { key: "yeni", label: "Yeni" },
+              { key: "stok", label: "Stok" },
+              { key: "isim", label: "İsim" },
             ].map(s => (
               <button key={s.key} onClick={() => setSortBy(s.key)}
                 style={{
@@ -601,10 +614,10 @@ export default function Parts({ user }) {
             </div>
           )}
           {loading ? <div className="loading">Yükleniyor...</div> :
-            filteredParts.length === 0 ? <div className="empty"><div className="empty-icon">📦</div>Parça bulunamadı</div> :
+            filteredParts.length === 0 ? <div className="empty"><div className="empty-icon" style={{display:"flex",justifyContent:"center"}}><Package size={40} stroke="var(--dim)" strokeWidth={1.5}/></div>Parça bulunamadı</div> :
             filteredParts.map((p) => {
               const isSelected = selectedPart?.id === p.id;
-              const SEBEP_LABEL = { tamir: "🔧 Tamire", satis: "💰 Satış", hasar: "💥 Hasar", diger: "📦 Diğer", satin_alma: "📥 Satın Alındı" };
+              const SEBEP_LABEL = { tamir: "Tamire", satis: "Satış", hasar: "Hasar", diger: "Diğer", satin_alma: "Satın Alındı" };
               return (
                 <div key={p.id}>
                   {/* Parça satırı */}
@@ -623,18 +636,18 @@ export default function Parts({ user }) {
                         style={{ padding: "4px 8px", fontSize: 16 }}
                         onClick={e => { e.stopPropagation(); openPanel(p, "gecmis"); }}
                         title="Stok geçmişi"
-                      >📋</button>
+                      ><History size={15} strokeWidth={2}/></button>
                       {user?.rol === "patron" && (
                         deletePartId === p.id ? (
                           <div style={{ display: "flex", gap: 3 }} onClick={e => e.stopPropagation()}>
                             <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 8px", fontSize: 12 }}
                               onClick={() => deletePart(p.id)}>Sil</button>
                             <button className="btn btn-ghost btn-sm" style={{ padding: "4px 8px", fontSize: 12 }}
-                              onClick={() => setDeletePartId(null)}>✕</button>
+                              onClick={() => setDeletePartId(null)}><X size={13} strokeWidth={2}/></button>
                           </div>
                         ) : (
                           <button className="btn btn-ghost btn-sm" style={{ padding: "4px 7px", fontSize: 14, color: "var(--danger)", opacity: 0.7 }}
-                            onClick={e => { e.stopPropagation(); setDeletePartId(p.id); }}>🗑</button>
+                            onClick={e => { e.stopPropagation(); setDeletePartId(p.id); }}><Trash2 size={14} strokeWidth={2}/></button>
                         )
                       )}
                     </div>
@@ -648,7 +661,7 @@ export default function Parts({ user }) {
                         {[
                           { key: "ekle", label: "Stok Ekle", clr: "var(--success)" },
                           { key: "dus", label: "Stok Düş", clr: "var(--danger)" },
-                          { key: "gecmis", label: "📋 Geçmiş", clr: "var(--accent)" },
+                          { key: "gecmis", label: "Geçmiş", clr: "var(--accent)" },
                         ].map(s => (
                           <button key={s.key} onClick={() => {
                             setPanelTab(s.key);
@@ -668,7 +681,7 @@ export default function Parts({ user }) {
                       {/* Stok Ekle formu */}
                       {panelTab === "ekle" && (
                         <form onSubmit={submitEkle} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          {ekleErr && <div style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600 }}>❌ {ekleErr}</div>}
+                          {ekleErr && <div style={{ color: "var(--red)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {ekleErr}</div>}
                           <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8 }}>
                             <div className="form-group" style={{ margin: 0 }}>
                               <label className="form-label">Adet</label>
@@ -686,7 +699,7 @@ export default function Parts({ user }) {
                                   style={{ marginLeft: "auto", fontSize: 10, padding: "2px 7px", borderRadius: 10, border: "none",
                                     background: ekleDolarMode ? "var(--accent)" : "var(--bg2)", color: ekleDolarMode ? "#fff" : "var(--hint)",
                                     cursor: "pointer", fontWeight: 700 }}>
-                                  💵 $
+                                  $
                                 </button>
                               </div>
                               {ekleDolarMode ? (
@@ -712,7 +725,7 @@ export default function Parts({ user }) {
                             <button type="button" onClick={fetchDollarRate} disabled={kurLoading}
                               style={{ alignSelf: "flex-start", fontSize: 11, padding: "3px 10px", borderRadius: 10,
                                 border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--hint)" }}>
-                              {kurLoading ? "..." : "🔄 Kur al"}
+                              {kurLoading ? "..." : <><RefreshCw size={11} strokeWidth={2} /> Kur al</>}
                             </button>
                           )}
                           <div className="form-group" style={{ margin: 0, position: "relative" }}>
@@ -750,11 +763,11 @@ export default function Parts({ user }) {
                         <>
                           <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
                             {[
-                              { key: "tamir", label: "🔧 Tamire Takıldı" },
-                              { key: "satis", label: "💰 Satıldı" },
-                              { key: "hasar", label: "💥 Hasar/Kayıp" },
-                              { key: "diger", label: "📦 Diğer" },
-                              { key: "iade", label: "↩️ İade Et" },
+                              { key: "tamir", label: "Tamire Takıldı" },
+                              { key: "satis", label: "Satıldı" },
+                              { key: "hasar", label: "Hasar/Kayıp" },
+                              { key: "diger", label: "Diğer" },
+                              { key: "iade", label: "İade Et" },
                             ].map(s => (
                               <button key={s.key} type="button"
                                 onClick={() => setKullanForm(f => ({ ...f, sebep: s.key }))}
@@ -774,16 +787,16 @@ export default function Parts({ user }) {
                               <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 8 }}>
                                 Parça iade sayfasına yönlendirileceksiniz.
                               </div>
-                              <button className="btn btn-sm" style={{ background: "var(--warning, #f59e0b)", color: "#fff" }}
+                              <button className="btn btn-sm" style={{ background: "var(--orange)", color: "#191b20", display: "flex", alignItems: "center", gap: 6 }}
                                 onClick={() => {
                                   navigate(`/parca-iade?part_id=${p.id}&part_name=${encodeURIComponent(p.name)}`);
                                 }}>
-                                ↩️ İade Sayfasına Git
+                                <Undo2 size={13} strokeWidth={2} /> İade Sayfasına Git
                               </button>
                             </div>
                           ) : (
                           <form onSubmit={submitKullan} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            {kullanErr && <div style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600 }}>❌ {kullanErr}</div>}
+                            {kullanErr && <div style={{ color: "var(--red)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {kullanErr}</div>}
                             <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8 }}>
                               <div className="form-group" style={{ margin: 0 }}>
                                 <label className="form-label">Adet</label>
@@ -829,12 +842,12 @@ export default function Parts({ user }) {
                           }}>
                             <div>
                               <div style={{ fontSize: 13, fontWeight: 600 }}>
-                                {SEBEP_LABEL[h.sebep] || "📦 Diğer"}
+                                {SEBEP_LABEL[h.sebep] || "Diğer"}
                                 {h.aciklama ? ` — ${h.aciklama}` : ""}
                               </div>
                               <div style={{ fontSize: 12, color: "var(--hint)" }}>
                                 {h.tarih}
-                                {h.yapan_adi ? <span style={{ marginLeft: 6, background: "var(--bg)", borderRadius: 6, padding: "1px 6px", fontWeight: 600 }}>👤 {h.yapan_adi}</span> : ""}
+                                {h.yapan_adi ? <span style={{ marginLeft: 6, background: "var(--bg)", borderRadius: 6, padding: "1px 6px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}><User size={10} strokeWidth={2} /> {h.yapan_adi}</span> : ""}
                               </div>
                             </div>
                             <div style={{ fontWeight: 700, color: h.hareket === "giris" ? "var(--success)" : "var(--danger)", fontSize: 15, flexShrink: 0 }}>
@@ -863,7 +876,7 @@ export default function Parts({ user }) {
             <div className="card" style={{ marginBottom: 12 }}>
               <div style={{ fontWeight: 600, marginBottom: 10 }}>Yeni Sipariş</div>
               <form onSubmit={submitShopItem}>
-                {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+                {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
                 <div className="form-group">
                   <label className="form-label">Parça Adı *</label>
                   <input className="form-input" required value={shopForm.part_name} onChange={e => setShopForm({ ...shopForm, part_name: e.target.value })} placeholder="Ekran, batarya, entegre..." />
@@ -919,7 +932,7 @@ export default function Parts({ user }) {
 
           {loading ? <div className="loading">Yükleniyor...</div> :
             shopping.bekliyor.length === 0 ? (
-              <div className="empty"><div className="empty-icon">🚚</div>Bekleyen sipariş yok</div>
+              <div className="empty"><div className="empty-icon" style={{display:"flex",justifyContent:"center"}}><Truck size={40} stroke="var(--dim)" strokeWidth={1.5}/></div>Bekleyen sipariş yok</div>
             ) : shopping.bekliyor.map((item) => (
               <div key={item.id} className="card">
                 <div className="card-row">
@@ -930,7 +943,7 @@ export default function Parts({ user }) {
                       {item.estimated_price ? ` · ~₺${item.estimated_price}` : ""}
                       {item.supplier_hint ? ` · ${item.supplier_hint}` : ""}
                     </div>
-                    {item.ekleyen && <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>👤 {item.ekleyen}</div>}
+                    {item.ekleyen && <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><User size={10} strokeWidth={2} /> {item.ekleyen}</div>}
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
                     {user?.rol === "patron" && (
@@ -939,15 +952,15 @@ export default function Parts({ user }) {
                           <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 8px", fontSize: 12 }}
                             onClick={() => deleteOrder(item.id)}>Sil</button>
                           <button className="btn btn-ghost btn-sm" style={{ padding: "4px 8px", fontSize: 12 }}
-                            onClick={() => setDeleteOrderId(null)}>✕</button>
+                            onClick={() => setDeleteOrderId(null)}><X size={13} strokeWidth={2}/></button>
                         </div>
                       ) : (
                         <button className="btn btn-ghost btn-sm" style={{ padding: "4px 7px", fontSize: 14, color: "var(--danger)", opacity: 0.7 }}
-                          onClick={() => setDeleteOrderId(item.id)}>🗑</button>
+                          onClick={() => setDeleteOrderId(item.id)}><Trash2 size={14} strokeWidth={2}/></button>
                       )
                     )}
                     <button className="btn btn-primary btn-sm" onClick={() => { setBoughtItem(item); setBoughtData(d => ({ ...d, stokMiktar: String(item.quantity || 1) })); }}>
-                      ✅ Aldım
+                      <CheckCircle2 size={13} strokeWidth={2} /> Aldım
                     </button>
                   </div>
                 </div>
@@ -959,10 +972,10 @@ export default function Parts({ user }) {
           {boughtItem && (
             <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
               <div style={{ background: "var(--bg)", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px", width: "100%" }}>
-                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>✅ Alındı: {boughtItem.part_name}</div>
+                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}><CheckCircle2 size={16} strokeWidth={2} /> Alındı: {boughtItem.part_name}</div>
                 <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 14 }}>{boughtItem.device_model}</div>
                 <form onSubmit={submitBought}>
-                  {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>❌ {err}</div>}
+                  {err && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
 
                   {/* Toptancı Autocomplete */}
                   <div className="form-group" style={{ position: "relative" }}>
@@ -979,7 +992,7 @@ export default function Parts({ user }) {
                           <div key={t.id} onMouseDown={() => { setBoughtData(d => ({ ...d, toptanci: t.ad })); setShowToptanciOner(false); }}
                             style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid var(--border)",
                               display: "flex", justifyContent: "space-between" }}>
-                            <span>🏭 {t.ad}</span>
+                            <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Factory size={13} strokeWidth={2} /> {t.ad}</span>
                             {t.sehir && <span style={{ fontSize: 12, color: "var(--hint)" }}>{t.sehir}</span>}
                           </div>
                         ))}
@@ -1003,13 +1016,13 @@ export default function Parts({ user }) {
                       style={{ padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
                         background: boughtData.dollarMode ? "var(--accent)" : "var(--bg2)",
                         color: boughtData.dollarMode ? "#fff" : "var(--text)" }}>
-                      💵 Dolar ile gir
+                      <DollarSign size={12} strokeWidth={2} /> Dolar ile gir
                     </button>
                     {dollarRate && <span style={{ fontSize: 12, color: "var(--hint)" }}>1$ = ₺{dollarRate}</span>}
                     <button type="button" onClick={fetchDollarRate} disabled={kurLoading}
                       style={{ marginLeft: "auto", padding: "5px 10px", borderRadius: 16, border: "1px solid var(--border)",
                         background: "transparent", cursor: "pointer", fontSize: 12, color: "var(--hint)" }}>
-                      {kurLoading ? "..." : "🔄 Kur"}
+                      {kurLoading ? "..." : <><RefreshCw size={11} strokeWidth={2} /> Kur</>}
                     </button>
                   </div>
 
@@ -1097,7 +1110,7 @@ export default function Parts({ user }) {
                           <div style={{ width: 14, height: 14, borderRadius: "50%", flexShrink: 0,
                             border: `2px solid ${boughtExistingId === null ? "var(--accent)" : "var(--hint)"}`,
                             background: boughtExistingId === null ? "var(--accent)" : "transparent" }} />
-                          <div style={{ fontSize: 12, color: "var(--text)" }}>➕ Yeni stok kaydı oluştur</div>
+                          <div style={{ fontSize: 12, color: "var(--text)", display: "flex", alignItems: "center", gap: 6 }}><Plus size={11} strokeWidth={2.4} /> Yeni stok kaydı oluştur</div>
                         </div>
                       </div>
                     )}
@@ -1118,7 +1131,7 @@ export default function Parts({ user }) {
       {tab === "gecmis" && (
         <>
           <div className="search-bar" style={{ marginBottom: 10 }}>
-            <input className="search-input" placeholder="🔍 Geçmişte ara..." value={gecmisQ} onChange={e => setGecmisQ(e.target.value)} />
+            <input className="search-input" placeholder="Geçmişte ara..." value={gecmisQ} onChange={e => setGecmisQ(e.target.value)} />
           </div>
           {loading ? <div className="loading">Yükleniyor...</div> :
             shopping.alindi.filter(i =>
@@ -1126,7 +1139,7 @@ export default function Parts({ user }) {
               (i.device_model || "").toLowerCase().includes(gecmisQ.toLowerCase()) ||
               (i.bought_from || "").toLowerCase().includes(gecmisQ.toLowerCase())
             ).length === 0 ? (
-              <div className="empty"><div className="empty-icon">✅</div>Henüz alınan parça yok</div>
+              <div className="empty"><div className="empty-icon" style={{display:"flex",justifyContent:"center"}}><CheckCircle2 size={40} stroke="var(--dim)" strokeWidth={1.5}/></div>Henüz alınan parça yok</div>
             ) : shopping.alindi.filter(i =>
               !gecmisQ || i.part_name.toLowerCase().includes(gecmisQ.toLowerCase()) ||
               (i.device_model || "").toLowerCase().includes(gecmisQ.toLowerCase()) ||
@@ -1134,7 +1147,7 @@ export default function Parts({ user }) {
             ).map((item) => (
               <div key={item.id} className="list-item" style={{ opacity: 0.9 }}>
                 <div className="list-item-body">
-                  <div className="list-item-title">✅ {item.part_name}</div>
+                  <div className="list-item-title" style={{ display: "flex", alignItems: "center", gap: 7 }}><CheckCircle2 size={14} strokeWidth={2} /> {item.part_name}</div>
                   <div className="list-item-sub">
                     {item.device_model ? `${item.device_model} · ` : ""}
                     {item.bought_from || "Toptancı belirtilmedi"}

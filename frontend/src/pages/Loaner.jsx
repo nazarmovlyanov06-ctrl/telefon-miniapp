@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import {
+  Smartphone, ClipboardList, CircleX, User, Camera, X, TriangleAlert,
+  CheckCircle2, Calendar,
+} from "lucide-react";
 
 export default function Loaner() {
   const navigate = useNavigate();
@@ -140,18 +144,18 @@ export default function Loaner() {
       </div>
 
       <div className="tabs" style={{ marginBottom: 12 }}>
-        <button className={`tab ${tab === "aktif" ? "active" : ""}`} onClick={() => setTab("aktif")}>
-          📱 Dışarıda ({list.length})
+        <button className={`tab ${tab === "aktif" ? "active" : ""}`} onClick={() => setTab("aktif")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Smartphone size={13} strokeWidth={2} /> Dışarıda ({list.length})
         </button>
-        <button className={`tab ${tab === "gecmis" ? "active" : ""}`} onClick={() => setTab("gecmis")}>
-          📋 İade Edildi ({gecmis.length})
+        <button className={`tab ${tab === "gecmis" ? "active" : ""}`} onClick={() => setTab("gecmis")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <ClipboardList size={13} strokeWidth={2} /> İade Edildi ({gecmis.length})
         </button>
       </div>
 
       {showForm && (
         <div className="card">
           <form onSubmit={submit}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
             <div className="form-group" style={{ position: "relative" }}>
               <label className="form-label">Müşteri Adı *</label>
               <input
@@ -165,14 +169,12 @@ export default function Loaner() {
                 autoComplete="off"
               />
               {showOneriler && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
-                  background: "rgba(var(--card-rgb, 255,255,255), 0.85)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-                  border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                <div className="ac-dropdown">
                   {oneriler.map(m => (
                     <div key={m.id} onMouseDown={() => { setForm(f => ({ ...f, musteri_adi: m.name })); setShowOneriler(false); }}
                       style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
-                        borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-                      <span>👤 {m.name}</span>
+                        borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
                       {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
                     </div>
                   ))}
@@ -186,16 +188,14 @@ export default function Loaner() {
                 onBlur={() => setTimeout(() => setShowCihazOneri(false), 150)}
                 placeholder="Samsung A12, Huawei P20..." />
               {showCihazOneri && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
-                  background: "rgba(var(--card-rgb, 255,255,255), 0.85)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-                  border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                <div className="ac-dropdown">
                   {cihazOneri.map(c => (
                     <div key={c.id} onMouseDown={() => {
                       setForm(f => ({ ...f, cihaz: c.model || "" }));
                       setShowCihazOneri(false);
                     }} style={{ padding: "9px 12px", cursor: "pointer", fontSize: 13,
-                      borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-                      <span>📱 {c.model}</span>
+                      borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Smartphone size={12} strokeWidth={2} /> {c.model}</span>
                       <span style={{ fontSize: 11, color: "var(--hint)" }}>2.El Stok</span>
                     </div>
                   ))}
@@ -229,14 +229,16 @@ export default function Loaner() {
           <div className="card" style={{ width: "100%", borderRadius: "20px 20px 0 0", maxHeight: "80vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
             <div className="card-row" style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>📷 {fotoModal.cihaz} Fotoğrafları</div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setFotoModal(null)}>✕</button>
+              <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+                <Camera size={15} strokeWidth={2} /> {fotoModal.cihaz} Fotoğrafları
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setFotoModal(null)}><X size={15} strokeWidth={2} /></button>
             </div>
             <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
               style={{ display: "none" }} onChange={addFoto} />
-            <button className="btn btn-primary btn-sm" style={{ marginBottom: 12 }}
+            <button className="btn btn-primary btn-sm" style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}
               onClick={() => fileInputRef.current?.click()}>
-              📷 Fotoğraf Çek / Ekle
+              <Camera size={14} strokeWidth={2} /> Fotoğraf Çek / Ekle
             </button>
             {fotoLoading ? (
               <div style={{ textAlign: "center", color: "var(--hint)", padding: 20 }}>Yükleniyor...</div>
@@ -281,7 +283,9 @@ export default function Loaner() {
                 placeholder="0" />
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              <button className="btn btn-primary" onClick={iadeKaydet}>✅ İade Al</button>
+              <button className="btn btn-primary" onClick={iadeKaydet} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                <CheckCircle2 size={15} strokeWidth={2} /> İade Al
+              </button>
               <button className="btn btn-ghost" onClick={() => setHasarModal(null)}>İptal</button>
             </div>
           </div>
@@ -299,21 +303,24 @@ export default function Loaner() {
             <div key={l.id} className="card">
               <div className="card-row">
                 <div>
-                  <div style={{ fontWeight: 600 }}>👤 {l.musteri_adi}</div>
-                  <div style={{ fontSize: 13, color: "var(--hint)" }}>📱 {l.cihaz}</div>
-                  <div style={{ fontSize: 12, color: warn ? "var(--danger)" : "var(--hint)" }}>
-                    📅 {l.teslim_tarihi} · {gun === 0 ? "Bugün" : `${gun} gündür dışarıda`}{warn && " ⚠️"}
+                  <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {l.musteri_adi}</div>
+                  <div style={{ fontSize: 13, color: "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}><Smartphone size={11} strokeWidth={2} /> {l.cihaz}</div>
+                  <div style={{ fontSize: 12, color: warn ? "var(--red)" : "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <Calendar size={10} strokeWidth={2} /> {l.teslim_tarihi} · {gun === 0 ? "Bugün" : `${gun} gündür dışarıda`}
+                    {warn && <TriangleAlert size={11} strokeWidth={2} />}
                   </div>
                   {l.notlar && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>{l.notlar}</div>}
                   {l.hasar_notu && (
-                    <div style={{ fontSize: 12, color: "var(--danger)", marginTop: 4 }}>
-                      ⚠️ Hasar: {l.hasar_notu}{l.hasar_tutar ? ` (₺${l.hasar_tutar})` : ""}
+                    <div style={{ fontSize: 12, color: "var(--red)", marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                      <TriangleAlert size={11} strokeWidth={2} /> Hasar: {l.hasar_notu}{l.hasar_tutar ? ` (₺${l.hasar_tutar})` : ""}
                     </div>
                   )}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <button className="btn btn-primary btn-sm" onClick={() => iade(l)}>İade Al</button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => openFotolar(l)}>📷</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => openFotolar(l)} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Camera size={14} strokeWidth={2} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -329,14 +336,16 @@ export default function Loaner() {
           <div key={l.id} className="card" style={{ opacity: 0.85 }}>
             <div className="card-row">
               <div>
-                <div style={{ fontWeight: 600 }}>✅ {l.musteri_adi}</div>
-                <div style={{ fontSize: 13, color: "var(--hint)" }}>📱 {l.cihaz}</div>
+                <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                  <CheckCircle2 size={13} stroke="var(--green)" strokeWidth={2} /> {l.musteri_adi}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}><Smartphone size={11} strokeWidth={2} /> {l.cihaz}</div>
                 <div style={{ fontSize: 12, color: "var(--hint)" }}>
                   Verildi: {l.teslim_tarihi} · İade: {l.iade_tarihi || "—"}
                 </div>
                 {l.hasar_notu && (
-                  <div style={{ fontSize: 12, color: "var(--danger)", marginTop: 2 }}>
-                    ⚠️ {l.hasar_notu}{l.hasar_tutar ? ` · ₺${l.hasar_tutar}` : ""}
+                  <div style={{ fontSize: 12, color: "var(--red)", marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}>
+                    <TriangleAlert size={11} strokeWidth={2} /> {l.hasar_notu}{l.hasar_tutar ? ` · ₺${l.hasar_tutar}` : ""}
                   </div>
                 )}
               </div>
@@ -346,8 +355,8 @@ export default function Loaner() {
                     {Math.floor((new Date(l.iade_tarihi) - new Date(l.teslim_tarihi)) / 86400000)} gün
                   </div>
                 )}
-                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}
-                  onClick={() => openFotolar(l)}>📷 Resimler</button>
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5 }}
+                  onClick={() => openFotolar(l)}><Camera size={11} strokeWidth={2} /> Resimler</button>
               </div>
             </div>
             {l.notlar && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>{l.notlar}</div>}

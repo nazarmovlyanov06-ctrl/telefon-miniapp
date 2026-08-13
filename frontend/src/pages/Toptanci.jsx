@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { Phone, MapPin, CircleX, Factory } from "lucide-react";
 
 export default function Toptanci() {
   const navigate = useNavigate();
@@ -80,8 +81,8 @@ export default function Toptanci() {
         </div>
         {selected.telefon && (
           <div className="card" style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 13, color: "var(--hint)" }}>📞 {selected.telefon}</div>
-            {selected.sehir && <div style={{ fontSize: 13, color: "var(--hint)" }}>📍 {selected.sehir}</div>}
+            <div style={{ fontSize: 13, color: "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}><Phone size={12} strokeWidth={2} /> {selected.telefon}</div>
+            {selected.sehir && <div style={{ fontSize: 13, color: "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}><MapPin size={12} strokeWidth={2} /> {selected.sehir}</div>}
           </div>
         )}
         <div className="card" style={{ marginBottom: 14 }}>
@@ -102,7 +103,7 @@ export default function Toptanci() {
         {showAlisForm && (
           <div className="card">
             <form onSubmit={submitAlis}>
-              {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+              {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
               <div className="form-group">
                 <label className="form-label">Ürün/Parça</label>
                 <input className="form-input" required value={alisForm.urun} onChange={e => setAlisForm({ ...alisForm, urun: e.target.value })} placeholder="Ekran, batarya..." />
@@ -132,7 +133,7 @@ export default function Toptanci() {
             </form>
           </div>
         )}
-        {alisErr && <div style={{ color: "var(--danger)", fontSize: 13, textAlign: "center", padding: "6px 0", marginBottom: 4 }}>❌ {alisErr}</div>}
+        {alisErr && <div style={{ color: "var(--danger)", fontSize: 13, textAlign: "center", padding: "6px 0", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {alisErr}</div>}
         {alisLoading ? <div style={{ textAlign: "center", color: "var(--hint)" }}>Yükleniyor...</div> :
           alislar.length === 0 && !alisErr ? <div className="card" style={{ color: "var(--hint)", textAlign: "center" }}>Henüz alış kaydı yok</div> :
           alislar.map(a => (
@@ -162,7 +163,7 @@ export default function Toptanci() {
       {showForm && (
         <div className="card">
           <form onSubmit={submitToptanci}>
-            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600 }}>❌ {err}</div>}
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
             <div className="form-group">
               <label className="form-label">Toptancı Adı *</label>
               <input className="form-input" required value={form.ad} onChange={e => setForm({ ...form, ad: e.target.value })} placeholder="Firma adı" />
@@ -190,7 +191,7 @@ export default function Toptanci() {
         <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Henüz toptancı eklenmedi</div>
       ) : list.map(t => (
         <div key={t.id} className="list-item" onClick={() => selectToptanci(t)}>
-          <span style={{ fontSize: 26 }}>🏭</span>
+          <Factory size={24} strokeWidth={1.6} style={{ color: "var(--hint)" }} />
           <div className="list-item-body">
             <div className="list-item-title">{t.ad}</div>
             {t.telefon && <div style={{ fontSize: 13, color: "var(--hint)" }}>{t.telefon}</div>}
