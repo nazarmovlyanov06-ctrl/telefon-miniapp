@@ -45,11 +45,11 @@ export default function More({ user }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontWeight: 800, fontSize: 18, flexShrink: 0,
           }}>
-            {(user.name || "?")[0].toUpperCase()}
+            {(user.ad || "?")[0].toUpperCase()}
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{user.name}</div>
-            <span className={`badge badge-${user.role}`} style={{ fontSize: 11 }}>{roleLabel(user.role)}</span>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>{user.ad}</div>
+            <span className={`badge badge-${user.rol}`} style={{ fontSize: 11 }}>{roleLabel(user.rol)}</span>
           </div>
         </div>
       )}

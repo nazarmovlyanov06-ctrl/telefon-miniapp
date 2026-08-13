@@ -357,7 +357,7 @@ export default function IkinciEl({ user }) {
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button className="btn btn-ghost btn-sm" onClick={() => { setShowMasraf(true); setShowSat(false); }}>+ Masraf</button>
                       <button className="btn btn-primary btn-sm" onClick={() => { setShowSat(true); setShowMasraf(false); }}>💰 Sat</button>
-                      {user?.role === "patron" && (
+                      {user?.rol === "patron" && (
                         deleteId === c.id ? (
                           <>
                             <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 12px", fontSize: 13 }}

@@ -1,7 +1,7 @@
+import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
-from aiosqlite import Connection
-from database import get_db, get_or_create_user
-from auth import get_current_user
+from database import get_db
+from auth import get_current_user, get_dukkan_id
 from datetime import date
 
 router = APIRouter(prefix="/sifir-cihaz", tags=["sifir-cihaz"])
@@ -10,56 +10,56 @@ router = APIRouter(prefix="/sifir-cihaz", tags=["sifir-cihaz"])
 @router.get("/imei-tam/{imei}")
 async def imei_tam_gecmis(
     imei: str,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        "SELECT * FROM sifir_cihazlar WHERE imei = ? ORDER BY created_at ASC",
-        (imei,)
+    rows = await db.fetch(
+        "SELECT * FROM sifir_cihazlar WHERE imei = $1 AND dukkan_id = $2 ORDER BY created_at ASC",
+        imei, dukkan_id,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.get("/listesi")
 async def list_stok(
     kaynak: str = Query(None),
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    where = ["durum = 'stokta'"]
-    params = []
+    where = ["dukkan_id = $1", "durum = 'stokta'"]
+    params = [dukkan_id]
     if kaynak:
-        where.append("COALESCE(kaynak, 'dukkan') = ?")
         params.append(kaynak)
-    cur = await db.execute(
-        f"SELECT * FROM sifir_cihazlar WHERE {' AND '.join(where)} ORDER BY created_at DESC",
-        params
+        where.append(f"COALESCE(kaynak, 'dukkan') = ${len(params)}")
+    rows = await db.fetch(
+        f"SELECT * FROM sifir_cihazlar WHERE {' AND '.join(where)} ORDER BY created_at DESC", *params
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.get("/satilanlar")
 async def list_satilanlar(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        "SELECT * FROM sifir_cihazlar WHERE durum = 'satildi' ORDER BY satis_tarihi DESC"
+    rows = await db.fetch(
+        "SELECT * FROM sifir_cihazlar WHERE dukkan_id = $1 AND durum = 'satildi' ORDER BY satis_tarihi DESC",
+        dukkan_id,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.get("/ozet")
 async def ozet(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute("SELECT * FROM sifir_cihazlar")
-    rows = [dict(r) for r in await cur.fetchall()]
+    rows = await db.fetch("SELECT * FROM sifir_cihazlar WHERE dukkan_id = $1", dukkan_id)
+    rows = [dict(r) for r in rows]
     stokta = satildi = 0
     kar = 0.0
     for r in rows:
@@ -74,47 +74,45 @@ async def ozet(
 @router.post("/")
 async def create_cihaz(
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     kimden = body.get("kimden") or ""
     kimden_telefon = body.get("kimden_telefon") or ""
-    cur = await db.execute(
-        """INSERT INTO sifir_cihazlar
-           (model, imei, renk, depolama, kimden, kimden_telefon, kaynak, alis_fiyati, notlar, alis_tarihi)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
-         kimden, kimden_telefon, body.get("kaynak", "dukkan"),
-         float(body["alis_fiyati"]), body.get("notlar"),
-         body.get("alis_tarihi", date.today().isoformat())),
-    )
-    # Satıcıyı müşteri olarak kaydet
-    if kimden and kimden_telefon:
-        cur2 = await db.execute(
-            "SELECT id FROM customers WHERE name = ? OR phone = ?",
-            (kimden, kimden_telefon)
+    async with db.transaction():
+        row = await db.fetchrow(
+            """INSERT INTO sifir_cihazlar
+               (dukkan_id, model, imei, renk, depolama, kimden, kimden_telefon, kaynak, alis_fiyati, notlar, alis_tarihi)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id""",
+            dukkan_id, body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
+            kimden, kimden_telefon, body.get("kaynak", "dukkan"),
+            float(body["alis_fiyati"]), body.get("notlar"),
+            body.get("alis_tarihi", date.today().isoformat()),
         )
-        if not await cur2.fetchone():
-            await db.execute(
-                "INSERT INTO customers (name, phone) VALUES (?, ?)",
-                (kimden, kimden_telefon)
+        if kimden and kimden_telefon:
+            existing = await db.fetchrow(
+                "SELECT id FROM customers WHERE dukkan_id=$1 AND (name = $2 OR phone = $3)",
+                dukkan_id, kimden, kimden_telefon,
             )
-    await db.commit()
-    return {"id": cur.lastrowid}
+            if not existing:
+                await db.execute(
+                    "INSERT INTO customers (dukkan_id, name, phone) VALUES ($1, $2, $3)",
+                    dukkan_id, kimden, kimden_telefon,
+                )
+    return {"id": row["id"]}
 
 
 @router.delete("/{cihaz_id}")
 async def delete_cihaz(
     cihaz_id: int,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    if user["role"] != "patron":
+    if user["rol"] != "patron":
         raise HTTPException(403, "Sadece patron silebilir")
-    await db.execute("DELETE FROM sifir_cihazlar WHERE id = ?", (cihaz_id,))
-    await db.commit()
+    await db.execute("DELETE FROM sifir_cihazlar WHERE id = $1 AND dukkan_id = $2", cihaz_id, dukkan_id)
     return {"ok": True}
 
 
@@ -122,12 +120,11 @@ async def delete_cihaz(
 async def sat_cihaz(
     cihaz_id: int,
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute("SELECT * FROM sifir_cihazlar WHERE id = ?", (cihaz_id,))
-    row = await cur.fetchone()
+    row = await db.fetchrow("SELECT * FROM sifir_cihazlar WHERE id = $1 AND dukkan_id = $2", cihaz_id, dukkan_id)
     if not row:
         raise HTTPException(404, "Cihaz bulunamadi")
     cihaz = dict(row)
@@ -139,58 +136,57 @@ async def sat_cihaz(
     taksit_sayi = int(body.get("taksit_sayi") or 1)
     pesinat = float(body.get("pesinat") or 0)
 
-    await db.execute(
-        """UPDATE sifir_cihazlar SET durum='satildi', satis_fiyati=?, satis_kanali=?,
-           satis_tarihi=?, musteri_adi=?, musteri_telefon=?, odeme_yontemi=?
-           WHERE id=?""",
-        (satis_fiyati, body.get("satis_kanali", "Dükkan"),
-         satis_tarihi, musteri_adi, musteri_telefon, odeme, cihaz_id),
-    )
-
-    # Müşteri bul veya oluştur
-    customer_id = None
-    if musteri_adi:
-        lookup = [musteri_adi]
-        sql = "SELECT id FROM customers WHERE name = ?"
-        if musteri_telefon:
-            sql += " OR phone = ?"
-            lookup.append(musteri_telefon)
-        cur2 = await db.execute(sql, lookup)
-        row2 = await cur2.fetchone()
-        if row2:
-            customer_id = row2["id"]
-        else:
-            ins = await db.execute(
-                "INSERT INTO customers (name, phone) VALUES (?, ?)",
-                (musteri_adi, musteri_telefon or None)
-            )
-            customer_id = ins.lastrowid
-
-    aciklama = f"Sıfır Satış: {cihaz.get('model', '')} → {musteri_adi}".strip(" →")
-
-    if odeme == "taksit":
-        if pesinat > 0:
-            await db.execute(
-                """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-                   VALUES (?, 'gelir', 'nakit', ?, ?, 'sifir_satis')""",
-                (satis_tarihi, pesinat, aciklama + " (peşinat)"),
-            )
-        kalan = satis_fiyati - pesinat
-        if kalan > 0 and customer_id:
-            await db.execute(
-                """INSERT INTO debts
-                   (customer_id, borc_turu, source_type, amount, total_amount,
-                    payment_type, installment_count, notes, created_by)
-                   VALUES (?, 'alacak', 'sifir_taksit', ?, ?, 'taksit', ?, ?, ?)""",
-                (customer_id, kalan, kalan, taksit_sayi,
-                 aciklama, user["id"]),
-            )
-    else:
+    async with db.transaction():
         await db.execute(
-            """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-               VALUES (?, 'gelir', ?, ?, ?, 'sifir_satis')""",
-            (satis_tarihi, odeme, satis_fiyati, aciklama),
+            """UPDATE sifir_cihazlar SET durum='satildi', satis_fiyati=$1, satis_kanali=$2,
+               satis_tarihi=$3, musteri_adi=$4, musteri_telefon=$5, odeme_yontemi=$6
+               WHERE id=$7 AND dukkan_id=$8""",
+            satis_fiyati, body.get("satis_kanali", "Dükkan"),
+            satis_tarihi, musteri_adi, musteri_telefon, odeme, cihaz_id, dukkan_id,
         )
 
-    await db.commit()
+        customer_id = None
+        if musteri_adi:
+            if musteri_telefon:
+                row2 = await db.fetchrow(
+                    "SELECT id FROM customers WHERE dukkan_id=$1 AND (name = $2 OR phone = $3)",
+                    dukkan_id, musteri_adi, musteri_telefon,
+                )
+            else:
+                row2 = await db.fetchrow(
+                    "SELECT id FROM customers WHERE dukkan_id=$1 AND name = $2", dukkan_id, musteri_adi
+                )
+            if row2:
+                customer_id = row2["id"]
+            else:
+                ins = await db.fetchrow(
+                    "INSERT INTO customers (dukkan_id, name, phone) VALUES ($1, $2, $3) RETURNING id",
+                    dukkan_id, musteri_adi, musteri_telefon or None,
+                )
+                customer_id = ins["id"]
+
+        aciklama = f"Sıfır Satış: {cihaz.get('model', '')} → {musteri_adi}".strip(" →")
+
+        if odeme == "taksit":
+            if pesinat > 0:
+                await db.execute(
+                    """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+                       VALUES ($1, $2, 'gelir', 'nakit', $3, $4, 'sifir_satis')""",
+                    dukkan_id, satis_tarihi, pesinat, aciklama + " (peşinat)",
+                )
+            kalan = satis_fiyati - pesinat
+            if kalan > 0 and customer_id:
+                await db.execute(
+                    """INSERT INTO debts
+                       (dukkan_id, customer_id, borc_turu, source_type, amount, total_amount,
+                        payment_type, installment_count, notes, created_by)
+                       VALUES ($1, $2, 'alacak', 'sifir_taksit', $3, $4, 'taksit', $5, $6, $7)""",
+                    dukkan_id, customer_id, kalan, kalan, taksit_sayi, aciklama, user["id"],
+                )
+        else:
+            await db.execute(
+                """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+                   VALUES ($1, $2, 'gelir', $3, $4, $5, 'sifir_satis')""",
+                dukkan_id, satis_tarihi, odeme, satis_fiyati, aciklama,
+            )
     return {"ok": True}

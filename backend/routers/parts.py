@@ -1,7 +1,7 @@
+import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
-from aiosqlite import Connection
-from database import get_db, get_or_create_user
-from auth import get_current_user
+from database import get_db
+from auth import get_current_user, get_dukkan_id
 from datetime import date
 
 router = APIRouter(prefix="/parts", tags=["parts"])
@@ -11,89 +11,83 @@ router = APIRouter(prefix="/parts", tags=["parts"])
 async def list_parts(
     q: str = Query(None),
     low_stock: bool = Query(False),
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    where = []
-    params = []
+    where = ["dukkan_id = $1"]
+    params = [dukkan_id]
     if q:
-        where.append("(name LIKE ? OR device_model LIKE ?)")
         params += [f"%{q}%", f"%{q}%"]
+        where.append(f"(name ILIKE ${len(params)-1} OR device_model ILIKE ${len(params)})")
     if low_stock:
         where.append("quantity <= min_quantity")
-    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
-    cur = await db.execute(
-        f"SELECT * FROM parts {where_sql} ORDER BY created_at DESC LIMIT 100",
-        params,
+    where_sql = "WHERE " + " AND ".join(where)
+    rows = await db.fetch(
+        f"SELECT * FROM parts {where_sql} ORDER BY created_at DESC LIMIT 100", *params
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.post("/")
 async def create_part(
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        """INSERT INTO parts (name, device_model, part_type, quantity, min_quantity,
+    row = await db.fetchrow(
+        """INSERT INTO parts (dukkan_id, name, device_model, part_type, quantity, min_quantity,
            purchase_price, sale_price, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            body["name"],
-            body.get("device_model"),
-            body.get("part_type"),
-            body.get("quantity", 0),
-            body.get("min_quantity", 2),
-            body.get("purchase_price"),
-            body.get("sale_price"),
-            user["id"],
-        ),
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id""",
+        dukkan_id,
+        body["name"],
+        body.get("device_model"),
+        body.get("part_type"),
+        body.get("quantity", 0),
+        body.get("min_quantity", 2),
+        body.get("purchase_price"),
+        body.get("sale_price"),
+        user["id"],
     )
-    await db.commit()
-    return {"id": cur.lastrowid}
+    return {"id": row["id"]}
 
 
 @router.put("/{part_id}")
 async def update_part(
     part_id: int,
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     await db.execute(
-        """UPDATE parts SET name=?, device_model=?, part_type=?, quantity=?,
-           min_quantity=?, purchase_price=?, sale_price=?
-           WHERE id=?""",
-        (
-            body["name"],
-            body.get("device_model"),
-            body.get("part_type"),
-            body.get("quantity", 0),
-            body.get("min_quantity", 2),
-            body.get("purchase_price"),
-            body.get("sale_price"),
-            part_id,
-        ),
+        """UPDATE parts SET name=$1, device_model=$2, part_type=$3, quantity=$4,
+           min_quantity=$5, purchase_price=$6, sale_price=$7
+           WHERE id=$8 AND dukkan_id=$9""",
+        body["name"],
+        body.get("device_model"),
+        body.get("part_type"),
+        body.get("quantity", 0),
+        body.get("min_quantity", 2),
+        body.get("purchase_price"),
+        body.get("sale_price"),
+        part_id,
+        dukkan_id,
     )
-    await db.commit()
     return {"ok": True}
 
 
 @router.delete("/{part_id}")
 async def delete_part(
     part_id: int,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    if user["role"] != "patron":
+    if user["rol"] != "patron":
         raise HTTPException(403, "Sadece patron silebilir")
-    await db.execute("DELETE FROM parts WHERE id = ?", (part_id,))
-    await db.commit()
+    await db.execute("DELETE FROM parts WHERE id = $1 AND dukkan_id = $2", part_id, dukkan_id)
     return {"ok": True}
 
 
@@ -101,31 +95,35 @@ async def delete_part(
 async def stok_ekle(
     part_id: int,
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute("SELECT id, name, quantity FROM parts WHERE id=?", (part_id,))
-    part = await cur.fetchone()
+    part = await db.fetchrow(
+        "SELECT id, name, quantity FROM parts WHERE id=$1 AND dukkan_id=$2", part_id, dukkan_id
+    )
     if not part:
         raise HTTPException(404, "Parça bulunamadı")
     miktar = int(body.get("miktar", 1))
     if miktar < 1:
         raise HTTPException(400, "Geçersiz miktar")
     fiyat = body.get("fiyat")
-    if fiyat:
+    async with db.transaction():
+        if fiyat:
+            await db.execute(
+                "UPDATE parts SET quantity = quantity + $1, purchase_price = $2 WHERE id = $3 AND dukkan_id = $4",
+                miktar, float(fiyat), part_id, dukkan_id,
+            )
+        else:
+            await db.execute(
+                "UPDATE parts SET quantity = quantity + $1 WHERE id = $2 AND dukkan_id = $3",
+                miktar, part_id, dukkan_id,
+            )
         await db.execute(
-            "UPDATE parts SET quantity = quantity + ?, purchase_price = ? WHERE id = ?",
-            (miktar, float(fiyat), part_id),
+            """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
+               VALUES ($1, $2, 'giris', $3, 'satin_alma', $4, $5, $6)""",
+            dukkan_id, part_id, miktar, body.get("aciklama"), date.today().isoformat(), user["id"],
         )
-    else:
-        await db.execute("UPDATE parts SET quantity = quantity + ? WHERE id = ?", (miktar, part_id))
-    await db.execute(
-        """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
-           VALUES (?, 'giris', ?, 'satin_alma', ?, ?, ?)""",
-        (part_id, miktar, body.get("aciklama"), date.today().isoformat(), user["id"]),
-    )
-    await db.commit()
     return {"ok": True}
 
 
@@ -133,74 +131,81 @@ async def stok_ekle(
 async def kullan_part(
     part_id: int,
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute("SELECT id, name, quantity FROM parts WHERE id=?", (part_id,))
-    part = await cur.fetchone()
+    part = await db.fetchrow(
+        "SELECT id, name, quantity FROM parts WHERE id=$1 AND dukkan_id=$2", part_id, dukkan_id
+    )
     if not part:
         raise HTTPException(404, "Parça bulunamadı")
-    part = dict(part)
     miktar = int(body.get("miktar", 1))
     if part["quantity"] < miktar:
         raise HTTPException(400, f"Yetersiz stok (mevcut: {part['quantity']})")
-    await db.execute("UPDATE parts SET quantity = quantity - ? WHERE id = ?", (miktar, part_id))
-    await db.execute(
-        """INSERT INTO stok_hareketleri (part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
-           VALUES (?, 'cikis', ?, ?, ?, ?, ?)""",
-        (part_id, miktar, body.get("sebep", "diger"), body.get("aciklama"), date.today().isoformat(), user["id"])
-    )
-    await db.commit()
+    async with db.transaction():
+        await db.execute(
+            "UPDATE parts SET quantity = quantity - $1 WHERE id = $2 AND dukkan_id = $3",
+            miktar, part_id, dukkan_id,
+        )
+        await db.execute(
+            """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
+               VALUES ($1, $2, 'cikis', $3, $4, $5, $6, $7)""",
+            dukkan_id, part_id, miktar, body.get("sebep", "diger"), body.get("aciklama"),
+            date.today().isoformat(), user["id"],
+        )
     return {"ok": True, "kalan": part["quantity"] - miktar}
 
 
 @router.get("/{part_id}/hareketler")
 async def part_hareketler(
     part_id: int,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        """SELECT h.*, u.name as yapan_adi
+    rows = await db.fetch(
+        """SELECT h.*, u.ad as yapan_adi
            FROM stok_hareketleri h
-           LEFT JOIN users u ON u.id = h.created_by
-           WHERE h.part_id=? ORDER BY h.created_at DESC LIMIT 20""",
-        (part_id,)
+           LEFT JOIN kullanicilar u ON u.id = h.created_by
+           WHERE h.part_id=$1 AND h.dukkan_id=$2 ORDER BY h.created_at DESC LIMIT 20""",
+        part_id, dukkan_id,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
-# Parça siparisleri
+# Parca siparisleri
 @router.get("/orders/")
 async def list_orders(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        """SELECT po.*, u.name as ordered_by_name
+    rows = await db.fetch(
+        """SELECT po.*, u.ad as ordered_by_name
            FROM part_orders po
-           LEFT JOIN users u ON po.ordered_by = u.id
-           ORDER BY po.ordered_at DESC LIMIT 50"""
+           LEFT JOIN kullanicilar u ON po.ordered_by = u.id
+           WHERE po.dukkan_id = $1
+           ORDER BY po.ordered_at DESC LIMIT 50""",
+        dukkan_id,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.post("/orders/")
 async def create_order(
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        """INSERT INTO part_orders
-           (supplier_id, part_name, device_model, quantity, estimated_price,
-            repair_id, ordered_by, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
+    async with db.transaction():
+        row = await db.fetchrow(
+            """INSERT INTO part_orders
+               (dukkan_id, supplier_id, part_name, device_model, quantity, estimated_price,
+                repair_id, ordered_by, notes)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id""",
+            dukkan_id,
             body.get("supplier_id"),
             body["part_name"],
             body.get("device_model"),
@@ -209,35 +214,30 @@ async def create_order(
             body.get("repair_id"),
             user["id"],
             body.get("notes"),
-        ),
-    )
-    # Alışveriş listesine de ekle
-    await db.execute(
-        """INSERT INTO alisveris_listesi
-           (part_name, device_model, quantity, estimated_price, added_by, status)
-           VALUES (?, ?, ?, ?, ?, 'bekliyor')""",
-        (
+        )
+        await db.execute(
+            """INSERT INTO alisveris_listesi
+               (dukkan_id, part_name, device_model, quantity, estimated_price, added_by, status)
+               VALUES ($1, $2, $3, $4, $5, $6, 'bekliyor')""",
+            dukkan_id,
             body["part_name"],
             body.get("device_model"),
             body.get("quantity", 1),
             body.get("estimated_price"),
             user["id"],
-        ),
-    )
-    await db.commit()
-    return {"id": cur.lastrowid}
+        )
+    return {"id": row["id"]}
 
 
 @router.put("/orders/{order_id}/arrive")
 async def mark_arrived(
     order_id: int,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     await db.execute(
-        "UPDATE part_orders SET status='geldi', arrived_at=CURRENT_TIMESTAMP WHERE id=?",
-        (order_id,),
+        "UPDATE part_orders SET status='geldi', arrived_at=now() WHERE id=$1 AND dukkan_id=$2",
+        order_id, dukkan_id,
     )
-    await db.commit()
     return {"ok": True}

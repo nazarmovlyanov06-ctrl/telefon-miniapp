@@ -270,7 +270,7 @@ export default function SifirCihaz({ user }) {
                   <div className="card" style={{ marginTop: -8, borderRadius: "0 0 12px 12px", background: "var(--bg2)" }}>
                     <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                       <button className="btn btn-primary btn-sm" onClick={() => setShowSat(true)}>💰 Sat</button>
-                      {user?.role === "patron" && (
+                      {user?.rol === "patron" && (
                         deleteId === c.id ? (
                           <>
                             <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 12px", fontSize: 13 }}

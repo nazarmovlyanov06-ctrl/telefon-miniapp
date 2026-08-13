@@ -76,7 +76,7 @@ export default function Dashboard({ user }) {
   const aranacaklar = data?.aranacaklar || [];
   const kasa = data?.kasa_bugun || {};
 
-  const isim = user?.name?.split(" ")[0] || "";
+  const isim = user?.ad?.split(" ")[0] || "";
   const saat = new Date().getHours();
   const selam = saat < 12 ? "☀️ Günaydın" : saat < 18 ? "👋 Merhaba" : "🌙 İyi akşamlar";
 

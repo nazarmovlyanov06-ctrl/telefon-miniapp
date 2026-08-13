@@ -40,11 +40,7 @@ function openEdevlet(imei) {
     try { navigator.clipboard?.writeText(imei); } catch {}
   }
   const url = "https://www.turkiye.gov.tr/imei-sorgulama";
-  if (window.Telegram?.WebApp?.openLink) {
-    window.Telegram.WebApp.openLink(url);
-  } else {
-    window.open(url, "_blank");
-  }
+  window.open(url, "_blank");
 }
 
 export default function IMEI() {

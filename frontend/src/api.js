@@ -1,16 +1,30 @@
-import { getInitData } from "./tg";
-
 const BASE = import.meta.env.VITE_API_URL || "";
+const TOKEN_KEY = "telefon_servis_token";
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY) || "";
+}
+
+export function setToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
 
 async function request(path, options = {}) {
+  const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      "X-Init-Data": getInitData(),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
   });
+  if (res.status === 401) {
+    setToken(null);
+    window.location.href = "/giris";
+    throw new Error("Oturum sona erdi");
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || `HTTP ${res.status}`);
@@ -25,7 +39,9 @@ const del = (path) => request(path, { method: "DELETE" });
 
 export const api = {
   // Auth
-  me: () => get("/users/me"),
+  me: () => get("/auth/me"),
+  girisYap: (email, sifre) => post("/auth/giris", { email, sifre }),
+  kayitOl: (data) => post("/auth/kayit", data),
 
   // Dashboard
   dashboard: () => get("/reports/dashboard"),
@@ -84,12 +100,12 @@ export const api = {
   payDebt: (id, data) => post(`/debts/${id}/pay`, data),
   debtOdemeler: (id) => get(`/debts/${id}/odemeler`),
 
-  // Kullaniciler
+  // Kullaniciler (calisanlar)
   users: () => get("/users/"),
   changeRole: (id, role) => put(`/users/${id}/role`, { role }),
-  davetKodu: (kod) => post("/users/davet", { kod }),
-  onaylaUser: (id) => put(`/users/${id}/onayla`, {}),
-  reddetUser: (id) => del(`/users/${id}/reddet`),
+  calisanEkle: (data) => post("/users/davet", data),
+  calisanSil: (id) => del(`/users/${id}`),
+  calisanAktiflik: (id, aktif) => put(`/users/${id}/aktiflik`, { aktif }),
 
   // Toptanci
   toptanciList: () => get("/toptanci/"),

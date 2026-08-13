@@ -1,7 +1,7 @@
+import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
-from aiosqlite import Connection
-from database import get_db, get_or_create_user
-from auth import get_current_user
+from database import get_db
+from auth import get_current_user, get_dukkan_id
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -9,33 +9,35 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 @router.get("/")
 async def list_customers(
     q: str = Query(None),
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     if q:
-        cur = await db.execute(
+        rows = await db.fetch(
             """SELECT * FROM customers
-               WHERE name LIKE ? OR phone LIKE ?
-               ORDER BY visit_count DESC LIMIT 50""",
-            (f"%{q}%", f"%{q}%"),
+               WHERE dukkan_id = $1 AND (name ILIKE $2 OR phone ILIKE $2)
+               ORDER BY created_at DESC LIMIT 50""",
+            dukkan_id, f"%{q}%",
         )
     else:
-        cur = await db.execute(
-            "SELECT * FROM customers ORDER BY visit_count DESC, created_at DESC LIMIT 100"
+        rows = await db.fetch(
+            "SELECT * FROM customers WHERE dukkan_id = $1 ORDER BY created_at DESC LIMIT 100",
+            dukkan_id,
         )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.get("/{customer_id}")
 async def get_customer(
     customer_id: int,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute("SELECT * FROM customers WHERE id = ?", (customer_id,))
-    row = await cur.fetchone()
+    row = await db.fetchrow(
+        "SELECT * FROM customers WHERE id = $1 AND dukkan_id = $2", customer_id, dukkan_id
+    )
     if not row:
         raise HTTPException(404, "Musteri bulunamadi")
     return dict(row)
@@ -44,81 +46,80 @@ async def get_customer(
 @router.post("/")
 async def create_customer(
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        "INSERT INTO customers (name, phone, notes) VALUES (?, ?, ?)",
-        (body["name"], body.get("phone"), body.get("notes")),
+    row = await db.fetchrow(
+        "INSERT INTO customers (dukkan_id, name, phone, notes) VALUES ($1, $2, $3, $4) RETURNING id",
+        dukkan_id, body["name"], body.get("phone"), body.get("notes"),
     )
-    await db.commit()
-    return {"id": cur.lastrowid}
+    return {"id": row["id"]}
 
 
 @router.put("/{customer_id}")
 async def update_customer(
     customer_id: int,
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     await db.execute(
-        """UPDATE customers SET name=?, phone=?, notes=?, is_vip=?
-           WHERE id=?""",
-        (body["name"], body.get("phone"), body.get("notes"), int(body.get("is_vip", 0)), customer_id),
+        """UPDATE customers SET name=$1, phone=$2, notes=$3
+           WHERE id=$4 AND dukkan_id=$5""",
+        body["name"], body.get("phone"), body.get("notes"), customer_id, dukkan_id,
     )
-    await db.commit()
     return {"ok": True}
 
 
 @router.delete("/{customer_id}")
 async def delete_customer(
     customer_id: int,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    if user["role"] != "patron":
+    if user["rol"] != "patron":
         raise HTTPException(403, "Sadece patron silebilir")
-    await db.execute("DELETE FROM customers WHERE id = ?", (customer_id,))
-    await db.commit()
+    await db.execute("DELETE FROM customers WHERE id = $1 AND dukkan_id = $2", customer_id, dukkan_id)
     return {"ok": True}
 
 
 @router.get("/{customer_id}/ikinciel")
 async def customer_ikinciel(
     customer_id: int,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute("SELECT name FROM customers WHERE id = ?", (customer_id,))
-    row = await cur.fetchone()
+    row = await db.fetchrow(
+        "SELECT name FROM customers WHERE id = $1 AND dukkan_id = $2", customer_id, dukkan_id
+    )
     if not row:
         raise HTTPException(404, "Musteri bulunamadi")
-    name = dict(row)["name"]
+    name = row["name"]
     # Kimden = aldığımız cihaz (bize sattı), musteri_adi = sattığımız (müşteri satın aldı)
-    cur = await db.execute(
-        """SELECT *, 'alim' as yon FROM ikinci_el WHERE LOWER(kimden) = LOWER(?)
+    rows = await db.fetch(
+        """SELECT *, 'alim' as yon FROM ikinci_el WHERE dukkan_id = $1 AND LOWER(kimden) = LOWER($2)
            UNION ALL
-           SELECT *, 'satim' as yon FROM ikinci_el WHERE LOWER(musteri_adi) = LOWER(?)
+           SELECT *, 'satim' as yon FROM ikinci_el WHERE dukkan_id = $1 AND LOWER(musteri_adi) = LOWER($2)
            ORDER BY created_at DESC""",
-        (name, name)
+        dukkan_id, name,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.get("/{customer_id}/gecmis")
 async def customer_gecmis(
     customer_id: int,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute("SELECT name, phone FROM customers WHERE id = ?", (customer_id,))
-    row = await cur.fetchone()
+    row = await db.fetchrow(
+        "SELECT name, phone FROM customers WHERE id = $1 AND dukkan_id = $2", customer_id, dukkan_id
+    )
     if not row:
         raise HTTPException(404, "Musteri bulunamadi")
     name = row["name"]
@@ -127,10 +128,11 @@ async def customer_gecmis(
     events = []
 
     # Tamirler
-    cur = await db.execute(
-        "SELECT * FROM repairs WHERE customer_id = ? ORDER BY created_at DESC", (customer_id,)
+    rows = await db.fetch(
+        "SELECT * FROM repairs WHERE customer_id = $1 AND dukkan_id = $2 ORDER BY created_at DESC",
+        customer_id, dukkan_id,
     )
-    for r in await cur.fetchall():
+    for r in rows:
         r = dict(r)
         events.append({
             "tur": "tamir", "ikon": "🔧",
@@ -147,10 +149,11 @@ async def customer_gecmis(
         })
 
     # Borçlar
-    cur = await db.execute(
-        "SELECT * FROM debts WHERE customer_id = ? ORDER BY created_at DESC", (customer_id,)
+    rows = await db.fetch(
+        "SELECT * FROM debts WHERE customer_id = $1 AND dukkan_id = $2 ORDER BY created_at DESC",
+        customer_id, dukkan_id,
     )
-    for d in await cur.fetchall():
+    for d in rows:
         d = dict(d)
         events.append({
             "tur": "borc", "ikon": "💰",
@@ -161,12 +164,18 @@ async def customer_gecmis(
         })
 
     # 2.El — bize sattı (kimden)
-    cur = await db.execute(
-        "SELECT * FROM ikinci_el WHERE LOWER(kimden) = LOWER(?)"
-        + (" OR (kimden_telefon IS NOT NULL AND kimden_telefon != '' AND kimden_telefon = ?)" if phone else ""),
-        (name, phone) if phone else (name,)
-    )
-    for c in await cur.fetchall():
+    if phone:
+        rows = await db.fetch(
+            """SELECT * FROM ikinci_el WHERE dukkan_id = $1 AND (LOWER(kimden) = LOWER($2)
+               OR (kimden_telefon IS NOT NULL AND kimden_telefon != '' AND kimden_telefon = $3))""",
+            dukkan_id, name, phone,
+        )
+    else:
+        rows = await db.fetch(
+            "SELECT * FROM ikinci_el WHERE dukkan_id = $1 AND LOWER(kimden) = LOWER($2)",
+            dukkan_id, name,
+        )
+    for c in rows:
         c = dict(c)
         events.append({
             "tur": "2el_alim", "ikon": "📲",
@@ -177,12 +186,18 @@ async def customer_gecmis(
         })
 
     # 2.El — bizden aldı (musteri_adi)
-    cur = await db.execute(
-        "SELECT * FROM ikinci_el WHERE LOWER(musteri_adi) = LOWER(?)"
-        + (" OR (musteri_telefon IS NOT NULL AND musteri_telefon != '' AND musteri_telefon = ?)" if phone else ""),
-        (name, phone) if phone else (name,)
-    )
-    for c in await cur.fetchall():
+    if phone:
+        rows = await db.fetch(
+            """SELECT * FROM ikinci_el WHERE dukkan_id = $1 AND (LOWER(musteri_adi) = LOWER($2)
+               OR (musteri_telefon IS NOT NULL AND musteri_telefon != '' AND musteri_telefon = $3))""",
+            dukkan_id, name, phone,
+        )
+    else:
+        rows = await db.fetch(
+            "SELECT * FROM ikinci_el WHERE dukkan_id = $1 AND LOWER(musteri_adi) = LOWER($2)",
+            dukkan_id, name,
+        )
+    for c in rows:
         c = dict(c)
         events.append({
             "tur": "2el_satim", "ikon": "📱",
@@ -193,12 +208,18 @@ async def customer_gecmis(
         })
 
     # Sıfır — bize sattı
-    cur = await db.execute(
-        "SELECT * FROM sifir_cihazlar WHERE LOWER(kimden) = LOWER(?)"
-        + (" OR (kimden_telefon IS NOT NULL AND kimden_telefon != '' AND kimden_telefon = ?)" if phone else ""),
-        (name, phone) if phone else (name,)
-    )
-    for c in await cur.fetchall():
+    if phone:
+        rows = await db.fetch(
+            """SELECT * FROM sifir_cihazlar WHERE dukkan_id = $1 AND (LOWER(kimden) = LOWER($2)
+               OR (kimden_telefon IS NOT NULL AND kimden_telefon != '' AND kimden_telefon = $3))""",
+            dukkan_id, name, phone,
+        )
+    else:
+        rows = await db.fetch(
+            "SELECT * FROM sifir_cihazlar WHERE dukkan_id = $1 AND LOWER(kimden) = LOWER($2)",
+            dukkan_id, name,
+        )
+    for c in rows:
         c = dict(c)
         events.append({
             "tur": "sifir_alim", "ikon": "📦",
@@ -209,12 +230,18 @@ async def customer_gecmis(
         })
 
     # Sıfır — bizden aldı
-    cur = await db.execute(
-        "SELECT * FROM sifir_cihazlar WHERE LOWER(musteri_adi) = LOWER(?)"
-        + (" OR (musteri_telefon IS NOT NULL AND musteri_telefon != '' AND musteri_telefon = ?)" if phone else ""),
-        (name, phone) if phone else (name,)
-    )
-    for c in await cur.fetchall():
+    if phone:
+        rows = await db.fetch(
+            """SELECT * FROM sifir_cihazlar WHERE dukkan_id = $1 AND (LOWER(musteri_adi) = LOWER($2)
+               OR (musteri_telefon IS NOT NULL AND musteri_telefon != '' AND musteri_telefon = $3))""",
+            dukkan_id, name, phone,
+        )
+    else:
+        rows = await db.fetch(
+            "SELECT * FROM sifir_cihazlar WHERE dukkan_id = $1 AND LOWER(musteri_adi) = LOWER($2)",
+            dukkan_id, name,
+        )
+    for c in rows:
         c = dict(c)
         events.append({
             "tur": "sifir_satim", "ikon": "📦",
@@ -231,16 +258,16 @@ async def customer_gecmis(
 @router.get("/{customer_id}/repairs")
 async def customer_repairs(
     customer_id: int,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        """SELECT r.*, u.name as assigned_name
+    rows = await db.fetch(
+        """SELECT r.*, u.ad as assigned_name
            FROM repairs r
-           LEFT JOIN users u ON r.assigned_to = u.id
-           WHERE r.customer_id = ?
+           LEFT JOIN kullanicilar u ON r.assigned_to = u.id
+           WHERE r.customer_id = $1 AND r.dukkan_id = $2
            ORDER BY r.created_at DESC""",
-        (customer_id,),
+        customer_id, dukkan_id,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]

@@ -13,10 +13,13 @@ export default function Settings({ user }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [feed, setFeed] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ email: "", ad: "", sifre: "", rol: "cirak" });
+  const [err, setErr] = useState("");
   const navigate = useNavigate();
 
   const load = () => {
-    if (user?.role === "patron") {
+    if (user?.rol === "patron") {
       api.users().then(setUsers).finally(() => setLoading(false));
       api.aktiviteFeed().then(setFeed).catch(() => {});
     } else {
@@ -26,20 +29,33 @@ export default function Settings({ user }) {
 
   useEffect(() => { load(); }, [user]);
 
-  async function changeRole(u, role) {
-    await api.changeRole(u.id, role);
+  async function changeRole(u, rol) {
+    await api.changeRole(u.id, rol);
     load();
   }
 
-  async function onayla(u) {
-    await api.onaylaUser(u.id);
+  async function toggleAktif(u) {
+    await api.calisanAktiflik(u.id, !u.aktif);
     load();
   }
 
-  async function reddet(u) {
-    if (!confirm(`${u.name} reddedilsin mi? (silinir)`)) return;
-    await api.reddetUser(u.id);
+  async function sil(u) {
+    if (!confirm(`${u.ad} silinsin mi?`)) return;
+    await api.calisanSil(u.id);
     load();
+  }
+
+  async function ekle(e) {
+    e.preventDefault();
+    setErr("");
+    try {
+      await api.calisanEkle(form);
+      setForm({ email: "", ad: "", sifre: "", rol: "cirak" });
+      setShowForm(false);
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
   }
 
   return (
@@ -49,7 +65,7 @@ export default function Settings({ user }) {
         <div className="page-title" style={{ margin: 0 }}>⚙️ Ayarlar</div>
       </div>
 
-      {user?.role !== "patron" ? (
+      {user?.rol !== "patron" ? (
         <div className="card" style={{ color: "var(--hint)", textAlign: "center", padding: 32 }}>
           Bu sayfayı sadece patron görebilir
         </div>
@@ -57,29 +73,47 @@ export default function Settings({ user }) {
         <div className="loading">Yükleniyor...</div>
       ) : (
         <>
-          {users.some(u => u.durum === "bekliyor") && (
-            <>
-              <div className="section-title" style={{ color: "var(--danger)" }}>
-                🔔 Onay Bekleyenler ({users.filter(u => u.durum === "bekliyor").length})
-              </div>
-              {users.filter(u => u.durum === "bekliyor").map(u => (
-                <div key={u.id} className="card" style={{ borderLeft: "3px solid var(--danger)" }}>
-                  <div className="card-row" style={{ marginBottom: 10 }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{u.name}</div>
-                      <div style={{ fontSize: 12, color: "var(--hint)" }}>ID: {u.telegram_id}</div>
-                    </div>
-                    <span style={{ fontSize: 11, color: "var(--danger)", fontWeight: 700 }}>⏳ Bekliyor</span>
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button className="btn btn-sm" style={{ background: "var(--success)", color: "#fff", padding: "6px 14px" }}
-                      onClick={() => onayla(u)}>✅ Onayla</button>
-                    <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "6px 14px" }}
-                      onClick={() => reddet(u)}>❌ Reddet</button>
-                  </div>
+          <div className="card-row" style={{ marginBottom: 12 }}>
+            <div className="section-title" style={{ margin: 0 }}>Çalışanlar</div>
+            <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(v => !v); setErr(""); }}>
+              + Yeni Çalışan
+            </button>
+          </div>
+
+          {showForm && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <form onSubmit={ekle}>
+                {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>❌ {err}</div>}
+                <div className="form-group">
+                  <label className="form-label">Ad Soyad</label>
+                  <input className="form-input" required value={form.ad}
+                    onChange={e => setForm(f => ({ ...f, ad: e.target.value }))} />
                 </div>
-              ))}
-            </>
+                <div className="form-group">
+                  <label className="form-label">E-posta</label>
+                  <input type="email" className="form-input" required value={form.email}
+                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Şifre (en az 6 karakter)</label>
+                  <input type="text" className="form-input" required minLength={6} value={form.sifre}
+                    onChange={e => setForm(f => ({ ...f, sifre: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Rol</label>
+                  <select className="form-select" value={form.rol}
+                    onChange={e => setForm(f => ({ ...f, rol: e.target.value }))}>
+                    {ROLES.filter(r => r.key !== "patron").map(r => (
+                      <option key={r.key} value={r.key}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button type="submit" className="btn btn-primary">Ekle</button>
+                  <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>İptal</button>
+                </div>
+              </form>
+            </div>
           )}
 
           {feed.length > 0 && (
@@ -105,31 +139,41 @@ export default function Settings({ user }) {
             </>
           )}
 
-          <div className="section-title">Çalışanlar</div>
-          {users.filter(u => u.durum !== "bekliyor").map((u) => (
-            <div key={u.id} className="card">
+          {users.map((u) => (
+            <div key={u.id} className="card" style={{ opacity: u.aktif ? 1 : 0.5 }}>
               <div className="card-row" style={{ marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontWeight: 600 }}>{u.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--hint)" }}>ID: {u.telegram_id}</div>
+                  <div style={{ fontWeight: 600 }}>{u.ad}</div>
+                  <div style={{ fontSize: 12, color: "var(--hint)" }}>{u.email}</div>
                 </div>
-                <span className={`badge badge-${u.role}`}>
-                  {ROLES.find((r) => r.key === u.role)?.label || u.role}
+                <span className={`badge badge-${u.rol}`}>
+                  {ROLES.find((r) => r.key === u.rol)?.label || u.rol}
                 </span>
               </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {ROLES.map((r) => (
-                  <button
-                    key={r.key}
-                    className={`tab ${u.role === r.key ? "active" : ""}`}
-                    style={{ fontSize: 12, padding: "5px 10px" }}
-                    onClick={() => changeRole(u, r.key)}
-                    disabled={u.role === r.key}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+              {u.rol !== "patron" && (
+                <>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                    {ROLES.map((r) => (
+                      <button
+                        key={r.key}
+                        className={`tab ${u.rol === r.key ? "active" : ""}`}
+                        style={{ fontSize: 12, padding: "5px 10px" }}
+                        onClick={() => changeRole(u, r.key)}
+                        disabled={u.rol === r.key}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-sm" style={{ padding: "6px 14px" }} onClick={() => toggleAktif(u)}>
+                      {u.aktif ? "⏸ Pasifleştir" : "▶️ Aktifleştir"}
+                    </button>
+                    <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "6px 14px" }}
+                      onClick={() => sil(u)}>🗑️ Sil</button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </>

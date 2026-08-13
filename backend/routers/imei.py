@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
-from aiosqlite import Connection
-from database import get_db, get_or_create_user
-from auth import get_current_user
-from config import IMEI_API_KEY
-import httpx
 import re
+import httpx
+import asyncpg
+from fastapi import APIRouter, Depends, HTTPException
+from database import get_db
+from auth import get_current_user, get_dukkan_id
+from config import IMEI_API_KEY
 
 router = APIRouter(prefix="/imei", tags=["imei"])
 
@@ -26,10 +26,10 @@ def luhn_check(imei: str) -> bool:
 @router.get("/btk/{imei}")
 async def btk_query(
     imei: str,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     imei = imei.strip().replace(" ", "").replace("-", "")
     if not luhn_check(imei):
         raise HTTPException(400, "Geçersiz IMEI")
@@ -42,7 +42,6 @@ async def btk_query(
     }
     try:
         async with httpx.AsyncClient(timeout=12, follow_redirects=True) as client:
-            # BTK JSON endpoint (reverse engineered)
             resp = await client.get(
                 f"https://imei.btk.gov.tr/api/sorgulama/{imei}",
                 headers=headers,
@@ -54,7 +53,6 @@ async def btk_query(
                 except Exception:
                     pass
 
-            # Fallback: form POST
             session_resp = await client.get("https://imei.btk.gov.tr/", headers=headers)
             csrf = ""
             m = re.search(r'name=["\']_token["\'] value=["\']([^"\']+)["\']', session_resp.text)
@@ -67,7 +65,6 @@ async def btk_query(
                 headers={**headers, "Content-Type": "application/x-www-form-urlencoded"},
             )
             text = post_resp.text
-            # BTK sonuç parse
             durum = "bilinmiyor"
             renk = "gray"
             if "kayıtlı" in text.lower() and "değil" not in text.lower():
@@ -86,7 +83,7 @@ async def btk_query(
             if durum != "bilinmiyor":
                 return {"kaynak": "btk_scrape", "durum": durum, "renk": renk, "ham": ""}
 
-    except Exception as e:
+    except Exception:
         pass
 
     return {"kaynak": "hata", "durum": "btk_erisim_hatasi", "mesaj": "BTK'ya erişilemedi, lütfen siteyi manuel ziyaret edin"}
@@ -95,32 +92,31 @@ async def btk_query(
 @router.get("/{imei}")
 async def query_imei(
     imei: str,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     imei = imei.strip().replace(" ", "").replace("-", "")
 
     if not luhn_check(imei):
         raise HTTPException(400, "Geçersiz IMEI numarası (15 rakam olmalı)")
 
-    cur = await db.execute(
+    local_rows = await db.fetch(
         """SELECT r.repair_no, r.device_model, r.status, r.created_at,
                   c.name as customer_name
            FROM repairs r
            LEFT JOIN customers c ON r.customer_id = c.id
-           WHERE r.imei = ?
+           WHERE r.imei = $1 AND r.dukkan_id = $2
            ORDER BY r.created_at DESC""",
-        (imei,),
+        imei, dukkan_id,
     )
-    local_records = [dict(r) for r in await cur.fetchall()]
+    local_records = [dict(r) for r in local_rows]
 
-    # 2. el cihazlarda ara
-    cur = await db.execute(
-        "SELECT model, durum, alis_fiyati, satis_fiyati, created_at FROM ikinci_el WHERE imei = ? ORDER BY created_at DESC",
-        (imei,),
+    sh_rows = await db.fetch(
+        "SELECT model, durum, alis_fiyati, satis_fiyati, created_at FROM ikinci_el WHERE imei = $1 AND dukkan_id = $2 ORDER BY created_at DESC",
+        imei, dukkan_id,
     )
-    second_hand = [dict(r) for r in await cur.fetchall()]
+    second_hand = [dict(r) for r in sh_rows]
 
     api_result = None
     if IMEI_API_KEY:
@@ -138,10 +134,9 @@ async def query_imei(
 
     try:
         await db.execute(
-            "INSERT INTO imei_history (imei, action) VALUES (?, 'sorgulama')",
-            (imei,),
+            "INSERT INTO imei_history (dukkan_id, imei, action) VALUES ($1, $2, 'sorgulama')",
+            dukkan_id, imei,
         )
-        await db.commit()
     except Exception:
         pass
 

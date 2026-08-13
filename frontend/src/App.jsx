@@ -1,25 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { initTg } from "./tg";
-import { api } from "./api";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { api, getToken, setToken } from "./api";
+import Login from "./pages/Login";
+import Kayit from "./pages/Kayit";
 
 function BekleyenEkran({ user }) {
-  const [kod, setKod] = useState("");
-  const [mesaj, setMesaj] = useState("");
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function gonder(e) {
-    e.preventDefault(); setErr(""); setMesaj("");
-    setLoading(true);
-    try {
-      const r = await api.davetKodu(kod);
-      setMesaj(r.mesaj || "Onaylandı!");
-      setTimeout(() => window.location.reload(), 1500);
-    } catch (e) { setErr(e.message); }
-    finally { setLoading(false); }
-  }
-
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center",
       height: "100vh", padding: 24, flexDirection: "column", gap: 16, textAlign: "center" }}>
@@ -28,23 +13,12 @@ function BekleyenEkran({ user }) {
       <div style={{ fontSize: 14, color: "var(--hint)", maxWidth: 300 }}>
         Hesabın henüz onaylanmadı. Patron seni onayladıktan sonra giriş yapabilirsin.
       </div>
-      <div style={{ width: "100%", maxWidth: 300, marginTop: 8 }}>
-        <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 8 }}>
-          Veya davet kodu varsa gir:
-        </div>
-        <form onSubmit={gonder} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <input className="form-input" placeholder="Davet kodu..."
-            value={kod} onChange={e => setKod(e.target.value)} />
-          {err && <div style={{ color: "var(--danger)", fontSize: 13 }}>❌ {err}</div>}
-          {mesaj && <div style={{ color: "var(--success)", fontSize: 13 }}>✅ {mesaj}</div>}
-          <button type="submit" className="btn btn-primary" disabled={loading || !kod}>
-            {loading ? "Kontrol ediliyor..." : "Gönder"}
-          </button>
-        </form>
-      </div>
       <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 8 }}>
-        👤 {user?.name}
+        👤 {user?.ad}
       </div>
+      <button className="btn" onClick={() => { setToken(null); window.location.href = "/giris"; }}>
+        Çıkış Yap
+      </button>
     </div>
   );
 }
@@ -179,30 +153,40 @@ function AppRoutes({ user }) {
   );
 }
 
-export default function App() {
+function Yukleniyor() {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center",
+      height: "100vh", flexDirection: "column", gap: 16, color: "var(--hint)"
+    }}>
+      <div style={{ fontSize: 48 }}>🔧</div>
+      <div>Yükleniyor...</div>
+    </div>
+  );
+}
+
+function Korumali({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    initTg();
+  function yukle() {
+    setLoading(true);
     api.me()
       .then(setUser)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    if (!getToken()) { navigate("/giris"); return; }
+    yukle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) {
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        height: "100vh", flexDirection: "column", gap: 16, color: "var(--hint)"
-      }}>
-        <div style={{ fontSize: 48 }}>🔧</div>
-        <div>Yükleniyor...</div>
-      </div>
-    );
-  }
+  if (!getToken()) return null;
+  if (loading) return <Yukleniyor />;
 
   if (error) {
     return (
@@ -211,7 +195,7 @@ export default function App() {
         <div style={{ color: "var(--danger)", marginBottom: 8 }}>Bağlantı hatası</div>
         <div style={{ fontSize: 13, color: "var(--hint)" }}>{error}</div>
         <button className="btn btn-primary" style={{ marginTop: 16, width: "auto", padding: "10px 24px" }}
-          onClick={() => window.location.reload()}>
+          onClick={yukle}>
           Tekrar Dene
         </button>
       </div>
@@ -222,9 +206,19 @@ export default function App() {
     return <BekleyenEkran user={user} />;
   }
 
+  return children(user);
+}
+
+export default function App() {
   return (
     <BrowserRouter>
-      <AppRoutes user={user} />
+      <Routes>
+        <Route path="/giris" element={<Login />} />
+        <Route path="/kayit" element={<Kayit />} />
+        <Route path="/*" element={
+          <Korumali>{(user) => <AppRoutes user={user} />}</Korumali>
+        } />
+      </Routes>
     </BrowserRouter>
   );
 }

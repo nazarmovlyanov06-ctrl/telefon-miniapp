@@ -1,7 +1,7 @@
+import asyncpg
 from fastapi import APIRouter, Depends, Query
-from aiosqlite import Connection
-from database import get_db, get_or_create_user
-from auth import get_current_user
+from database import get_db
+from auth import get_current_user, get_dukkan_id
 import datetime
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -9,87 +9,77 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/dashboard")
 async def dashboard(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     today = datetime.date.today().isoformat()
     month_start = datetime.date.today().replace(day=1).isoformat()
     iki_gun_once = (datetime.date.today() - datetime.timedelta(days=2)).isoformat()
     yedi_gun_sonra = (datetime.date.today() + datetime.timedelta(days=7)).isoformat()
 
-    async def scalar(sql, params=()):
-        cur = await db.execute(sql, params)
-        row = await cur.fetchone()
-        return row[0] if row else 0
+    async def scalar(sql, *params):
+        return await db.fetchval(sql, *params) or 0
 
-    # Tamir durum sayıları (aktif olanlar)
-    cur = await db.execute(
-        "SELECT status, COUNT(*) as c FROM repairs WHERE status != 'teslim' GROUP BY status"
+    rows = await db.fetch(
+        "SELECT status, COUNT(*) as c FROM repairs WHERE dukkan_id=$1 AND status != 'teslim' GROUP BY status",
+        dukkan_id,
     )
-    tamir_durumlar = {r["status"]: r["c"] for r in await cur.fetchall()}
+    tamir_durumlar = {r["status"]: r["c"] for r in rows}
 
-    # Bugünkü kasa
-    cur = await db.execute(
-        "SELECT tur, COALESCE(SUM(tutar),0) as t FROM kasa_hareketleri WHERE tarih=? GROUP BY tur",
-        (today,),
+    rows = await db.fetch(
+        "SELECT tur, COALESCE(SUM(tutar),0) as t FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih=$2 GROUP BY tur",
+        dukkan_id, today,
     )
-    kasa = {r["tur"]: r["t"] for r in await cur.fetchall()}
+    kasa = {r["tur"]: float(r["t"]) for r in rows}
 
-    # Uyarılar — stok
-    cur = await db.execute(
+    stok_uyari = [dict(r) for r in await db.fetch(
         """SELECT name, quantity, min_quantity FROM parts
-           WHERE quantity <= COALESCE(min_quantity, 0) OR quantity = 0
-           ORDER BY quantity ASC LIMIT 5"""
-    )
-    stok_uyari = [dict(r) for r in await cur.fetchall()]
+           WHERE dukkan_id=$1 AND (quantity <= COALESCE(min_quantity, 0) OR quantity = 0)
+           ORDER BY quantity ASC LIMIT 5""",
+        dukkan_id,
+    )]
 
-    # Uyarılar — garanti
-    cur = await db.execute(
+    garanti_uyari = [dict(r) for r in await db.fetch(
         """SELECT musteri_adi, cihaz, bitis_tarihi FROM garantiler
-           WHERE aktif=1 AND bitis_tarihi >= ? AND bitis_tarihi <= ?
+           WHERE dukkan_id=$1 AND aktif=true AND bitis_tarihi >= $2 AND bitis_tarihi <= $3
            ORDER BY bitis_tarihi ASC LIMIT 5""",
-        (today, yedi_gun_sonra),
-    )
-    garanti_uyari = [dict(r) for r in await cur.fetchall()]
+        dukkan_id, today, yedi_gun_sonra,
+    )]
 
-    # Uyarılar — gecikmiş borçlar
-    cur = await db.execute(
-        """SELECT c.name as musteri_adi, d.total_amount - d.paid_amount as kalan, d.due_date
+    borc_uyari = [dict(r) for r in await db.fetch(
+        """SELECT COALESCE(c.name, d.alacakli_adi) as musteri_adi,
+                  d.total_amount - d.paid_amount as kalan, d.due_date
            FROM debts d LEFT JOIN customers c ON d.customer_id = c.id
-           WHERE d.due_date < ? AND d.total_amount > d.paid_amount
+           WHERE d.dukkan_id=$1 AND d.due_date < $2 AND d.total_amount > d.paid_amount
            ORDER BY d.due_date ASC LIMIT 5""",
-        (today,),
-    )
-    borc_uyari = [dict(r) for r in await cur.fetchall()]
+        dukkan_id, today,
+    )]
 
-    # Bugün aranacaklar (hazır 2+ gün)
-    cur = await db.execute(
+    aranacaklar = [dict(r) for r in await db.fetch(
         """SELECT r.id, r.repair_no, c.name as musteri_adi, c.phone as telefon,
                   r.device_model, r.completed_at
            FROM repairs r LEFT JOIN customers c ON r.customer_id = c.id
-           WHERE r.status='hazir' AND (r.completed_at <= ? OR r.completed_at IS NULL)
+           WHERE r.dukkan_id=$1 AND r.status='hazir' AND (r.completed_at <= $2 OR r.completed_at IS NULL)
            ORDER BY r.completed_at ASC LIMIT 10""",
-        (iki_gun_once,),
-    )
-    aranacaklar = [dict(r) for r in await cur.fetchall()]
+        dukkan_id, iki_gun_once,
+    )]
 
-    # Son 5 tamir (canlı feed)
-    cur = await db.execute(
+    son_tamirler = [dict(r) for r in await db.fetch(
         """SELECT r.id, r.repair_no, c.name as musteri_adi, r.device_model,
                   r.fault_desc, r.status, r.created_at, r.final_price
            FROM repairs r LEFT JOIN customers c ON r.customer_id = c.id
+           WHERE r.dukkan_id=$1
            ORDER BY r.created_at DESC LIMIT 5""",
-    )
-    son_tamirler = [dict(r) for r in await cur.fetchall()]
+        dukkan_id,
+    )]
 
-    # Bu ay
     bu_ay_gelir = await scalar(
-        "SELECT COALESCE(SUM(final_price),0) FROM repairs WHERE status='teslim' AND delivered_at >= ?",
-        (month_start,),
+        "SELECT COALESCE(SUM(final_price),0) FROM repairs WHERE dukkan_id=$1 AND status='teslim' AND delivered_at >= $2",
+        dukkan_id, month_start,
     )
     bu_ay_tamir = await scalar(
-        "SELECT COUNT(*) FROM repairs WHERE created_at >= ?", (month_start,)
+        "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND created_at >= $2", dukkan_id, month_start
     )
 
     return {
@@ -99,26 +89,24 @@ async def dashboard(
             "gider": kasa.get("gider", 0),
             "net": kasa.get("gelir", 0) - kasa.get("gider", 0),
         },
-        "bu_ay": {
-            "gelir": bu_ay_gelir,
-            "tamir": bu_ay_tamir,
-        },
-        "uyarilar": {
-            "stok": stok_uyari,
-            "garanti": garanti_uyari,
-            "borc": borc_uyari,
-        },
+        "bu_ay": {"gelir": bu_ay_gelir, "tamir": bu_ay_tamir},
+        "uyarilar": {"stok": stok_uyari, "garanti": garanti_uyari, "borc": borc_uyari},
         "aranacaklar": aranacaklar,
         "son_tamirler": son_tamirler,
-        # Legacy compat
         "bugun": {
-            "tamir_sayisi": await scalar("SELECT COUNT(*) FROM repairs WHERE DATE(created_at)=?", (today,)),
-            "teslim_sayisi": await scalar("SELECT COUNT(*) FROM repairs WHERE DATE(delivered_at)=?", (today,)),
+            "tamir_sayisi": await scalar(
+                "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND DATE(created_at)=$2", dukkan_id, today
+            ),
+            "teslim_sayisi": await scalar(
+                "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND DATE(delivered_at)=$2", dukkan_id, today
+            ),
             "gelir": kasa.get("gelir", 0),
         },
         "bekleyen": {
             "tamir": sum(tamir_durumlar.get(s, 0) for s in ["bekliyor", "tamirde", "parca_bekleniyor"]),
-            "borc": await scalar("SELECT COUNT(*) FROM debts WHERE total_amount > paid_amount"),
+            "borc": await scalar(
+                "SELECT COUNT(*) FROM debts WHERE dukkan_id=$1 AND total_amount > paid_amount", dukkan_id
+            ),
         },
         "stok_uyari": len(stok_uyari),
     }
@@ -126,35 +114,36 @@ async def dashboard(
 
 @router.get("/repairs-by-status")
 async def repairs_by_status(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute("SELECT status, COUNT(*) as count FROM repairs GROUP BY status")
-    rows = await cur.fetchall()
+    rows = await db.fetch(
+        "SELECT status, COUNT(*) as count FROM repairs WHERE dukkan_id=$1 GROUP BY status", dukkan_id
+    )
     return {r["status"]: r["count"] for r in rows}
 
 
 @router.get("/genel")
 async def genel_stats(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     today = datetime.date.today()
 
     son7gun = []
     for i in range(6, -1, -1):
         gun = (today - datetime.timedelta(days=i)).isoformat()
-        cur = await db.execute(
-            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE tarih=? AND tur='gelir'", (gun,)
+        gelir = await db.fetchval(
+            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih=$2 AND tur='gelir'",
+            dukkan_id, gun,
         )
-        gelir = (await cur.fetchone())[0]
-        cur = await db.execute(
-            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE tarih=? AND tur='gider'", (gun,)
+        gider = await db.fetchval(
+            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih=$2 AND tur='gider'",
+            dukkan_id, gun,
         )
-        gider = (await cur.fetchone())[0]
-        son7gun.append({"gun": gun, "gelir": gelir, "gider": gider})
+        son7gun.append({"gun": gun, "gelir": float(gelir), "gider": float(gider)})
 
     son6ay = []
     for i in range(5, -1, -1):
@@ -165,40 +154,36 @@ async def genel_stats(
             yil -= 1
         ay_basi = f"{yil}-{ay:02d}-01"
         ay_sonu = f"{yil+1}-01-01" if ay == 12 else f"{yil}-{ay+1:02d}-01"
-        cur = await db.execute(
-            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE tarih>=? AND tarih<? AND tur='gelir'",
-            (ay_basi, ay_sonu),
+        gelir = await db.fetchval(
+            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih>=$2 AND tarih<$3 AND tur='gelir'",
+            dukkan_id, ay_basi, ay_sonu,
         )
-        gelir = (await cur.fetchone())[0]
-        cur = await db.execute(
-            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE tarih>=? AND tarih<? AND tur='gider'",
-            (ay_basi, ay_sonu),
+        gider = await db.fetchval(
+            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih>=$2 AND tarih<$3 AND tur='gider'",
+            dukkan_id, ay_basi, ay_sonu,
         )
-        gider = (await cur.fetchone())[0]
-        son6ay.append({"ay": f"{yil}-{ay:02d}", "gelir": gelir, "gider": gider})
+        son6ay.append({"ay": f"{yil}-{ay:02d}", "gelir": float(gelir), "gider": float(gider)})
 
-    cur = await db.execute(
+    ariza_top = [dict(r) for r in await db.fetch(
         """SELECT fault_desc, COUNT(*) as c FROM repairs
-           WHERE fault_desc IS NOT NULL AND fault_desc != ''
-           GROUP BY LOWER(TRIM(fault_desc)) ORDER BY c DESC LIMIT 8"""
-    )
-    ariza_top = [dict(r) for r in await cur.fetchall()]
+           WHERE dukkan_id=$1 AND fault_desc IS NOT NULL AND fault_desc != ''
+           GROUP BY LOWER(TRIM(fault_desc)), fault_desc ORDER BY c DESC LIMIT 8""",
+        dukkan_id,
+    )]
 
-    cur = await db.execute(
+    musteri_top = [dict(r) for r in await db.fetch(
         """SELECT c.name, COALESCE(SUM(r.final_price),0) as toplam
            FROM customers c JOIN repairs r ON r.customer_id = c.id
-           WHERE r.status='teslim' AND r.final_price > 0
-           GROUP BY c.id ORDER BY toplam DESC LIMIT 6"""
-    )
-    musteri_top = [dict(r) for r in await cur.fetchall()]
+           WHERE c.dukkan_id=$1 AND r.status='teslim' AND r.final_price > 0
+           GROUP BY c.id ORDER BY toplam DESC LIMIT 6""",
+        dukkan_id,
+    )]
 
-    cur = await db.execute("SELECT status, COUNT(*) as c FROM repairs GROUP BY status")
-    tamir_durum = {r["status"]: r["c"] for r in await cur.fetchall()}
+    rows = await db.fetch("SELECT status, COUNT(*) as c FROM repairs WHERE dukkan_id=$1 GROUP BY status", dukkan_id)
+    tamir_durum = {r["status"]: r["c"] for r in rows}
 
-    async def scalar(sql, params=()):
-        cur = await db.execute(sql, params)
-        row = await cur.fetchone()
-        return row[0] if row else 0
+    async def scalar(sql, *params):
+        return await db.fetchval(sql, *params) or 0
 
     return {
         "son7gun": son7gun,
@@ -207,12 +192,16 @@ async def genel_stats(
         "musteri_top": musteri_top,
         "tamir_durum": tamir_durum,
         "sayilar": {
-            "musteri": await scalar("SELECT COUNT(*) FROM customers"),
-            "tamir_toplam": await scalar("SELECT COUNT(*) FROM repairs"),
-            "ikinciel_stok": await scalar("SELECT COUNT(*) FROM ikinci_el WHERE durum='stokta'"),
-            "sifir_stok": await scalar("SELECT COUNT(*) FROM sifir_cihazlar WHERE durum='stokta'"),
-            "parca_cesit": await scalar("SELECT COUNT(*) FROM parts"),
-            "aksesuar_cesit": await scalar("SELECT COUNT(*) FROM aksesuarlar"),
+            "musteri": await scalar("SELECT COUNT(*) FROM customers WHERE dukkan_id=$1", dukkan_id),
+            "tamir_toplam": await scalar("SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1", dukkan_id),
+            "ikinciel_stok": await scalar(
+                "SELECT COUNT(*) FROM ikinci_el WHERE dukkan_id=$1 AND durum='stokta'", dukkan_id
+            ),
+            "sifir_stok": await scalar(
+                "SELECT COUNT(*) FROM sifir_cihazlar WHERE dukkan_id=$1 AND durum='stokta'", dukkan_id
+            ),
+            "parca_cesit": await scalar("SELECT COUNT(*) FROM parts WHERE dukkan_id=$1", dukkan_id),
+            "aksesuar_cesit": await scalar("SELECT COUNT(*) FROM aksesuarlar WHERE dukkan_id=$1", dukkan_id),
         },
     }
 
@@ -221,45 +210,44 @@ async def genel_stats(
 async def monthly_report(
     year: int = Query(None),
     month: int = Query(None),
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     now = datetime.date.today()
     year = year or now.year
     month = month or now.month
     start = f"{year}-{month:02d}-01"
     end = f"{year + 1}-01-01" if month == 12 else f"{year}-{month + 1:02d}-01"
 
-    cur = await db.execute(
+    rows = await db.fetch(
         """SELECT DATE(created_at) as day, COUNT(*) as count,
                   COALESCE(SUM(final_price),0) as gelir
-           FROM repairs WHERE created_at >= ? AND created_at < ?
+           FROM repairs WHERE dukkan_id=$1 AND created_at >= $2 AND created_at < $3
            GROUP BY DATE(created_at) ORDER BY day""",
-        (start, end),
+        dukkan_id, start, end,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.get("/feed")
 async def aktivite_feed(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    import datetime
     today = datetime.date.today().isoformat()
-    cur = await db.execute(
+    rows = await db.fetch(
         """SELECT r.id, r.repair_no, r.device_model, r.status,
                   c.name as musteri_adi,
-                  u.name as guncelleyen,
+                  u.ad as guncelleyen,
                   r.updated_at
            FROM repairs r
            LEFT JOIN customers c ON r.customer_id = c.id
-           LEFT JOIN users u ON u.id = r.son_guncelleyen_id
-           WHERE r.son_guncelleyen_id IS NOT NULL
-             AND DATE(r.updated_at) = ?
+           LEFT JOIN kullanicilar u ON u.id = r.son_guncelleyen_id
+           WHERE r.dukkan_id = $1 AND r.son_guncelleyen_id IS NOT NULL
+             AND DATE(r.updated_at) = $2
            ORDER BY r.updated_at DESC LIMIT 30""",
-        (today,),
+        dukkan_id, today,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]

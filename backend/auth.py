@@ -1,37 +1,82 @@
-import json
 import time
-import os
-from urllib.parse import parse_qsl
-from fastapi import HTTPException, Header
+import bcrypt
+import jwt
+from fastapi import HTTPException, Header, Depends
+import asyncpg
 
-DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
-DEV_TELEGRAM_ID = int(os.getenv("DEV_TELEGRAM_ID", "0"))
+from config import JWT_SECRET, JWT_ALGO, JWT_ACCESS_MIN, ROLE_SUPER_ADMIN
+from database import get_db
 
 
-def validate_init_data(init_data: str) -> dict:
-    """Telegram WebApp initData'dan user bilgisini cikarir."""
-    if DEV_MODE or init_data == "mock_dev_mode":
-        return {"id": DEV_TELEGRAM_ID, "first_name": "Dev"}
+def hash_sifre(sifre: str) -> str:
+    return bcrypt.hashpw(sifre.encode(), bcrypt.gensalt()).decode()
+
+
+def dogrula_sifre(sifre: str, hash_: str) -> bool:
     try:
-        parsed = dict(parse_qsl(init_data, strict_parsing=False))
+        return bcrypt.checkpw(sifre.encode(), hash_.encode())
+    except Exception:
+        return False
 
-        auth_date = int(parsed.get("auth_date", 0))
-        if time.time() - auth_date > 86400:
-            raise HTTPException(status_code=401, detail="Token suresi dolmus")
 
-        user_data = json.loads(parsed.get("user", "{}"))
-        if not user_data.get("id"):
-            raise HTTPException(status_code=401, detail="Kullanici bulunamadi")
-        return user_data
+def olustur_token(kullanici_id: int, dukkan_id: int | None, rol: str) -> str:
+    payload = {
+        "sub": kullanici_id,
+        "dukkan_id": dukkan_id,
+        "rol": rol,
+        "exp": int(time.time()) + JWT_ACCESS_MIN * 60,
+        "iat": int(time.time()),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Auth hatasi: {e}")
+
+def coz_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Oturum suresi doldu, tekrar giris yapin")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Gecersiz oturum")
 
 
 async def get_current_user(
-    x_init_data: str = Header(..., alias="X-Init-Data"),
-):
-    """FastAPI dependency — her endpoint'te kullanilir."""
-    return validate_init_data(x_init_data)
+    authorization: str = Header(..., alias="Authorization"),
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    """FastAPI dependency — Bearer token dogrular, kullaniciyi + dukkan_id'yi dondurur."""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token eksik")
+    token = authorization[7:]
+    payload = coz_token(token)
+
+    row = await db.fetchrow(
+        "SELECT id, dukkan_id, email, ad, rol, durum, aktif FROM kullanicilar WHERE id = $1",
+        payload["sub"],
+    )
+    if not row:
+        raise HTTPException(status_code=401, detail="Kullanici bulunamadi")
+    if not row["aktif"]:
+        raise HTTPException(status_code=403, detail="Hesap pasif")
+    if row["durum"] == "bekliyor":
+        raise HTTPException(status_code=403, detail="Hesabiniz onay bekliyor")
+
+    return dict(row)
+
+
+async def require_patron(user: dict = Depends(get_current_user)) -> dict:
+    if user["rol"] not in ("patron", ROLE_SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Bu islem icin patron yetkisi gerekli")
+    return user
+
+
+async def require_super_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user["rol"] != ROLE_SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Bu islem icin super admin yetkisi gerekli")
+    return user
+
+
+def get_dukkan_id(user: dict = Depends(get_current_user)) -> int:
+    """Cogu router bunu kullanir — sorguyu otomatik dukkana kilitler."""
+    if user["dukkan_id"] is None:
+        raise HTTPException(status_code=400, detail="Bu hesap bir dukkana bagli degil")
+    return user["dukkan_id"]

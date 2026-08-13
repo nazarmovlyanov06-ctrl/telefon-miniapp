@@ -9,7 +9,7 @@ function fmt(dt) {
 
 export default function GeriBildirim({ user }) {
   const navigate = useNavigate();
-  const isPatron = user?.role === "patron";
+  const isPatron = user?.rol === "patron";
   const [tab, setTab] = useState("sikayet");
   const [list, setList] = useState([]);
   const [skor, setSkor] = useState([]);
@@ -120,7 +120,7 @@ export default function GeriBildirim({ user }) {
                 onChange={e => setForm(f => ({ ...f, hedef_id: parseInt(e.target.value) }))}>
                 <option value="">Çalışan seç...</option>
                 {kullanicilar.map(u => (
-                  <option key={u.id} value={u.id}>{u.name || u.first_name}</option>
+                  <option key={u.id} value={u.id}>{u.ad}</option>
                 ))}
               </select>
             </div>
@@ -153,7 +153,7 @@ export default function GeriBildirim({ user }) {
           <div className="card" style={{ marginBottom: 14 }}>
             {skor.map((s, i) => (
               <div key={s.id} className="card-row" style={{ padding: "8px 0", borderBottom: i < skor.length - 1 ? "1px solid var(--bg2)" : "none" }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{s.name || s.first_name}</span>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{s.ad}</span>
                 <div style={{ display: "flex", gap: 10 }}>
                   <span style={{ fontSize: 13, color: "var(--success)", fontWeight: 600 }}>
                     ⭐ {s.ovgu_sayisi || 0}
@@ -191,7 +191,7 @@ export default function GeriBildirim({ user }) {
         activeList.map(item => (
           <div key={item.id} className="card" style={{
             marginBottom: 8,
-            borderLeft: `3px solid ${item.goruldu === 0
+            borderLeft: `3px solid ${!item.goruldu
               ? (tab === "sikayet" ? "var(--danger)" : "var(--success)")
               : "var(--border)"}`,
           }}>
@@ -214,7 +214,7 @@ export default function GeriBildirim({ user }) {
                 <div style={{ fontSize: 14, lineHeight: 1.5 }}>{item.mesaj}</div>
                 <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 6 }}>{fmt(item.created_at)}</div>
               </div>
-              {item.goruldu === 0 && (
+              {!item.goruldu && (
                 <div style={{
                   flexShrink: 0, width: 8, height: 8, borderRadius: "50%",
                   background: tab === "sikayet" ? "var(--danger)" : "var(--success)",

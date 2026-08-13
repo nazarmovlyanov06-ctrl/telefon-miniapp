@@ -1,17 +1,18 @@
-from fastapi import APIRouter, Depends, Query
-from aiosqlite import Connection
-from database import get_db, get_or_create_user
-from auth import get_current_user
+import asyncpg
+from fastapi import APIRouter, Depends, HTTPException, Query
+from database import get_db
+from auth import get_current_user, get_dukkan_id
 from datetime import date, timedelta
 
 router = APIRouter(prefix="/kasa", tags=["kasa"])
 
 
-async def _gun_ozet(db: Connection, tarih: str) -> dict:
-    cur = await db.execute(
-        "SELECT * FROM kasa_hareketleri WHERE tarih = ? ORDER BY id DESC", (tarih,)
+async def _gun_ozet(db: asyncpg.Connection, dukkan_id: int, tarih: str) -> dict:
+    rows = await db.fetch(
+        "SELECT * FROM kasa_hareketleri WHERE dukkan_id = $1 AND tarih = $2 ORDER BY id DESC",
+        dukkan_id, tarih,
     )
-    rows = [dict(r) for r in await cur.fetchall()]
+    rows = [dict(r) for r in rows]
     giris = cikis = nakit = kart = 0.0
     for r in rows:
         if r["tur"] == "giris":
@@ -35,51 +36,51 @@ async def _gun_ozet(db: Connection, tarih: str) -> dict:
 
 @router.get("/bugun")
 async def bugun(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    return await _gun_ozet(db, date.today().isoformat())
+    return await _gun_ozet(db, dukkan_id, date.today().isoformat())
 
 
 @router.get("/tarih/{tarih}")
 async def belirli_gun(
     tarih: str,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    return await _gun_ozet(db, tarih)
+    return await _gun_ozet(db, dukkan_id, tarih)
 
 
 @router.post("/gider")
 async def manuel_hareket(
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (body.get("tarih", date.today().isoformat()),
-         body.get("tur", "cikis"),
-         body.get("odeme_yontemi", "nakit"),
-         float(body["tutar"]),
-         body.get("aciklama"),
-         body.get("kaynak", "manuel")),
+    row = await db.fetchrow(
+        """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id""",
+        dukkan_id,
+        body.get("tarih", date.today().isoformat()),
+        body.get("tur", "cikis"),
+        body.get("odeme_yontemi", "nakit"),
+        float(body["tutar"]),
+        body.get("aciklama"),
+        body.get("kaynak", "manuel"),
     )
-    await db.commit()
-    return {"id": cur.lastrowid}
+    return {"id": row["id"]}
 
 
 @router.get("/ozet")
 async def kasa_ozet(
     periyot: str = Query("bugun"),
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     today = date.today()
 
     if periyot == "hafta":
@@ -89,31 +90,36 @@ async def kasa_ozet(
     else:
         baslangic = today.isoformat()
     bitis = today.isoformat()
-    p = (baslangic, bitis)
 
-    async def scalar(sql, params=()):
-        c = await db.execute(sql, params)
-        r = await c.fetchone()
-        return float(r[0] or 0) if r else 0.0
+    async def scalar(sql, *params):
+        return float(await db.fetchval(sql, *params) or 0)
 
     gelir = await scalar(
-        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE tur IN ('giris','gelir') AND tarih>=? AND tarih<=?", p)
+        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tur IN ('giris','gelir') AND tarih>=$2 AND tarih<=$3",
+        dukkan_id, baslangic, bitis)
     gelir_nakit = await scalar(
-        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE tur IN ('giris','gelir') AND odeme_yontemi='nakit' AND tarih>=? AND tarih<=?", p)
+        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tur IN ('giris','gelir') AND odeme_yontemi='nakit' AND tarih>=$2 AND tarih<=$3",
+        dukkan_id, baslangic, bitis)
     gelir_kart = await scalar(
-        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE tur IN ('giris','gelir') AND odeme_yontemi='kart' AND tarih>=? AND tarih<=?", p)
+        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tur IN ('giris','gelir') AND odeme_yontemi='kart' AND tarih>=$2 AND tarih<=$3",
+        dukkan_id, baslangic, bitis)
 
     gider = await scalar(
-        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE tur IN ('cikis','gider') AND tarih>=? AND tarih<=?", p)
+        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tur IN ('cikis','gider') AND tarih>=$2 AND tarih<=$3",
+        dukkan_id, baslangic, bitis)
     gider_nakit = await scalar(
-        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE tur IN ('cikis','gider') AND odeme_yontemi='nakit' AND tarih>=? AND tarih<=?", p)
+        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tur IN ('cikis','gider') AND odeme_yontemi='nakit' AND tarih>=$2 AND tarih<=$3",
+        dukkan_id, baslangic, bitis)
     gider_kart = await scalar(
-        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE tur IN ('cikis','gider') AND odeme_yontemi='kart' AND tarih>=? AND tarih<=?", p)
+        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tur IN ('cikis','gider') AND odeme_yontemi='kart' AND tarih>=$2 AND tarih<=$3",
+        dukkan_id, baslangic, bitis)
 
-    cur = await db.execute(
-        "SELECT COALESCE(kaynak,'diger') as k, COALESCE(SUM(tutar),0) as t FROM kasa_hareketleri WHERE tur IN ('giris','gelir') AND tarih>=? AND tarih<=? GROUP BY k ORDER BY t DESC",
-        p)
-    raw = {r['k']: float(r['t']) for r in await cur.fetchall()}
+    rows = await db.fetch(
+        """SELECT COALESCE(kaynak,'diger') as k, COALESCE(SUM(tutar),0) as t
+           FROM kasa_hareketleri WHERE dukkan_id=$1 AND tur IN ('giris','gelir') AND tarih>=$2 AND tarih<=$3
+           GROUP BY k ORDER BY t DESC""",
+        dukkan_id, baslangic, bitis)
+    raw = {r['k']: float(r['t']) for r in rows}
 
     KAYNAK_LABEL = {
         'tamir': 'Tamir gelirleri',
@@ -132,17 +138,22 @@ async def kasa_ozet(
         gelir_kaynaklar.append({"kaynak": "diger", "label": "Diğer", "tutar": diger})
 
     alacak_toplam = await scalar(
-        "SELECT COALESCE(SUM(total_amount-paid_amount),0) FROM debts WHERE COALESCE(borc_turu,'alacak')='alacak' AND total_amount>paid_amount")
+        "SELECT COALESCE(SUM(total_amount-paid_amount),0) FROM debts WHERE dukkan_id=$1 AND COALESCE(borc_turu,'alacak')='alacak' AND total_amount>paid_amount",
+        dukkan_id)
     alacak_sayi = int(await scalar(
-        "SELECT COUNT(*) FROM debts WHERE COALESCE(borc_turu,'alacak')='alacak' AND total_amount>paid_amount"))
+        "SELECT COUNT(*) FROM debts WHERE dukkan_id=$1 AND COALESCE(borc_turu,'alacak')='alacak' AND total_amount>paid_amount",
+        dukkan_id))
     dukkan_borcu = await scalar(
-        "SELECT COALESCE(SUM(total_amount-paid_amount),0) FROM debts WHERE borc_turu='dukkan_borcu' AND total_amount>paid_amount")
+        "SELECT COALESCE(SUM(total_amount-paid_amount),0) FROM debts WHERE dukkan_id=$1 AND borc_turu='dukkan_borcu' AND total_amount>paid_amount",
+        dukkan_id)
     dukkan_sayi = int(await scalar(
-        "SELECT COUNT(*) FROM debts WHERE borc_turu='dukkan_borcu' AND total_amount>paid_amount"))
+        "SELECT COUNT(*) FROM debts WHERE dukkan_id=$1 AND borc_turu='dukkan_borcu' AND total_amount>paid_amount",
+        dukkan_id))
 
-    cur = await db.execute(
-        "SELECT * FROM kasa_hareketleri WHERE tarih>=? AND tarih<=? ORDER BY id DESC LIMIT 30", p)
-    hareketler = [dict(r) for r in await cur.fetchall()]
+    rows = await db.fetch(
+        "SELECT * FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih>=$2 AND tarih<=$3 ORDER BY id DESC LIMIT 30",
+        dukkan_id, baslangic, bitis)
+    hareketler = [dict(r) for r in rows]
 
     return {
         "periyot": periyot,
@@ -168,22 +179,21 @@ async def kasa_ozet(
 @router.post("/duzelt")
 async def manuel_duzelt(
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    from fastapi import HTTPException
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    if user["role"] != "patron":
+    if user["rol"] != "patron":
         raise HTTPException(403, "Sadece patron")
     await db.execute(
-        """INSERT INTO kasa_hareketleri (tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (body.get("tarih", date.today().isoformat()),
-         body.get("tur", "cikis"),
-         body.get("odeme_yontemi", "nakit"),
-         float(body["tutar"]),
-         body.get("aciklama", "Manuel düzeltme"),
-         "duzeltme"),
+        """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+        dukkan_id,
+        body.get("tarih", date.today().isoformat()),
+        body.get("tur", "cikis"),
+        body.get("odeme_yontemi", "nakit"),
+        float(body["tutar"]),
+        body.get("aciklama", "Manuel düzeltme"),
+        "duzeltme",
     )
-    await db.commit()
     return {"ok": True}

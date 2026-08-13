@@ -723,7 +723,7 @@ export default function RepairDetail({ user }) {
               👤 Müşteri Detayı
             </button>
           )}
-          {user?.role === "patron" && (
+          {user?.rol === "patron" && (
             <button className="btn btn-danger" style={{ marginTop: 8 }}
               onClick={async () => {
                 if (confirm("Bu tamiri silmek istediğinize emin misiniz?")) {

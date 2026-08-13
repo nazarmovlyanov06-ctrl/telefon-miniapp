@@ -1,113 +1,114 @@
-from fastapi import APIRouter, Depends
-from aiosqlite import Connection
-from database import get_db, get_or_create_user
-from auth import get_current_user
+import asyncpg
+from fastapi import APIRouter, Depends, HTTPException
+from database import get_db
+from auth import get_current_user, get_dukkan_id
 
 router = APIRouter(prefix="/geri-bildirim", tags=["geri-bildirim"])
 
 
 @router.get("/calisanlar")
 async def calisanlar_listesi(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        "SELECT id, name, role FROM users ORDER BY name"
+    rows = await db.fetch(
+        "SELECT id, ad, rol FROM kullanicilar WHERE dukkan_id = $1 ORDER BY ad", dukkan_id
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.get("/bildirim")
 async def bildirim_sayisi(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        "SELECT COUNT(*) FROM calisan_geri_bildirim WHERE hedef_id=? AND goruldu=0",
-        (user["id"],),
+    count = await db.fetchval(
+        "SELECT COUNT(*) FROM calisan_geri_bildirim WHERE dukkan_id=$1 AND hedef_id=$2 AND goruldu=false",
+        dukkan_id, user["id"],
     )
-    count = (await cur.fetchone())[0]
     return {"bekleyen": int(count)}
 
 
 @router.get("/")
 async def list_bildirimler(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-
-    if user["role"] == "patron":
-        cur = await db.execute(
+    if user["rol"] == "patron":
+        rows = await db.fetch(
             """SELECT cb.*,
-                      ug.name as gonderen_adi,
-                      uh.name as hedef_adi
+                      ug.ad as gonderen_adi,
+                      uh.ad as hedef_adi
                FROM calisan_geri_bildirim cb
-               LEFT JOIN users ug ON cb.gonderen_id = ug.id
-               LEFT JOIN users uh ON cb.hedef_id = uh.id
-               ORDER BY cb.created_at DESC LIMIT 200"""
+               LEFT JOIN kullanicilar ug ON cb.gonderen_id = ug.id
+               LEFT JOIN kullanicilar uh ON cb.hedef_id = uh.id
+               WHERE cb.dukkan_id = $1
+               ORDER BY cb.created_at DESC LIMIT 200""",
+            dukkan_id,
         )
     else:
-        cur = await db.execute(
+        rows = await db.fetch(
             """SELECT cb.id, cb.tur, cb.mesaj, cb.goruldu, cb.created_at,
                       NULL as gonderen_adi,
-                      uh.name as hedef_adi
+                      uh.ad as hedef_adi
                FROM calisan_geri_bildirim cb
-               LEFT JOIN users uh ON cb.hedef_id = uh.id
-               ORDER BY cb.created_at DESC LIMIT 200"""
+               LEFT JOIN kullanicilar uh ON cb.hedef_id = uh.id
+               WHERE cb.dukkan_id = $1
+               ORDER BY cb.created_at DESC LIMIT 200""",
+            dukkan_id,
         )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.get("/skor")
 async def skor(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        """SELECT u.id, u.name,
+    rows = await db.fetch(
+        """SELECT u.id, u.ad,
                   SUM(CASE WHEN cb.tur='sikayet' THEN 1 ELSE 0 END) as sikayet_sayisi,
                   SUM(CASE WHEN cb.tur='ovgu'    THEN 1 ELSE 0 END) as ovgu_sayisi
-           FROM users u
-           LEFT JOIN calisan_geri_bildirim cb ON u.id = cb.hedef_id
+           FROM kullanicilar u
+           LEFT JOIN calisan_geri_bildirim cb ON u.id = cb.hedef_id AND cb.dukkan_id = $1
+           WHERE u.dukkan_id = $1
            GROUP BY u.id
-           ORDER BY ovgu_sayisi DESC, sikayet_sayisi ASC"""
+           ORDER BY ovgu_sayisi DESC, sikayet_sayisi ASC""",
+        dukkan_id,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.post("/")
 async def create_bildirim(
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     hedef_id = body["hedef_id"]
     if hedef_id == user["id"]:
-        from fastapi import HTTPException
         raise HTTPException(400, "Kendinize bildirim gönderemezsiniz")
-    cur = await db.execute(
-        """INSERT INTO calisan_geri_bildirim (gonderen_id, hedef_id, tur, mesaj)
-           VALUES (?, ?, ?, ?)""",
-        (user["id"], hedef_id, body["tur"], body["mesaj"]),
+    row = await db.fetchrow(
+        """INSERT INTO calisan_geri_bildirim (dukkan_id, gonderen_id, hedef_id, tur, mesaj)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id""",
+        dukkan_id, user["id"], hedef_id, body["tur"], body["mesaj"],
     )
-    await db.commit()
-    return {"id": cur.lastrowid}
+    return {"id": row["id"]}
 
 
 @router.post("/goruldu")
 async def mark_goruldu(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    user = await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     await db.execute(
-        "UPDATE calisan_geri_bildirim SET goruldu=1 WHERE hedef_id=?",
-        (user["id"],),
+        "UPDATE calisan_geri_bildirim SET goruldu=true WHERE dukkan_id=$1 AND hedef_id=$2",
+        dukkan_id, user["id"],
     )
-    await db.commit()
     return {"ok": True}

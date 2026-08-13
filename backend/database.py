@@ -1,36 +1,30 @@
-import aiosqlite
-from config import DB_PATH
+import asyncpg
+from config import DATABASE_URL
+
+_pool: asyncpg.Pool | None = None
+
+
+async def init_pool():
+    global _pool
+    _pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+    return _pool
+
+
+async def close_pool():
+    global _pool
+    if _pool:
+        await _pool.close()
+        _pool = None
+
+
+def get_pool() -> asyncpg.Pool:
+    if _pool is None:
+        raise RuntimeError("DB pool henuz baslatilmadi")
+    return _pool
 
 
 async def get_db():
-    db = await aiosqlite.connect(DB_PATH)
-    db.row_factory = aiosqlite.Row
-    try:
-        yield db
-    finally:
-        await db.close()
-
-
-async def get_or_create_user(db: aiosqlite.Connection, tg_id: int, name: str) -> dict:
-    cur = await db.execute(
-        "SELECT * FROM users WHERE telegram_id = ?", (tg_id,)
-    )
-    row = await cur.fetchone()
-    if row:
-        return dict(row)
-
-    # First user ever = auto patron (single-tenant app)
-    cur2 = await db.execute("SELECT COUNT(*) FROM users")
-    total = (await cur2.fetchone())[0]
-    is_first = total == 0
-    role = "patron" if is_first else "cirak"
-    durum = "aktif" if is_first else "bekliyor"
-    await db.execute(
-        "INSERT INTO users (telegram_id, name, role, durum) VALUES (?, ?, ?, ?)",
-        (tg_id, name, role, durum),
-    )
-    await db.commit()
-    cur = await db.execute(
-        "SELECT * FROM users WHERE telegram_id = ?", (tg_id,)
-    )
-    return dict(await cur.fetchone())
+    """FastAPI dependency — havuzdan bir baglanti odunc alir."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        yield conn

@@ -1,7 +1,7 @@
+import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
-from aiosqlite import Connection
-from database import get_db, get_or_create_user
-from auth import get_current_user
+from database import get_db
+from auth import get_current_user, get_dukkan_id
 from datetime import date
 
 router = APIRouter(prefix="/loaner", tags=["loaner"])
@@ -9,58 +9,58 @@ router = APIRouter(prefix="/loaner", tags=["loaner"])
 
 @router.get("/")
 async def list_loaner(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        "SELECT * FROM loaner_cihazlar WHERE aktif = 1 ORDER BY teslim_tarihi DESC"
+    rows = await db.fetch(
+        "SELECT * FROM loaner_cihazlar WHERE dukkan_id = $1 AND aktif = true ORDER BY teslim_tarihi DESC",
+        dukkan_id,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.post("/")
 async def create_loaner(
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        """INSERT INTO loaner_cihazlar (musteri_adi, cihaz, teslim_tarihi, notlar, aktif)
-           VALUES (?, ?, ?, ?, 1)""",
-        (body["musteri_adi"], body["cihaz"],
-         body.get("teslim_tarihi", date.today().isoformat()), body.get("notlar")),
+    row = await db.fetchrow(
+        """INSERT INTO loaner_cihazlar (dukkan_id, musteri_adi, cihaz, teslim_tarihi, notlar, aktif)
+           VALUES ($1, $2, $3, $4, $5, true) RETURNING id""",
+        dukkan_id, body["musteri_adi"], body["cihaz"],
+        body.get("teslim_tarihi", date.today().isoformat()), body.get("notlar"),
     )
-    await db.commit()
-    return {"id": cur.lastrowid}
+    return {"id": row["id"]}
 
 
 @router.get("/gecmis")
 async def list_gecmis(
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        "SELECT * FROM loaner_cihazlar WHERE aktif = 0 ORDER BY iade_tarihi DESC LIMIT 50"
+    rows = await db.fetch(
+        "SELECT * FROM loaner_cihazlar WHERE dukkan_id = $1 AND aktif = false ORDER BY iade_tarihi DESC LIMIT 50",
+        dukkan_id,
     )
-    return [dict(r) for r in await cur.fetchall()]
+    return [dict(r) for r in rows]
 
 
 @router.post("/{loaner_id}/hasar")
 async def hasar_ekle(
     loaner_id: int,
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     await db.execute(
-        "UPDATE loaner_cihazlar SET hasar_notu=?, hasar_tutar=? WHERE id=?",
-        (body.get("notu"), float(body.get("tutar") or 0), loaner_id)
+        "UPDATE loaner_cihazlar SET hasar_notu=$1, hasar_tutar=$2 WHERE id=$3 AND dukkan_id=$4",
+        body.get("notu"), float(body.get("tutar") or 0), loaner_id, dukkan_id,
     )
-    await db.commit()
     return {"ok": True}
 
 
@@ -68,35 +68,35 @@ async def hasar_ekle(
 async def iade_loaner(
     loaner_id: int,
     body: dict = None,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     iade_tarihi = (body or {}).get("iade_tarihi", date.today().isoformat())
     await db.execute(
-        "UPDATE loaner_cihazlar SET aktif = 0, iade_tarihi = ? WHERE id = ?",
-        (iade_tarihi, loaner_id),
+        "UPDATE loaner_cihazlar SET aktif = false, iade_tarihi = $1 WHERE id = $2 AND dukkan_id = $3",
+        iade_tarihi, loaner_id, dukkan_id,
     )
-    await db.commit()
     return {"ok": True}
 
 
 @router.get("/{loaner_id}/fotolar")
 async def get_fotolar(
     loaner_id: int,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
-    cur = await db.execute(
-        "SELECT id, aciklama, created_at FROM loaner_fotograflari WHERE loaner_id=? ORDER BY created_at",
-        (loaner_id,),
+    rows = await db.fetch(
+        "SELECT id, aciklama, created_at FROM loaner_fotograflari WHERE loaner_id=$1 AND dukkan_id=$2 ORDER BY created_at",
+        loaner_id, dukkan_id,
     )
-    rows = [dict(r) for r in await cur.fetchall()]
+    rows = [dict(r) for r in rows]
     result = []
     for r in rows:
-        cur2 = await db.execute("SELECT foto FROM loaner_fotograflari WHERE id=?", (r["id"],))
-        frow = await cur2.fetchone()
+        frow = await db.fetchrow(
+            "SELECT foto FROM loaner_fotograflari WHERE id=$1 AND dukkan_id=$2", r["id"], dukkan_id
+        )
         result.append({**r, "foto": frow["foto"] if frow else ""})
     return result
 
@@ -105,16 +105,15 @@ async def get_fotolar(
 async def add_foto(
     loaner_id: int,
     body: dict,
-    tg_user=Depends(get_current_user),
-    db: Connection = Depends(get_db),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
 ):
-    await get_or_create_user(db, tg_user["id"], tg_user.get("first_name", ""))
     foto = body.get("foto", "")
     if not foto:
         raise HTTPException(400, "Fotoğraf verisi gerekli")
     await db.execute(
-        "INSERT INTO loaner_fotograflari (loaner_id, foto, aciklama) VALUES (?, ?, ?)",
-        (loaner_id, foto, body.get("aciklama")),
+        "INSERT INTO loaner_fotograflari (dukkan_id, loaner_id, foto, aciklama) VALUES ($1, $2, $3, $4)",
+        dukkan_id, loaner_id, foto, body.get("aciklama"),
     )
-    await db.commit()
     return {"ok": True}

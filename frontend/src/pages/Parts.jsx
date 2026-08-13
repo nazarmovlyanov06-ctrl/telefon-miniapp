@@ -624,7 +624,7 @@ export default function Parts({ user }) {
                         onClick={e => { e.stopPropagation(); openPanel(p, "gecmis"); }}
                         title="Stok geçmişi"
                       >📋</button>
-                      {user?.role === "patron" && (
+                      {user?.rol === "patron" && (
                         deletePartId === p.id ? (
                           <div style={{ display: "flex", gap: 3 }} onClick={e => e.stopPropagation()}>
                             <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 8px", fontSize: 12 }}
@@ -933,7 +933,7 @@ export default function Parts({ user }) {
                     {item.ekleyen && <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>👤 {item.ekleyen}</div>}
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
-                    {user?.role === "patron" && (
+                    {user?.rol === "patron" && (
                       deleteOrderId === item.id ? (
                         <div style={{ display: "flex", gap: 3 }}>
                           <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 8px", fontSize: 12 }}

@@ -219,7 +219,7 @@ export default function Aksesuar({ user }) {
               {a.stok > 0 && (
                 <button className="btn btn-primary btn-sm" onClick={() => setSatForm(a)}>Sat</button>
               )}
-              {user?.role === "patron" && (
+              {user?.rol === "patron" && (
                 deleteId === a.id ? (
                   <div style={{ display: "flex", gap: 3 }}>
                     <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff", padding: "4px 8px", fontSize: 12 }}
