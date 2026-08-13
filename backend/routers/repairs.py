@@ -172,7 +172,7 @@ async def update_repair(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    now = datetime.datetime.now().isoformat()
+    now = datetime.datetime.now()
     tamirde_at = now if body.get("status") == "tamirde" else None
     completed_at = now if body.get("status") == "hazir" else None
     delivered_at = now if body.get("status") == "teslim" else None

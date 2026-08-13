@@ -13,10 +13,12 @@ async def dashboard(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    today = datetime.date.today().isoformat()
-    month_start = datetime.date.today().replace(day=1).isoformat()
-    iki_gun_once = (datetime.date.today() - datetime.timedelta(days=2)).isoformat()
-    yedi_gun_sonra = (datetime.date.today() + datetime.timedelta(days=7)).isoformat()
+    today_date = datetime.date.today()
+    today = today_date.isoformat()
+    month_start_date = today_date.replace(day=1)
+    month_start = month_start_date.isoformat()
+    iki_gun_once = today_date - datetime.timedelta(days=2)
+    yedi_gun_sonra = (today_date + datetime.timedelta(days=7)).isoformat()
 
     async def scalar(sql, *params):
         return await db.fetchval(sql, *params) or 0
@@ -76,10 +78,10 @@ async def dashboard(
 
     bu_ay_gelir = await scalar(
         "SELECT COALESCE(SUM(final_price),0) FROM repairs WHERE dukkan_id=$1 AND status='teslim' AND delivered_at >= $2",
-        dukkan_id, month_start,
+        dukkan_id, month_start_date,
     )
     bu_ay_tamir = await scalar(
-        "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND created_at >= $2", dukkan_id, month_start
+        "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND created_at >= $2", dukkan_id, month_start_date
     )
 
     return {
@@ -95,10 +97,10 @@ async def dashboard(
         "son_tamirler": son_tamirler,
         "bugun": {
             "tamir_sayisi": await scalar(
-                "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND DATE(created_at)=$2", dukkan_id, today
+                "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND DATE(created_at)=$2", dukkan_id, today_date
             ),
             "teslim_sayisi": await scalar(
-                "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND DATE(delivered_at)=$2", dukkan_id, today
+                "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND DATE(delivered_at)=$2", dukkan_id, today_date
             ),
             "gelir": kasa.get("gelir", 0),
         },
@@ -217,8 +219,8 @@ async def monthly_report(
     now = datetime.date.today()
     year = year or now.year
     month = month or now.month
-    start = f"{year}-{month:02d}-01"
-    end = f"{year + 1}-01-01" if month == 12 else f"{year}-{month + 1:02d}-01"
+    start = datetime.date(year, month, 1)
+    end = datetime.date(year + 1, 1, 1) if month == 12 else datetime.date(year, month + 1, 1)
 
     rows = await db.fetch(
         """SELECT DATE(created_at) as day, COUNT(*) as count,
@@ -236,7 +238,7 @@ async def aktivite_feed(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    today = datetime.date.today().isoformat()
+    today = datetime.date.today()
     rows = await db.fetch(
         """SELECT r.id, r.repair_no, r.device_model, r.status,
                   c.name as musteri_adi,

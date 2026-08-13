@@ -10,16 +10,21 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 async def _servis_verisi(db: asyncpg.Connection, dukkan_id: int) -> str:
-    bugun = date.today().isoformat()
-    ay_basi = date.today().replace(day=1).isoformat()
-    yil_basi = date.today().replace(month=1, day=1).isoformat()
-    son30 = (date.today() - timedelta(days=30)).isoformat()
+    today_date = date.today()
+    ay_basi_date = today_date.replace(day=1)
+    yil_basi_date = today_date.replace(month=1, day=1)
+    son30_date = today_date - timedelta(days=30)
+
+    bugun = today_date.isoformat()
+    ay_basi = ay_basi_date.isoformat()
+    yil_basi = yil_basi_date.isoformat()
+    son30 = son30_date.isoformat()
 
     satirlar = [f"=== SERVİS VERİTABANI ({bugun}) ===\n"]
 
     # ── TAMİRLER ──────────────────────────────────────────────
     bugun_tamir = await db.fetchval(
-        "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND DATE(created_at) = $2", dukkan_id, bugun
+        "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND DATE(created_at) = $2", dukkan_id, today_date
     )
 
     rows = await db.fetch(
@@ -41,16 +46,16 @@ async def _servis_verisi(db: asyncpg.Connection, dukkan_id: int) -> str:
            FROM repairs r LEFT JOIN customers c ON r.customer_id = c.id
            WHERE r.dukkan_id=$1 AND r.status = 'teslim' AND DATE(r.delivered_at) >= $2
            ORDER BY r.delivered_at DESC LIMIT 10""",
-        dukkan_id, son30,
+        dukkan_id, son30_date,
     )]
 
     ay_tamir_ciro = await db.fetchval(
         "SELECT COALESCE(SUM(final_price),0) FROM repairs WHERE dukkan_id=$1 AND status='teslim' AND DATE(delivered_at) >= $2",
-        dukkan_id, ay_basi,
+        dukkan_id, ay_basi_date,
     )
     yil_tamir_ciro = await db.fetchval(
         "SELECT COALESCE(SUM(final_price),0) FROM repairs WHERE dukkan_id=$1 AND status='teslim' AND DATE(delivered_at) >= $2",
-        dukkan_id, yil_basi,
+        dukkan_id, yil_basi_date,
     )
 
     satirlar.append("## TAMİRLER")
