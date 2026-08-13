@@ -38,7 +38,7 @@ app = FastAPI(title="Telefon Servis API", version="2.0.0", lifespan=lifespan)
 # Belirli originlere sinirlandirildi — production'da acik CORS risklidir.
 _allowed_origins = [FRONTEND_URL, "https://telefon.varmistok.com"]
 if os.getenv("DEV_MODE", "false").lower() == "true":
-    _allowed_origins += ["http://localhost:5173", "http://localhost:3000"]
+    _allowed_origins += ["http://localhost:5173", "http://localhost:3000", "http://localhost:5183"]
 
 app.add_middleware(
     CORSMiddleware,
