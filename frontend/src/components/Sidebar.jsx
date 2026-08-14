@@ -4,8 +4,9 @@ import {
   Landmark, TrendingDown, Target, CreditCard,
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
-  Banknote, BarChart3, ScanLine, Settings, ShieldAlert,
+  Banknote, BarChart3, ScanLine, Settings, ShieldAlert, LogOut,
 } from "lucide-react";
+import { setToken } from "../api";
 
 const ANA = [
   { path: "/", icon: Home, label: "Ana Sayfa" },
@@ -66,6 +67,12 @@ function Grup({ label, items, pathname, navigate }) {
   );
 }
 
+function cikisYap() {
+  if (!confirm("Çıkış yapmak istediğine emin misin?")) return;
+  setToken(null);
+  window.location.href = "/giris";
+}
+
 export default function Sidebar({ dukkanAdi, user }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -84,6 +91,17 @@ export default function Sidebar({ dukkanAdi, user }) {
       {user?.rol === "super_admin" && (
         <Grup label="Yönetim" items={[{ path: "/admin", icon: ShieldAlert, label: "Süper Admin" }]} pathname={pathname} navigate={navigate} />
       )}
+      <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--divider)" }}>
+        {user && (
+          <div style={{ padding: "6px 12px 10px", fontSize: 12, color: "var(--hint)" }}>
+            {user.ad}
+          </div>
+        )}
+        <button className="sidebar-item" onClick={cikisYap} style={{ color: "var(--red)" }}>
+          <LogOut />
+          Çıkış Yap
+        </button>
+      </div>
     </nav>
   );
 }

@@ -8,6 +8,7 @@ import {
 import BrandModelPicker from "../components/BrandModelPicker";
 import PartTypePicker from "../components/PartTypePicker";
 import BrandLogo from "../components/BrandLogo";
+import PartsBrowser from "../components/PartsBrowser";
 
 const TABS = [
   { key: "stok", label: "Stok" },
@@ -48,8 +49,6 @@ export default function Parts({ user }) {
   const [shopping, setShopping] = useState({ bekliyor: [], alindi: [] });
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
-  const [brandFilter, setBrandFilter] = useState("Tümü");
-  const [typeFilter, setTypeFilter] = useState("Tümü");
   const [deletePartId, setDeletePartId] = useState(null);
   const [deleteOrderId, setDeleteOrderId] = useState(null);
   const [lowStock, setLowStock] = useState(searchParams.get("low_stock") === "true");
@@ -180,8 +179,6 @@ export default function Parts({ user }) {
       setBoughtData({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "" });
       api.shopping().then(setShopping);
       if (willAddStock) {
-        setBrandFilter("Tümü");
-        setTypeFilter("Tümü");
         setQ(partName);
         api.parts({ q: partName }).then(setParts);
         setTab("stok");
@@ -320,19 +317,12 @@ export default function Parts({ user }) {
     } catch (e) { setAddErr(e.message); }
   }
 
-  const brands = ["Tümü", ...new Set(parts.map(p => (p.device_model || "").split(" ")[0]).filter(Boolean).sort())];
-  const types = ["Tümü", ...new Set(parts.map(p => p.part_type).filter(Boolean).sort())];
-  const filteredParts = parts
-    .filter(p => {
-      const bm = brandFilter === "Tümü" || (p.device_model || "").toLowerCase().startsWith(brandFilter.toLowerCase());
-      const tm = typeFilter === "Tümü" || p.part_type === typeFilter;
-      return bm && tm;
-    })
-    .sort((a, b) => {
-      if (sortBy === "stok") return b.quantity - a.quantity;
-      if (sortBy === "isim") return (a.name || "").localeCompare(b.name || "", "tr");
-      return b.id - a.id; // yeni (default)
-    });
+  const flatMode = q.trim().length > 0 || lowStock;
+  const filteredParts = [...parts].sort((a, b) => {
+    if (sortBy === "stok") return b.quantity - a.quantity;
+    if (sortBy === "isim") return (a.name || "").localeCompare(b.name || "", "tr");
+    return b.id - a.id; // yeni (default)
+  });
 
   return (
     <div className="page">
@@ -530,41 +520,8 @@ export default function Parts({ user }) {
               <TriangleAlert size={12} strokeWidth={2.2} /> Kritik Stok
             </button>
           </div>
-          {brands.length > 1 && (
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 4, fontWeight: 600 }}>MARKA</div>
-              <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2, scrollbarWidth: "none" }}>
-                {brands.map(b => (
-                  <button key={b} onClick={() => { setBrandFilter(b); setTypeFilter("Tümü"); }}
-                    style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 20, border: "none",
-                      background: brandFilter === b ? "var(--accent)" : "var(--bg2)",
-                      color: brandFilter === b ? "#fff" : "var(--text)",
-                      fontWeight: brandFilter === b ? 700 : 400, fontSize: 12, cursor: "pointer" }}>
-                    {b}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {types.length > 1 && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 4, fontWeight: 600 }}>PARÇA TÜRÜ</div>
-              <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2, scrollbarWidth: "none" }}>
-                {types.map(t => (
-                  <button key={t} onClick={() => setTypeFilter(t)}
-                    style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 20, border: "none",
-                      background: typeFilter === t ? "var(--success)" : "var(--bg2)",
-                      color: typeFilter === t ? "#fff" : "var(--text)",
-                      fontWeight: typeFilter === t ? 700 : 400, fontSize: 12, cursor: "pointer" }}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {loading ? <div className="loading">Yükleniyor...</div> :
-            filteredParts.length === 0 ? <div className="empty"><div className="empty-icon" style={{display:"flex",justifyContent:"center"}}><Package size={40} stroke="var(--dim)" strokeWidth={1.5}/></div>Parça bulunamadı</div> :
-            filteredParts.map((p) => {
+          {loading ? <div className="loading">Yükleniyor...</div> : (() => {
+            function renderPart(p) {
               const isSelected = selectedPart?.id === p.id;
               const SEBEP_LABEL = { tamir: "Tamire", satis: "Satış", hasar: "Hasar", diger: "Diğer", satin_alma: "Satın Alındı" };
               return (
@@ -812,8 +769,15 @@ export default function Parts({ user }) {
                   )}
                 </div>
               );
-            })
-          }
+            }
+
+            if (flatMode) {
+              return filteredParts.length === 0
+                ? <div className="empty"><div className="empty-icon" style={{display:"flex",justifyContent:"center"}}><Package size={40} stroke="var(--dim)" strokeWidth={1.5}/></div>Parça bulunamadı</div>
+                : filteredParts.map(renderPart);
+            }
+            return <PartsBrowser parts={parts} renderLeaf={(leafParts) => [...leafParts].sort((a, b) => b.id - a.id).map(renderPart)} />;
+          })()}
         </>
       )}
 

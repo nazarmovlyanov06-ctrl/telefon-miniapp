@@ -342,6 +342,29 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+/* ── Marka/model/parça-tipi gezgin grid'i (Stok sayfası) ────── */
+
+.brand-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+@media (min-width: 1024px) {
+  .brand-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+}
+.brand-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 16px 10px; border-radius: var(--radius); border: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
+  color: var(--text); font: inherit;
+}
+.brand-card:active { transform: translateY(1px); }
+.brand-card-logo { display: flex; align-items: center; justify-content: center; height: 34px; }
+.brand-card-name { font-size: 12.5px; font-weight: 700; text-align: center; line-height: 1.25; }
+.brand-card-count { font-size: 10.5px; color: var(--hint); }
+
 /* ── Masaüstü tablo / mobil kart geçişi ──────────────────────
    Aynı veri iki markupla render edilir (Sidebar/BottomNav deseniyle
    aynı yaklaşım): .mobile-list kartlar <1024px, .desktop-table-wrap

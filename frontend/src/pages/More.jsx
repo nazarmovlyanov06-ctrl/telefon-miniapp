@@ -1,11 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { api } from "../api";
+import { api, setToken } from "../api";
 import {
   Landmark, TrendingDown, Target, CreditCard,
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
-  Banknote, BarChart3, ScanLine, Settings, ShieldAlert,
+  Banknote, BarChart3, ScanLine, Settings, ShieldAlert, LogOut,
 } from "lucide-react";
 
 const ITEMS = [
@@ -49,6 +49,12 @@ export default function More({ user }) {
     api.geriBildirimBekleyen().then(r => setBildirimSayisi(r.bekleyen || 0)).catch(() => {});
   }, []);
 
+  function cikisYap() {
+    if (!confirm("Çıkış yapmak istediğine emin misin?")) return;
+    setToken(null);
+    window.location.href = "/giris";
+  }
+
   return (
     <div className="page" style={{ paddingBottom: 90 }}>
       {user && (
@@ -62,12 +68,16 @@ export default function More({ user }) {
           }}>
             {(user.ad || "?")[0].toUpperCase()}
           </div>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-strong)" }}>{user.ad}</div>
             <span className={`badge badge-${user.rol}`} style={{ fontSize: 11, marginTop: 2, display: "inline-block" }}>
               {ROLE_LABELS[user.rol] || user.rol}
             </span>
           </div>
+          <button className="btn btn-ghost btn-sm" onClick={cikisYap}
+            style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--danger)", flexShrink: 0 }}>
+            <LogOut size={14} strokeWidth={2} /> Çıkış
+          </button>
         </div>
       )}
 
