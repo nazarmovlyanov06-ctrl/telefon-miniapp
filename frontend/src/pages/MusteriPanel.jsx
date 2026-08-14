@@ -41,10 +41,12 @@ const TAKAS_DURUM_META = {
 
 function AdimCizelgesi({ status }) {
   const aktif = DURUM_ADIM[status] ?? 0;
+  // "teslim" son durum — o noktada son adım da tamamlanmış sayılır, "sırada" değil.
+  const bitti = status === "teslim";
   return (
     <div className="cp-steps">
       {ADIMLAR.map((a, i) => {
-        const durum = i < aktif ? "done" : i === aktif ? "current" : "";
+        const durum = i < aktif || (i === aktif && bitti) ? "done" : i === aktif ? "current" : "";
         const Ic = a.ic;
         return (
           <div key={a.key} className={`cp-step ${durum}`}>
