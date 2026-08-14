@@ -2,6 +2,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from database import get_db
 from photo_storage import save_upload
+from auth import hash_sifre, dogrula_sifre, olustur_musteri_token, get_current_musteri
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -215,3 +216,104 @@ async def takas_teklifi(
         d["id"], musteri_adi.strip(), telefon.strip(), cihaz_model.strip(), aciklama or None, foto_url,
     )
     return {"ok": True}
+
+
+# ── MÜŞTERİ PORTALI ───────────────────────────────────────────────────────
+# Kayıt için kimlik doğrulaması: müşterinin zaten bildiği bir bilgi olan
+# tamir no + telefon eşleşmesi (SMS/e-posta OTP altyapısı yok, bu yüzden
+# bu yöntem seçildi). customers.phone benzersiz DEĞİL, bu yüzden şifre
+# doğrudan repairs.customer_id üzerinden bulunan TEK satıra yazılıyor —
+# telefon bazlı belirsizlik oluşmuyor.
+
+@router.post("/dukkan/{slug}/musteri/kayit")
+async def musteri_kayit(slug: str, body: dict, db: asyncpg.Connection = Depends(get_db)):
+    d = await _dukkan_by_slug(db, slug)
+    repair_no = (body.get("repair_no") or "").strip().replace("#", "")
+    telefon = (body.get("telefon") or "").strip()
+    yeni_sifre = body.get("yeni_sifre") or ""
+    if not repair_no or not telefon:
+        raise HTTPException(400, "Tamir no ve telefon gerekli")
+    if len(yeni_sifre) < 6:
+        raise HTTPException(400, "Şifre en az 6 karakter olmalı")
+
+    row = await db.fetchrow(
+        """SELECT c.id AS customer_id, c.sifre_hash FROM repairs r
+           JOIN customers c ON c.id = r.customer_id
+           WHERE r.dukkan_id = $1 AND r.repair_no = $2 AND c.phone = $3""",
+        d["id"], repair_no, telefon,
+    )
+    if not row:
+        raise HTTPException(404, "Bu bilgilerle eşleşen bir tamir kaydı bulunamadı")
+    if row["sifre_hash"]:
+        raise HTTPException(400, "Bu telefon numarası zaten kayıtlı, giriş yapın")
+
+    await db.execute("UPDATE customers SET sifre_hash = $1 WHERE id = $2", hash_sifre(yeni_sifre), row["customer_id"])
+    token = olustur_musteri_token(row["customer_id"], d["id"])
+    return {"token": token}
+
+
+@router.post("/dukkan/{slug}/musteri/giris")
+async def musteri_giris(slug: str, body: dict, db: asyncpg.Connection = Depends(get_db)):
+    d = await _dukkan_by_slug(db, slug)
+    telefon = (body.get("telefon") or "").strip()
+    sifre = body.get("sifre") or ""
+    row = await db.fetchrow(
+        """SELECT id, sifre_hash FROM customers
+           WHERE dukkan_id = $1 AND phone = $2 AND sifre_hash IS NOT NULL
+           ORDER BY id LIMIT 1""",
+        d["id"], telefon,
+    )
+    if not row or not dogrula_sifre(sifre, row["sifre_hash"]):
+        raise HTTPException(401, "Telefon veya şifre hatalı")
+    token = olustur_musteri_token(row["id"], d["id"])
+    return {"token": token}
+
+
+@router.get("/dukkan/{slug}/musteri/panelim")
+async def musteri_panelim(
+    slug: str,
+    musteri: dict = Depends(get_current_musteri),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    d = await _dukkan_by_slug(db, slug)
+    if musteri["dukkan_id"] != d["id"]:
+        raise HTTPException(403, "Bu mağazaya ait bir oturum değil")
+
+    tamirler = await db.fetch(
+        """SELECT repair_no, device_model, fault_desc, status, final_price, created_at, delivered_at
+           FROM repairs WHERE customer_id = $1 AND dukkan_id = $2 ORDER BY created_at DESC""",
+        musteri["id"], d["id"],
+    )
+    garantiler = await db.fetch(
+        """SELECT cihaz, tamir_aciklama, baslangic_tarihi, bitis_tarihi, aktif
+           FROM garantiler WHERE dukkan_id = $1 AND telefon = $2 ORDER BY bitis_tarihi DESC""",
+        d["id"], musteri["phone"],
+    )
+    ikinci_el = await db.fetch(
+        """SELECT model, renk, depolama, ram, satis_fiyati, satis_tarihi
+           FROM ikinci_el WHERE customer_id = $1 AND dukkan_id = $2 AND durum = 'satildi'
+           ORDER BY satis_tarihi DESC""",
+        musteri["id"], d["id"],
+    )
+    sifir = await db.fetch(
+        """SELECT model, renk, depolama, satis_fiyati, satis_tarihi
+           FROM sifir_cihazlar WHERE customer_id = $1 AND dukkan_id = $2 AND durum = 'satildi'
+           ORDER BY satis_tarihi DESC""",
+        musteri["id"], d["id"],
+    )
+    aksesuar = await db.fetch(
+        """SELECT a.ad, s.miktar, s.toplam, s.tarih
+           FROM aksesuar_satislar s JOIN aksesuarlar a ON a.id = s.aksesuar_id
+           WHERE s.customer_id = $1 AND s.dukkan_id = $2 ORDER BY s.tarih DESC""",
+        musteri["id"], d["id"],
+    )
+    return {
+        "ad": musteri["name"],
+        "tamirler": [dict(r) for r in tamirler],
+        "garantiler": [dict(r) for r in garantiler],
+        "satin_alinan": {
+            "ikinci_el": [dict(r) for r in ikinci_el],
+            "sifir": [dict(r) for r in sifir],
+            "aksesuar": [dict(r) for r in aksesuar],
+        },
+    }

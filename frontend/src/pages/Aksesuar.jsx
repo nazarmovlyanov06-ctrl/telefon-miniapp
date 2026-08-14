@@ -21,7 +21,7 @@ export default function Aksesuar({ user }) {
   const [showForm, setShowForm] = useState(false);
   const [satForm, setSatForm] = useState(null);
   const [form, setForm] = useState({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer" });
-  const [satData, setSatData] = useState({ miktar: "1", musteri_adi: "" });
+  const [satData, setSatData] = useState({ miktar: "1", musteri_adi: "", musteri_telefon: "" });
   const [err, setErr] = useState("");
   const [deleteId, setDeleteId] = useState(null);
 
@@ -68,9 +68,9 @@ export default function Aksesuar({ user }) {
   async function submitSat(e) {
     e.preventDefault(); setErr("");
     try {
-      await api.satAksesuar(satForm.id, { miktar: parseInt(satData.miktar), musteri_adi: satData.musteri_adi, tarih: today() });
+      await api.satAksesuar(satForm.id, { miktar: parseInt(satData.miktar), musteri_adi: satData.musteri_adi, musteri_telefon: satData.musteri_telefon, tarih: today() });
       setSatForm(null);
-      setSatData({ miktar: "1", musteri_adi: "" });
+      setSatData({ miktar: "1", musteri_adi: "", musteri_telefon: "" });
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -185,6 +185,10 @@ export default function Aksesuar({ user }) {
             <div className="form-group">
               <label className="form-label">Müşteri Adı (opsiyonel)</label>
               <input className="form-input" value={satData.musteri_adi} onChange={e => setSatData({ ...satData, musteri_adi: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Müşteri Telefonu (opsiyonel — müşteri portalında görünmesi için)</label>
+              <input className="form-input" type="tel" value={satData.musteri_telefon} onChange={e => setSatData({ ...satData, musteri_telefon: e.target.value })} />
             </div>
             <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8 }}>
               Toplam: {(parseInt(satData.miktar || 1) * (satForm.satis_fiyati || 0)).toLocaleString("tr-TR")} ₺

@@ -93,3 +93,36 @@ def get_dukkan_id(user: dict = Depends(get_current_user)) -> int:
     if user["dukkan_id"] is None:
         raise HTTPException(status_code=400, detail="Bu hesap bir dukkana bagli degil")
     return user["dukkan_id"]
+
+
+def olustur_musteri_token(customer_id: int, dukkan_id: int) -> str:
+    """Personel token'ından ayrı — 'tip' claim'i ile kullanicilar tablosuyla
+    çakışmaz, get_current_musteri sadece bunu kabul eder."""
+    payload = {
+        "sub": str(customer_id),
+        "dukkan_id": dukkan_id,
+        "tip": "musteri",
+        "exp": int(time.time()) + JWT_ACCESS_MIN * 60,
+        "iat": int(time.time()),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+
+
+async def get_current_musteri(
+    authorization: str = Header(..., alias="Authorization"),
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    """Musteri portali icin ayri dependency — kullanicilar tablosuna hic bakmaz."""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token eksik")
+    payload = coz_token(authorization[7:])
+    if payload.get("tip") != "musteri":
+        raise HTTPException(status_code=401, detail="Gecersiz musteri oturumu")
+
+    row = await db.fetchrow(
+        "SELECT id, dukkan_id, name, phone FROM customers WHERE id = $1",
+        int(payload["sub"]),
+    )
+    if not row or row["dukkan_id"] != payload["dukkan_id"]:
+        raise HTTPException(status_code=401, detail="Musteri bulunamadi")
+    return dict(row)

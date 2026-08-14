@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS customers (
     phone TEXT,
     notes TEXT,
     visit_count INTEGER DEFAULT 0,
+    sifre_hash TEXT,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -236,6 +237,7 @@ CREATE TABLE IF NOT EXISTS ikinci_el (
     musteri_adi TEXT,
     musteri_telefon TEXT,
     kaynak TEXT DEFAULT 'dukkan',
+    customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -323,6 +325,8 @@ CREATE TABLE IF NOT EXISTS aksesuar_satislar (
     miktar INTEGER NOT NULL,
     toplam REAL NOT NULL,
     musteri_adi TEXT,
+    musteri_telefon TEXT,
+    customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     tarih TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT now()
 );
@@ -396,6 +400,7 @@ CREATE TABLE IF NOT EXISTS sifir_cihazlar (
     musteri_telefon TEXT,
     odeme_yontemi TEXT DEFAULT 'nakit',
     notlar TEXT,
+    customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT now()
 );
 

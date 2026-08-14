@@ -137,14 +137,6 @@ async def sat_cihaz(
     pesinat = float(body.get("pesinat") or 0)
 
     async with db.transaction():
-        await db.execute(
-            """UPDATE sifir_cihazlar SET durum='satildi', satis_fiyati=$1, satis_kanali=$2,
-               satis_tarihi=$3, musteri_adi=$4, musteri_telefon=$5, odeme_yontemi=$6
-               WHERE id=$7 AND dukkan_id=$8""",
-            satis_fiyati, body.get("satis_kanali", "Dükkan"),
-            satis_tarihi, musteri_adi, musteri_telefon, odeme, cihaz_id, dukkan_id,
-        )
-
         customer_id = None
         if musteri_adi:
             if musteri_telefon:
@@ -164,6 +156,14 @@ async def sat_cihaz(
                     dukkan_id, musteri_adi, musteri_telefon or None,
                 )
                 customer_id = ins["id"]
+
+        await db.execute(
+            """UPDATE sifir_cihazlar SET durum='satildi', satis_fiyati=$1, satis_kanali=$2,
+               satis_tarihi=$3, musteri_adi=$4, musteri_telefon=$5, odeme_yontemi=$6, customer_id=$7
+               WHERE id=$8 AND dukkan_id=$9""",
+            satis_fiyati, body.get("satis_kanali", "Dükkan"),
+            satis_tarihi, musteri_adi, musteri_telefon, odeme, customer_id, cihaz_id, dukkan_id,
+        )
 
         aciklama = f"Sıfır Satış: {cihaz.get('model', '')} → {musteri_adi}".strip(" →")
 

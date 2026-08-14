@@ -7,6 +7,7 @@ import Kayit from "./pages/Kayit";
 import Landing from "./pages/Landing";
 import MagazaPublic from "./pages/MagazaPublic";
 import MagazaFis from "./pages/MagazaFis";
+import MusteriPanel from "./pages/MusteriPanel";
 
 function BekleyenEkran({ user }) {
   return (
@@ -239,6 +240,7 @@ export default function App() {
         <Route path="/magaza/:slug" element={<MagazaPublic />} />
         <Route path="/magaza/:slug/fis" element={<MagazaFis />} />
         <Route path="/magaza/:slug/fis/:repairNo" element={<MagazaFis />} />
+        <Route path="/magaza/:slug/panelim" element={<MusteriPanel />} />
         <Route path="/" element={getToken() ? <AuthedRoot /> : <Landing />} />
         <Route path="/*" element={<AuthedRoot />} />
       </Routes>

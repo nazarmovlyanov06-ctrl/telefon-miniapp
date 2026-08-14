@@ -79,6 +79,17 @@ async function postForm(path, fields) {
   return res.json();
 }
 
+// Müşteri portalı token'ı ile — shop staff token'ından ayrı, localStorage'da
+// ayrı bir anahtarda tutulur (MusteriPanel.jsx yönetir), burada parametre olarak geçilir.
+async function getWithToken(path, token) {
+  const res = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 // Excel/PDF gibi ikili dosya indirmeleri — request()'in JSON parse'ını atlar.
 async function downloadFile(path, filename) {
   const token = getToken();
@@ -358,6 +369,11 @@ export const api = {
   publicDegerlendirmeEkle: (slug, body) => post(`/public/dukkan/${slug}/degerlendirme`, body),
   publicDegerlendirmeler: (slug) => get(`/public/dukkan/${slug}/degerlendirmeler`),
   publicTakasTeklifi: (slug, fields) => postForm(`/public/dukkan/${slug}/takas-teklifi`, fields),
+
+  // Müşteri portalı
+  musteriKayit: (slug, body) => post(`/public/dukkan/${slug}/musteri/kayit`, body),
+  musteriGiris: (slug, body) => post(`/public/dukkan/${slug}/musteri/giris`, body),
+  musteriPanelim: (slug, token) => getWithToken(`/public/dukkan/${slug}/musteri/panelim`, token),
 
   // E-posta doğrulama (kayıt)
   emailDogrulamaDurumu: () => get("/auth/email-dogrulama-durumu"),

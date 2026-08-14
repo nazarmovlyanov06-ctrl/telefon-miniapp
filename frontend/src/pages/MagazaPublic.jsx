@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "../api";
 import {
   Wrench, Search, MapPin, Phone, Clock, Smartphone, CircleX,
-  CheckCircle2, Send, Store, ShieldCheck, Tag, Star, Repeat, Receipt, Headphones,
+  CheckCircle2, Send, Store, ShieldCheck, Tag, Star, Repeat, Receipt, Headphones, User,
 } from "lucide-react";
 
 const DURUM_LABEL = {
@@ -462,7 +462,10 @@ export default function MagazaPublic() {
         <TakasTeklifi slug={slug} />
         <RandevuFormu slug={slug} />
 
-        <div style={{ textAlign: "center", marginTop: 4 }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 18, marginTop: 4, flexWrap: "wrap" }}>
+          <Link to={`/magaza/${slug}/panelim`} style={{ fontSize: 12.5, color: "var(--hint)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <User size={13} strokeWidth={2} /> Müşteri Paneli
+          </Link>
           <Link to={`/magaza/${slug}/fis`} style={{ fontSize: 12.5, color: "var(--hint)", display: "inline-flex", alignItems: "center", gap: 6 }}>
             <Receipt size={13} strokeWidth={2} /> Dijital fiş görüntüle
           </Link>

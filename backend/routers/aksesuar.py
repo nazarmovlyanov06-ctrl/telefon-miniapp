@@ -78,14 +78,37 @@ async def sat_aksesuar(
         raise HTTPException(400, "Yetersiz stok")
     toplam = body.get("toplam") or (miktar * aks["satis_fiyati"])
     tarih = body.get("tarih", date.today().isoformat())
+    musteri_adi = body.get("musteri_adi") or ""
+    musteri_telefon = body.get("musteri_telefon") or ""
     async with db.transaction():
         await db.execute(
             "UPDATE aksesuarlar SET stok = stok - $1 WHERE id = $2 AND dukkan_id = $3", miktar, aksesuar_id, dukkan_id
         )
+
+        customer_id = None
+        if musteri_adi:
+            if musteri_telefon:
+                row2 = await db.fetchrow(
+                    "SELECT id FROM customers WHERE dukkan_id=$1 AND (name = $2 OR phone = $3)",
+                    dukkan_id, musteri_adi, musteri_telefon,
+                )
+            else:
+                row2 = await db.fetchrow(
+                    "SELECT id FROM customers WHERE dukkan_id=$1 AND name = $2", dukkan_id, musteri_adi
+                )
+            if row2:
+                customer_id = row2["id"]
+            else:
+                ins = await db.fetchrow(
+                    "INSERT INTO customers (dukkan_id, name, phone) VALUES ($1, $2, $3) RETURNING id",
+                    dukkan_id, musteri_adi, musteri_telefon or None,
+                )
+                customer_id = ins["id"]
+
         row = await db.fetchrow(
-            """INSERT INTO aksesuar_satislar (dukkan_id, aksesuar_id, miktar, toplam, musteri_adi, tarih)
-               VALUES ($1, $2, $3, $4, $5, $6) RETURNING id""",
-            dukkan_id, aksesuar_id, miktar, toplam, body.get("musteri_adi"), tarih,
+            """INSERT INTO aksesuar_satislar (dukkan_id, aksesuar_id, miktar, toplam, musteri_adi, musteri_telefon, tarih, customer_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id""",
+            dukkan_id, aksesuar_id, miktar, toplam, musteri_adi or None, musteri_telefon or None, tarih, customer_id,
         )
         await db.execute(
             """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
