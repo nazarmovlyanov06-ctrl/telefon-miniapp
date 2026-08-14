@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "../api";
 import {
   Wrench, Search, MapPin, Phone, Clock, Smartphone, CircleX,
-  CheckCircle2, Send, Store, ShieldCheck, Tag, Star, Repeat, Receipt,
+  CheckCircle2, Send, Store, ShieldCheck, Tag, Star, Repeat, Receipt, Headphones,
 } from "lucide-react";
 
 const DURUM_LABEL = {
@@ -291,33 +291,59 @@ function TakasTeklifi({ slug }) {
 
 function CihazListesi({ slug }) {
   const [data, setData] = useState(null);
-  useEffect(() => { api.publicCihazlar(slug).then(setData).catch(() => setData({ ikinci_el: [], sifir: [] })); }, [slug]);
+  useEffect(() => { api.publicCihazlar(slug).then(setData).catch(() => setData({ ikinci_el: [], sifir: [], aksesuar: [] })); }, [slug]);
   if (!data) return null;
   const hepsi = [...data.sifir.map(c => ({ ...c, yeni: true })), ...data.ikinci_el.map(c => ({ ...c, yeni: false }))];
-  if (hepsi.length === 0) return null;
+  const aksesuar = data.aksesuar || [];
+  if (hepsi.length === 0 && aksesuar.length === 0) return null;
 
   return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}>
-        <Smartphone size={15} strokeWidth={2} /> Satılık Cihazlar
-      </div>
-      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
-        {hepsi.map(c => (
-          <div key={`${c.yeni}-${c.id}`} className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-              <span className="badge" style={{ background: c.yeni ? "rgba(74,222,128,0.15)" : "rgba(157,210,255,0.15)", color: c.yeni ? "var(--green)" : "var(--blue2)" }}>
-                {c.yeni ? "Sıfır" : "2. El"}
-              </span>
-            </div>
-            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{c.model}</div>
-            <div style={{ fontSize: 12, color: "var(--hint)" }}>{[c.renk, c.depolama].filter(Boolean).join(" · ") || "—"}</div>
-            <div style={{ fontWeight: 800, fontSize: 16, marginTop: 6, color: "var(--orange)" }}>
-              {c.satis_fiyati ? `${c.satis_fiyati.toLocaleString("tr-TR")}₺` : "Fiyat için sorunuz"}
-            </div>
+    <>
+      {hepsi.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}>
+            <Smartphone size={15} strokeWidth={2} /> Satılık Cihazlar
           </div>
-        ))}
-      </div>
-    </div>
+          <div className="stats-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+            {hepsi.map(c => (
+              <div key={`${c.yeni}-${c.id}`} className="card">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                  <span className="badge" style={{ background: c.yeni ? "rgba(74,222,128,0.15)" : "rgba(157,210,255,0.15)", color: c.yeni ? "var(--green)" : "var(--blue2)" }}>
+                    {c.yeni ? "Sıfır" : "2. El"}
+                  </span>
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{c.model}</div>
+                <div style={{ fontSize: 12, color: "var(--hint)" }}>{[c.renk, c.depolama].filter(Boolean).join(" · ") || "—"}</div>
+                <div style={{ fontWeight: 800, fontSize: 16, marginTop: 6, color: "var(--orange)" }}>
+                  {c.satis_fiyati ? `${c.satis_fiyati.toLocaleString("tr-TR")}₺` : "Fiyat için sorunuz"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {aksesuar.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}>
+            <Headphones size={15} strokeWidth={2} /> Aksesuarlar
+          </div>
+          <div className="stats-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+            {aksesuar.map(a => (
+              <div key={a.id} className="card">
+                <span className="badge" style={{ background: "rgba(255,193,102,0.15)", color: "var(--orange)", marginBottom: 6, display: "inline-block" }}>
+                  {a.kategori || "Diğer"}
+                </span>
+                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{a.ad}</div>
+                <div style={{ fontWeight: 800, fontSize: 16, marginTop: 6, color: "var(--orange)" }}>
+                  {a.satis_fiyati ? `${a.satis_fiyati.toLocaleString("tr-TR")}₺` : "Fiyat için sorunuz"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

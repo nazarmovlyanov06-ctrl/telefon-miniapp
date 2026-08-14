@@ -59,7 +59,16 @@ async def satilik_cihazlar(slug: str, db: asyncpg.Connection = Depends(get_db)):
            FROM sifir_cihazlar WHERE dukkan_id = $1 AND durum = 'stokta' ORDER BY created_at DESC""",
         d["id"],
     )
-    return {"ikinci_el": [dict(r) for r in ikinci_el], "sifir": [dict(r) for r in sifir]}
+    aksesuar = await db.fetch(
+        """SELECT id, ad, kategori, satis_fiyati FROM aksesuarlar
+           WHERE dukkan_id = $1 AND stok > 0 ORDER BY kategori, ad""",
+        d["id"],
+    )
+    return {
+        "ikinci_el": [dict(r) for r in ikinci_el],
+        "sifir": [dict(r) for r in sifir],
+        "aksesuar": [dict(r) for r in aksesuar],
+    }
 
 
 @router.post("/dukkan/{slug}/randevu")
