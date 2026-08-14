@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "../api";
 import {
   Wrench, User, LogOut, ShieldCheck, ShoppingBag, CircleX,
-  Smartphone, Headphones, CheckCircle2,
+  Smartphone, Headphones, CheckCircle2, CalendarClock, Repeat,
 } from "lucide-react";
 
 function tokenKey(slug) { return `musteri_token_${slug}`; }
@@ -12,6 +12,20 @@ function fmt(n) { return (n || 0).toLocaleString("tr-TR", { maximumFractionDigit
 const DURUM_LABEL = {
   bekliyor: "Bekliyor", tamirde: "Tamirde", parca_bekleniyor: "Parça Bekleniyor",
   hazir: "Hazır", teslim: "Teslim Edildi",
+};
+
+const RANDEVU_DURUM_META = {
+  yeni: { label: "Yeni", color: "var(--blue)" },
+  goruldu: { label: "Görüldü", color: "var(--gold)" },
+  tamire_donusturuldu: { label: "Tamire Dönüştürüldü", color: "var(--green)" },
+  reddedildi: { label: "Reddedildi", color: "var(--red)" },
+};
+
+const TAKAS_DURUM_META = {
+  yeni: { label: "Yeni", color: "var(--blue)" },
+  teklif_verildi: { label: "Teklif Verildi", color: "var(--gold)" },
+  kabul_edildi: { label: "Kabul Edildi", color: "var(--green)" },
+  reddedildi: { label: "Reddedildi", color: "var(--red)" },
 };
 
 function GirisKayitForm({ slug, onGiris }) {
@@ -177,6 +191,52 @@ export default function MusteriPanel() {
                       <div style={{ fontSize: 12.5, fontWeight: 700, color: gecerli ? "var(--green)" : "var(--hint)", marginTop: 4 }}>
                         {gecerli ? `Garantili — ${kalanGun} gün kaldı` : "Süresi doldu"}
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}>
+              <CalendarClock size={15} strokeWidth={2} /> Randevu Taleplerim
+            </div>
+            {panel.randevularim.length === 0 ? (
+              <div className="card" style={{ marginBottom: 20, fontSize: 13, color: "var(--hint)" }}>Gönderdiğiniz bir randevu talebi yok.</div>
+            ) : (
+              <div className="card" style={{ marginBottom: 20 }}>
+                {panel.randevularim.map((r, i) => {
+                  const meta = RANDEVU_DURUM_META[r.durum] || { label: r.durum, color: "var(--hint)" };
+                  return (
+                    <div key={i} style={{ padding: "10px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.cihaz_model || "—"}</div>
+                        {r.aciklama && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 2 }}>{r.aciklama}</div>}
+                        <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3 }}>{new Date(r.created_at).toLocaleDateString("tr-TR")}</div>
+                      </div>
+                      <span className="badge" style={{ background: `${meta.color}22`, color: meta.color, flexShrink: 0 }}>{meta.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}>
+              <Repeat size={15} strokeWidth={2} /> Takas Tekliflerim
+            </div>
+            {panel.takaslarim.length === 0 ? (
+              <div className="card" style={{ marginBottom: 20, fontSize: 13, color: "var(--hint)" }}>Gönderdiğiniz bir takas teklifi yok.</div>
+            ) : (
+              <div className="card" style={{ marginBottom: 20 }}>
+                {panel.takaslarim.map((t, i) => {
+                  const meta = TAKAS_DURUM_META[t.durum] || { label: t.durum, color: "var(--hint)" };
+                  return (
+                    <div key={i} style={{ padding: "10px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{t.cihaz_model}</div>
+                        {t.teklif_tutari && <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--orange)", marginTop: 2 }}>{fmt(t.teklif_tutari)}₺</div>}
+                        <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3 }}>{new Date(t.created_at).toLocaleDateString("tr-TR")}</div>
+                      </div>
+                      <span className="badge" style={{ background: `${meta.color}22`, color: meta.color, flexShrink: 0 }}>{meta.label}</span>
                     </div>
                   );
                 })}

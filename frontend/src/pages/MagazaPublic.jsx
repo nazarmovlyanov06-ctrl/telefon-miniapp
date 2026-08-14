@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api } from "../api";
+import { api, fotoUrl } from "../api";
 import {
   Wrench, Search, MapPin, Phone, Clock, Smartphone, CircleX,
   CheckCircle2, Send, Store, ShieldCheck, Tag, Star, Repeat, Receipt, Headphones, User,
@@ -430,9 +430,19 @@ export default function MagazaPublic() {
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--bg)" }}>
+      {dukkan.kapak_url && (
+        <div style={{ width: "100%", height: 180, background: `url(${fotoUrl(dukkan.kapak_url)}) center/cover` }} />
+      )}
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "30px 20px 60px" }}>
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <Wrench size={36} strokeWidth={1.6} style={{ marginBottom: 10 }} />
+        <div style={{ textAlign: "center", marginBottom: 24, marginTop: dukkan.kapak_url ? -56 : 0 }}>
+          {dukkan.logo_url ? (
+            <img src={fotoUrl(dukkan.logo_url)} alt="" style={{
+              width: 72, height: 72, borderRadius: "50%", objectFit: "cover", marginBottom: 10,
+              border: "3px solid var(--bg)", boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+            }} />
+          ) : (
+            <Wrench size={36} strokeWidth={1.6} style={{ marginBottom: 10 }} />
+          )}
           <div style={{ fontWeight: 800, fontSize: 22 }}>{dukkan.ad}</div>
           {dukkan.vitrin_aciklama && <div style={{ fontSize: 13, color: "var(--hint)", marginTop: 6 }}>{dukkan.vitrin_aciklama}</div>}
           <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap", marginTop: 12, fontSize: 12.5, color: "var(--hint)" }}>

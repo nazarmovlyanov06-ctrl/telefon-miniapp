@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api";
-import { Store, CircleX, ExternalLink } from "lucide-react";
+import { api, fotoUrl } from "../api";
+import { Store, CircleX, ExternalLink, Image, ImagePlus } from "lucide-react";
 
 export default function VitrinAyarlari() {
   const navigate = useNavigate();
@@ -9,6 +9,9 @@ export default function VitrinAyarlari() {
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [gorselYukleniyor, setGorselYukleniyor] = useState(null);
+  const logoInputRef = useRef(null);
+  const kapakInputRef = useRef(null);
 
   useEffect(() => { api.vitrinAyarlarim().then(setForm).catch(e => setErr(e.message)); }, []);
 
@@ -21,6 +24,15 @@ export default function VitrinAyarlari() {
       setSaved(true);
     } catch (e) { setErr(e.message); }
     finally { setBusy(false); }
+  }
+
+  async function gorselYukle(tip, file) {
+    setErr(""); setGorselYukleniyor(tip);
+    try {
+      const r = tip === "logo" ? await api.vitrinLogoYukle(file) : await api.vitrinKapakYukle(file);
+      set(tip === "logo" ? "logo_url" : "kapak_url", r.url);
+    } catch (e) { setErr(e.message); }
+    finally { setGorselYukleniyor(null); }
   }
 
   if (!form) return <div className="page"><div className="loading">Yükleniyor...</div></div>;
@@ -43,8 +55,48 @@ export default function VitrinAyarlari() {
         </a>
       </div>
 
+      {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hint)", marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}>
+          <Image size={14} strokeWidth={2} /> GÖRSELLER
+        </div>
+
+        <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 14 }}>
+          <div onClick={() => logoInputRef.current?.click()}
+            style={{
+              width: 64, height: 64, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+              background: form.logo_url ? `url(${fotoUrl(form.logo_url)}) center/cover` : "var(--bg2)",
+              border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+            {!form.logo_url && <ImagePlus size={20} stroke="var(--hint)" strokeWidth={1.6} />}
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13.5 }}>Dükkân Logosu</div>
+            <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 4 }}>Mağaza sayfanızda isminizin yanında görünür</div>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => logoInputRef.current?.click()} disabled={gorselYukleniyor === "logo"}>
+              {gorselYukleniyor === "logo" ? "Yükleniyor..." : form.logo_url ? "Değiştir" : "Yükle"}
+            </button>
+          </div>
+          <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }}
+            onChange={e => { if (e.target.files[0]) gorselYukle("logo", e.target.files[0]); e.target.value = ""; }} />
+        </div>
+
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 4 }}>Kapak Fotoğrafı</div>
+          <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 8 }}>Mağaza sayfanızın en üstünde geniş banner olarak görünür</div>
+          {form.kapak_url && (
+            <img src={fotoUrl(form.kapak_url)} alt="" style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />
+          )}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => kapakInputRef.current?.click()} disabled={gorselYukleniyor === "kapak"}>
+            {gorselYukleniyor === "kapak" ? "Yükleniyor..." : form.kapak_url ? "Değiştir" : "Yükle"}
+          </button>
+          <input ref={kapakInputRef} type="file" accept="image/*" style={{ display: "none" }}
+            onChange={e => { if (e.target.files[0]) gorselYukle("kapak", e.target.files[0]); e.target.value = ""; }} />
+        </div>
+      </div>
+
       <form onSubmit={kaydet}>
-        {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
         {saved && <div style={{ color: "var(--success)", fontSize: 13, marginBottom: 8 }}>Kaydedildi</div>}
 
         <div className="card">

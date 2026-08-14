@@ -1,7 +1,8 @@
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from database import get_db
 from auth import get_current_user, get_dukkan_id, require_patron
+from photo_storage import save_upload
 
 router = APIRouter(prefix="/vitrin", tags=["vitrin"])
 
@@ -14,10 +15,40 @@ async def ayarlarim(
 ):
     row = await db.fetchrow(
         """SELECT slug, ad, telefon, adres, sehir, vitrin_aktif, vitrin_aciklama,
-                  calisma_saatleri, hizmetler FROM dukkanlar WHERE id = $1""",
+                  calisma_saatleri, hizmetler, logo_url, kapak_url FROM dukkanlar WHERE id = $1""",
         dukkan_id,
     )
     return dict(row)
+
+
+@router.post("/logo")
+async def logo_yukle(
+    dosya: UploadFile = File(...),
+    dukkan_id: int = Depends(get_dukkan_id),
+    _patron: dict = Depends(require_patron),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    try:
+        url, _, _ = await save_upload(dosya, "dukkan-logo", dukkan_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await db.execute("UPDATE dukkanlar SET logo_url = $1 WHERE id = $2", url, dukkan_id)
+    return {"url": url}
+
+
+@router.post("/kapak")
+async def kapak_yukle(
+    dosya: UploadFile = File(...),
+    dukkan_id: int = Depends(get_dukkan_id),
+    _patron: dict = Depends(require_patron),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    try:
+        url, _, _ = await save_upload(dosya, "dukkan-kapak", dukkan_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await db.execute("UPDATE dukkanlar SET kapak_url = $1 WHERE id = $2", url, dukkan_id)
+    return {"url": url}
 
 
 @router.put("/ayarlarim")

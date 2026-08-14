@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS dukkanlar (
     vitrin_aciklama TEXT,
     calisma_saatleri TEXT,
     hizmetler TEXT,
+    logo_url TEXT,
+    kapak_url TEXT,
     created_at TIMESTAMP DEFAULT now()
 );
 

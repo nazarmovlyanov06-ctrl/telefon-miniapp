@@ -349,6 +349,8 @@ export const api = {
   // Vitrin (dükkan ayarları + randevu talepleri)
   vitrinAyarlarim: () => get("/vitrin/ayarlarim"),
   vitrinAyarlariGuncelle: (body) => put("/vitrin/ayarlarim", body),
+  vitrinLogoYukle: (file) => uploadFile("/vitrin/logo", file),
+  vitrinKapakYukle: (file) => uploadFile("/vitrin/kapak", file),
   vitrinRandevuTalepleri: () => get("/vitrin/randevu-talepleri"),
   vitrinRandevuDurumGuncelle: (id, durum) => put(`/vitrin/randevu-talepleri/${id}/durum`, { durum }),
   vitrinDegerlendirmeler: () => get("/vitrin/degerlendirmeler"),

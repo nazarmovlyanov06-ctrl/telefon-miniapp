@@ -15,7 +15,8 @@ async def planlar(db: asyncpg.Connection = Depends(get_db)):
 
 async def _dukkan_by_slug(db: asyncpg.Connection, slug: str):
     row = await db.fetchrow(
-        "SELECT id, ad, slug, telefon, adres, sehir, vitrin_aktif, vitrin_aciklama, calisma_saatleri, hizmetler FROM dukkanlar WHERE slug = $1",
+        """SELECT id, ad, slug, telefon, adres, sehir, vitrin_aktif, vitrin_aciklama,
+                  calisma_saatleri, hizmetler, logo_url, kapak_url FROM dukkanlar WHERE slug = $1""",
         slug,
     )
     if not row or not row["vitrin_aktif"]:
@@ -307,6 +308,16 @@ async def musteri_panelim(
            WHERE s.customer_id = $1 AND s.dukkan_id = $2 ORDER BY s.tarih DESC""",
         musteri["id"], d["id"],
     )
+    randevularim = await db.fetch(
+        """SELECT cihaz_model, aciklama, durum, created_at
+           FROM randevu_talepleri WHERE dukkan_id = $1 AND telefon = $2 ORDER BY created_at DESC""",
+        d["id"], musteri["phone"],
+    )
+    takaslarim = await db.fetch(
+        """SELECT cihaz_model, aciklama, durum, teklif_tutari, created_at
+           FROM takas_teklifleri WHERE dukkan_id = $1 AND telefon = $2 ORDER BY created_at DESC""",
+        d["id"], musteri["phone"],
+    )
     return {
         "ad": musteri["name"],
         "tamirler": [dict(r) for r in tamirler],
@@ -316,4 +327,6 @@ async def musteri_panelim(
             "sifir": [dict(r) for r in sifir],
             "aksesuar": [dict(r) for r in aksesuar],
         },
+        "randevularim": [dict(r) for r in randevularim],
+        "takaslarim": [dict(r) for r in takaslarim],
     }
