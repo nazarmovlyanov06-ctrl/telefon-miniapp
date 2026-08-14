@@ -5,7 +5,7 @@ import { PatternPreview } from "../components/PatternLock";
 import {
   Pencil, Home, CheckCircle2, Receipt, Copy, Check, MessageCircle,
   Trash2, Lock, Eye, EyeOff, SquareCheck, Calendar, ClipboardList,
-  Wrench, Camera, User, X, CircleX, Search, FileClock, Package,
+  Wrench, Camera, User, X, CircleX, Search, FileClock, Package, QrCode,
 } from "lucide-react";
 
 const STATUSES = [
@@ -62,6 +62,11 @@ export default function RepairDetail({ user }) {
   const [fisModal, setFisModal] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Dijital fiş / QR
+  const [qrModal, setQrModal] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [dukkanSlug, setDukkanSlug] = useState(null);
+
   // Ekran kilidi göster/gizle
   const [showLock, setShowLock] = useState(false);
 
@@ -88,6 +93,7 @@ export default function RepairDetail({ user }) {
       });
       if (r.final_price) setTeslimForm(f => ({ ...f, final_price: r.final_price, payment_type: r.payment_type || "nakit" }));
     }).finally(() => setLoading(false));
+    api.vitrinAyarlarim().then(r => setDukkanSlug(r.slug)).catch(() => {});
   }, [id]);
 
   async function changeStatus(status) {
@@ -370,6 +376,37 @@ export default function RepairDetail({ user }) {
         </div>
       )}
 
+      {/* Dijital fiş / QR modal */}
+      {qrModal && dukkanSlug && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 16 }}
+          onClick={() => setQrModal(false)}>
+          <div className="card" style={{ width: "100%", maxWidth: 380, textAlign: "center" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <QrCode size={16} strokeWidth={2} /> Dijital Fiş
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--hint)", marginBottom: 12 }}>
+              Müşteri bu kodu okutup telefon numarasını girerek tamir fişini görüntüleyebilir.
+            </div>
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`${window.location.origin}/magaza/${dukkanSlug}/fis/${repair.repair_no}`)}`}
+              alt="QR" width={220} height={220} style={{ borderRadius: 8, marginBottom: 12, background: "#fff", padding: 8 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(`${window.location.origin}/magaza/${dukkanSlug}/fis/${repair.repair_no}`);
+                    setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000);
+                  } catch {}
+                }}>
+                {linkCopied ? <><Check size={14} strokeWidth={2.4} /> Kopyalandı!</> : <><Copy size={14} strokeWidth={2} /> Linki Kopyala</>}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setQrModal(false)}>Kapat</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Fotoğraf büyük görünüm */}
       {fotoView && (
         <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}
@@ -578,6 +615,11 @@ export default function RepairDetail({ user }) {
             <button className="btn btn-ghost btn-sm" onClick={() => setFisModal(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <Receipt size={13} strokeWidth={2} /> Fiş
             </button>
+            {dukkanSlug && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setQrModal(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <QrCode size={13} strokeWidth={2} /> Dijital Fiş / QR
+              </button>
+            )}
           </div>
 
           {/* Kullanılan Parçalar */}

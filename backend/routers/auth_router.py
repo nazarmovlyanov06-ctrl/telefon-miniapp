@@ -1,12 +1,18 @@
+import random
 import re
+from datetime import datetime, timedelta
+
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 
 from database import get_db
 from auth import hash_sifre, dogrula_sifre, olustur_token, get_current_user
+from email_service import email_yapilandirildi, dogrulama_kodu_gonder
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+_KOD_GECERLILIK_DK = 10
 
 
 def slug_uret(ad: str) -> str:
@@ -25,9 +31,53 @@ class KayitBody(BaseModel):
     referans_kod: str | None = None
 
 
+class KodGonderBody(BaseModel):
+    email: EmailStr
+
+
+class KodDogrulaBody(BaseModel):
+    email: EmailStr
+    kod: str
+
+
 class GirisBody(BaseModel):
     email: EmailStr
     sifre: str
+
+
+@router.get("/email-dogrulama-durumu")
+async def email_dogrulama_durumu():
+    return {"aktif": email_yapilandirildi()}
+
+
+@router.post("/kod-gonder")
+async def kod_gonder(body: KodGonderBody, db: asyncpg.Connection = Depends(get_db)):
+    if not email_yapilandirildi():
+        raise HTTPException(400, "E-posta doğrulama şu an aktif değil")
+    var_mi = await db.fetchrow("SELECT id FROM kullanicilar WHERE email = $1", body.email)
+    if var_mi:
+        raise HTTPException(400, "Bu e-posta zaten kayitli")
+    kod = f"{random.randint(0, 999999):06d}"
+    await db.execute("INSERT INTO email_dogrulama_kodlari (email, kod) VALUES ($1, $2)", body.email, kod)
+    gonderildi = dogrulama_kodu_gonder(body.email, kod)
+    if not gonderildi:
+        raise HTTPException(500, "Doğrulama e-postası gönderilemedi, lütfen tekrar deneyin")
+    return {"ok": True}
+
+
+@router.post("/kod-dogrula")
+async def kod_dogrula(body: KodDogrulaBody, db: asyncpg.Connection = Depends(get_db)):
+    sinir = datetime.utcnow() - timedelta(minutes=_KOD_GECERLILIK_DK)
+    row = await db.fetchrow(
+        """SELECT id FROM email_dogrulama_kodlari
+           WHERE email = $1 AND kod = $2 AND created_at >= $3
+           ORDER BY id DESC LIMIT 1""",
+        body.email, body.kod, sinir,
+    )
+    if not row:
+        raise HTTPException(400, "Kod geçersiz veya süresi dolmuş")
+    await db.execute("UPDATE email_dogrulama_kodlari SET dogrulandi = true WHERE id = $1", row["id"])
+    return {"ok": True}
 
 
 @router.post("/kayit")
@@ -38,6 +88,17 @@ async def kayit_ol(body: KayitBody, db: asyncpg.Connection = Depends(get_db)):
     var_mi = await db.fetchrow("SELECT id FROM kullanicilar WHERE email = $1", body.email)
     if var_mi:
         raise HTTPException(400, "Bu e-posta zaten kayitli")
+
+    if email_yapilandirildi():
+        sinir = datetime.utcnow() - timedelta(minutes=_KOD_GECERLILIK_DK)
+        dogrulandi = await db.fetchval(
+            """SELECT 1 FROM email_dogrulama_kodlari
+               WHERE email = $1 AND dogrulandi = true AND created_at >= $2
+               ORDER BY id DESC LIMIT 1""",
+            body.email, sinir,
+        )
+        if not dogrulandi:
+            raise HTTPException(400, "E-posta doğrulanmadı — önce doğrulama kodunu isteyip girin")
 
     slug_base = slug_uret(body.dukkan_adi)
     slug = slug_base

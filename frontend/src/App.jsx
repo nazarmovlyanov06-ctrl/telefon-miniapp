@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Kayit from "./pages/Kayit";
 import Landing from "./pages/Landing";
 import MagazaPublic from "./pages/MagazaPublic";
+import MagazaFis from "./pages/MagazaFis";
 
 function BekleyenEkran({ user }) {
   return (
@@ -58,6 +59,8 @@ import SuperAdmin from "./pages/SuperAdmin";
 import Destek from "./pages/Destek";
 import VitrinAyarlari from "./pages/VitrinAyarlari";
 import RandevuTalepleri from "./pages/RandevuTalepleri";
+import VitrinDegerlendirme from "./pages/VitrinDegerlendirme";
+import VitrinTakas from "./pages/VitrinTakas";
 import "./index.css";
 
 // Kenar kaydırma (sol kenardan sağa → geri) + geri butonu
@@ -157,6 +160,8 @@ function AppRoutes({ user }) {
         <Route path="/destek" element={<Destek />} />
         <Route path="/vitrin-ayarlari" element={<VitrinAyarlari />} />
         <Route path="/randevu-talepleri" element={<RandevuTalepleri />} />
+        <Route path="/vitrin-degerlendirme" element={<VitrinDegerlendirme />} />
+        <Route path="/vitrin-takas" element={<VitrinTakas />} />
       </Routes>
       <BottomNav />
     </NavShell>
@@ -232,6 +237,8 @@ export default function App() {
         <Route path="/giris" element={<Login />} />
         <Route path="/kayit" element={<Kayit />} />
         <Route path="/magaza/:slug" element={<MagazaPublic />} />
+        <Route path="/magaza/:slug/fis" element={<MagazaFis />} />
+        <Route path="/magaza/:slug/fis/:repairNo" element={<MagazaFis />} />
         <Route path="/" element={getToken() ? <AuthedRoot /> : <Landing />} />
         <Route path="/*" element={<AuthedRoot />} />
       </Routes>

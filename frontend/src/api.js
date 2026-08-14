@@ -62,6 +62,23 @@ async function uploadFile(path, file) {
   return res.json();
 }
 
+// Karma alan+dosya formları (ör. takas teklifi) için — kimlik doğrulaması olmadan da çalışır.
+async function postForm(path, fields) {
+  const token = getToken();
+  const form = new FormData();
+  Object.entries(fields).forEach(([k, v]) => { if (v !== undefined && v !== null) form.append(k, v); });
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 // Excel/PDF gibi ikili dosya indirmeleri — request()'in JSON parse'ını atlar.
 async function downloadFile(path, filename) {
   const token = getToken();
@@ -323,6 +340,11 @@ export const api = {
   vitrinAyarlariGuncelle: (body) => put("/vitrin/ayarlarim", body),
   vitrinRandevuTalepleri: () => get("/vitrin/randevu-talepleri"),
   vitrinRandevuDurumGuncelle: (id, durum) => put(`/vitrin/randevu-talepleri/${id}/durum`, { durum }),
+  vitrinDegerlendirmeler: () => get("/vitrin/degerlendirmeler"),
+  vitrinDegerlendirmeOnay: (id, onaylandi) => put(`/vitrin/degerlendirmeler/${id}/onay`, { onaylandi }),
+  vitrinDegerlendirmeSil: (id) => del(`/vitrin/degerlendirmeler/${id}`),
+  vitrinTakasTeklifleri: () => get("/vitrin/takas-teklifleri"),
+  vitrinTakasTeklifiGuncelle: (id, durum, teklif_tutari) => put(`/vitrin/takas-teklifleri/${id}`, { durum, teklif_tutari }),
 
   // Public (kayıtsız erişim — Landing + Mağaza portalı)
   publicPlanlar: () => get("/public/planlar"),
@@ -330,4 +352,15 @@ export const api = {
   publicTamirDurumu: (slug, q) => get(`/public/dukkan/${slug}/tamir-durumu?q=${encodeURIComponent(q)}`),
   publicCihazlar: (slug) => get(`/public/dukkan/${slug}/cihazlar`),
   publicRandevuTalebi: (slug, body) => post(`/public/dukkan/${slug}/randevu`, body),
+  publicGarantiDurumu: (slug, q) => get(`/public/dukkan/${slug}/garanti-durumu?q=${encodeURIComponent(q)}`),
+  publicFis: (slug, repairNo, telefon) => get(`/public/dukkan/${slug}/fis/${repairNo}?telefon=${encodeURIComponent(telefon)}`),
+  publicFiyatSorgu: (slug, model) => get(`/public/dukkan/${slug}/fiyat-sorgu?model=${encodeURIComponent(model)}`),
+  publicDegerlendirmeEkle: (slug, body) => post(`/public/dukkan/${slug}/degerlendirme`, body),
+  publicDegerlendirmeler: (slug) => get(`/public/dukkan/${slug}/degerlendirmeler`),
+  publicTakasTeklifi: (slug, fields) => postForm(`/public/dukkan/${slug}/takas-teklifi`, fields),
+
+  // E-posta doğrulama (kayıt)
+  emailDogrulamaDurumu: () => get("/auth/email-dogrulama-durumu"),
+  kodGonder: (email) => post("/auth/kod-gonder", { email }),
+  kodDogrula: (email, kod) => post("/auth/kod-dogrula", { email, kod }),
 };

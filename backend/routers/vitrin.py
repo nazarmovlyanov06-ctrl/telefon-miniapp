@@ -70,3 +70,86 @@ async def randevu_durum_guncelle(
     if result == "UPDATE 0":
         raise HTTPException(404, "Talep bulunamadı")
     return {"ok": True}
+
+
+# ── DEĞERLENDİRME MODERASYONU ──────────────────────────────────────────
+
+@router.get("/degerlendirmeler")
+async def degerlendirmeler_hepsi(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch(
+        """SELECT id, repair_no, musteri_adi, puan, yorum, onaylandi, created_at
+           FROM degerlendirmeler WHERE dukkan_id = $1 ORDER BY created_at DESC""",
+        dukkan_id,
+    )
+    return [dict(r) for r in rows]
+
+
+@router.put("/degerlendirmeler/{id}/onay")
+async def degerlendirme_onayla(
+    id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    result = await db.execute(
+        "UPDATE degerlendirmeler SET onaylandi = $1 WHERE id = $2 AND dukkan_id = $3",
+        bool(body.get("onaylandi", True)), id, dukkan_id,
+    )
+    if result == "UPDATE 0":
+        raise HTTPException(404, "Değerlendirme bulunamadı")
+    return {"ok": True}
+
+
+@router.delete("/degerlendirmeler/{id}")
+async def degerlendirme_sil(
+    id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    result = await db.execute("DELETE FROM degerlendirmeler WHERE id = $1 AND dukkan_id = $2", id, dukkan_id)
+    if result == "DELETE 0":
+        raise HTTPException(404, "Değerlendirme bulunamadı")
+    return {"ok": True}
+
+
+# ── TAKAS TEKLİFLERİ ─────────────────────────────────────────────────────
+
+@router.get("/takas-teklifleri")
+async def takas_teklifleri(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch(
+        """SELECT id, musteri_adi, telefon, cihaz_model, aciklama, foto_url, durum, teklif_tutari, created_at
+           FROM takas_teklifleri WHERE dukkan_id = $1 ORDER BY created_at DESC""",
+        dukkan_id,
+    )
+    return [dict(r) for r in rows]
+
+
+@router.put("/takas-teklifleri/{id}")
+async def takas_teklifi_guncelle(
+    id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    durum = body.get("durum")
+    if durum not in ("yeni", "teklif_verildi", "kabul_edildi", "reddedildi"):
+        raise HTTPException(400, "Geçersiz durum")
+    teklif_tutari = body.get("teklif_tutari")
+    result = await db.execute(
+        "UPDATE takas_teklifleri SET durum = $1, teklif_tutari = $2 WHERE id = $3 AND dukkan_id = $4",
+        durum, float(teklif_tutari) if teklif_tutari else None, id, dukkan_id,
+    )
+    if result == "UPDATE 0":
+        raise HTTPException(404, "Teklif bulunamadı")
+    return {"ok": True}

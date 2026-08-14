@@ -30,18 +30,9 @@ ROLE_SATIS = "satis"
 ROLE_TEKNISYEN = "teknisyen"
 ROLE_CIRAK = "cirak"
 
-DURUM_LABELS = {
-    "bekliyor": "⏳ Bekliyor",
-    "parca_bekleniyor": "📦 Parça Bekleniyor",
-    "tamirde": "🔧 Tamirde",
-    "hazir": "✅ Hazır",
-    "teslim": "🏠 Teslim Edildi",
-}
-
-ODEME_LABELS = {
-    "nakit": "💵 Nakit",
-    "kart": "💳 Kart",
-    "senet": "📄 Senet",
-    "taksit": "📅 Taksit",
-    "borc": "📝 Borç",
-}
+# SMTP (e-posta doğrulama) — ayarlanmazsa özellik sessizce devre dışı kalır.
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER)
