@@ -5,7 +5,7 @@ import {
   Landmark, TrendingDown, Target, CreditCard,
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
-  Banknote, BarChart3, ScanLine, Settings, ShieldAlert, LogOut, LifeBuoy, Megaphone, X,
+  Banknote, BarChart3, ScanLine, Settings, LogOut, LifeBuoy, Megaphone, X,
 } from "lucide-react";
 
 const ITEMS = [
@@ -43,15 +43,11 @@ export default function More({ user }) {
   const navigate = useNavigate();
   const [bildirimSayisi, setBildirimSayisi] = useState(0);
   const [duyurular, setDuyurular] = useState([]);
-  const items = user?.rol === "super_admin"
-    ? [...ITEMS, { icon: ShieldAlert, label: "Süper Admin", path: "/admin", color: "var(--red)" }]
-    : ITEMS;
+  const items = ITEMS;
 
   useEffect(() => {
     api.geriBildirimBekleyen().then(r => setBildirimSayisi(r.bekleyen || 0)).catch(() => {});
-    if (user?.rol !== "super_admin") {
-      api.destekDuyurularim().then(setDuyurular).catch(() => {});
-    }
+    api.destekDuyurularim().then(setDuyurular).catch(() => {});
   }, [user]);
 
   function cikisYap() {

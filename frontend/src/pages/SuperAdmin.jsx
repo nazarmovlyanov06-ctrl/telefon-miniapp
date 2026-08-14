@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { api } from "../api";
+import { api, setToken } from "../api";
 import {
   ShieldAlert, Store, BarChart3, Wallet, LifeBuoy, Activity,
   Users, Wrench, TrendingUp, CircleX, Clock, Search, Send, Trash2,
-  Plus, X, ChevronUp, ChevronDown, Megaphone, Infinity as InfinityIcon,
+  Plus, X, ChevronUp, ChevronDown, Megaphone, Infinity as InfinityIcon, LogOut,
 } from "lucide-react";
 
 const TABS = [
@@ -33,7 +32,7 @@ const sonGirisFmt = (s) => {
 
 function KalanRozet({ d }) {
   const meta = DURUM_META[d.abonelik_durumu] || { label: d.abonelik_durumu, color: "var(--hint)" };
-  if (d.abonelik_durumu !== "aktif" && d.abonelik_durumu !== "deneme") {
+  if (d.abonelik_durumu !== "aktif" && !(d.abonelik_durumu === "deneme" && d.kalan_gun !== null)) {
     return <span className="badge" style={{ background: `${meta.color}22`, color: meta.color }}>{meta.label}</span>;
   }
   if (d.kalan_gun === null) {
@@ -612,8 +611,13 @@ function AktiviteTab() {
 
 // ── Ana sayfa ────────────────────────────────────────────────────────────
 
+function cikisYap() {
+  if (!confirm("Çıkış yapmak istediğine emin misin?")) return;
+  setToken(null);
+  window.location.href = "/giris";
+}
+
 export default function SuperAdmin() {
-  const navigate = useNavigate();
   const [tab, setTab] = useState("dukkanlar");
   const [ozet, setOzet] = useState(null);
 
@@ -625,13 +629,21 @@ export default function SuperAdmin() {
   }, []);
 
   return (
-    <div className="page">
-      <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate("/more")}>← Geri</button>
-        <div className="page-title" style={{ margin: 0, flex: 1, display: "flex", alignItems: "center", gap: 9 }}>
-          <ShieldAlert size={19} strokeWidth={2} /> Süper Admin
-        </div>
+    <div style={{ minHeight: "100dvh", background: "var(--bg)" }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 12, padding: "16px 20px",
+        borderBottom: "1px solid var(--divider)", position: "sticky", top: 0,
+        background: "var(--bg)", zIndex: 50,
+      }}>
+        <ShieldAlert size={20} strokeWidth={2} stroke="var(--orange)" />
+        <div style={{ fontWeight: 800, fontSize: 16, flex: 1 }}>Süper Admin Paneli</div>
+        <button className="btn btn-ghost btn-sm" onClick={cikisYap}
+          style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--danger)" }}>
+          <LogOut size={14} strokeWidth={2} /> Çıkış
+        </button>
       </div>
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 20px 60px" }}>
 
       {ozet && (ozet.abonelik_yaklasan > 0 || ozet.destek_okunmamis > 0) && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -663,6 +675,7 @@ export default function SuperAdmin() {
       {tab === "mali" && <MaliDurumTab />}
       {tab === "destek" && <DestekTab />}
       {tab === "aktivite" && <AktiviteTab />}
+      </div>
     </div>
   );
 }

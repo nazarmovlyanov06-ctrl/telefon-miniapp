@@ -4,7 +4,7 @@ import {
   Landmark, TrendingDown, Target, CreditCard,
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
-  Banknote, BarChart3, ScanLine, Settings, ShieldAlert, LogOut,
+  Banknote, BarChart3, ScanLine, Settings, LogOut,
 } from "lucide-react";
 import { setToken } from "../api";
 
@@ -88,9 +88,6 @@ export default function Sidebar({ dukkanAdi, user }) {
       <Grup label="Satış & Stok" items={SATIS_STOK} pathname={pathname} navigate={navigate} />
       <Grup label="Müşteri" items={MUSTERI} pathname={pathname} navigate={navigate} />
       <Grup label="Araçlar" items={ARACLAR} pathname={pathname} navigate={navigate} />
-      {user?.rol === "super_admin" && (
-        <Grup label="Yönetim" items={[{ path: "/admin", icon: ShieldAlert, label: "Süper Admin" }]} pathname={pathname} navigate={navigate} />
-      )}
       <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--divider)" }}>
         {user && (
           <div style={{ padding: "6px 12px 10px", fontSize: 12, color: "var(--hint)" }}>

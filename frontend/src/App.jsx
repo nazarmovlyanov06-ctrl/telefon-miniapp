@@ -150,7 +150,6 @@ function AppRoutes({ user }) {
         <Route path="/stats" element={<Stats />} />
         <Route path="/search" element={<Search />} />
         <Route path="/geri-bildirim" element={<GeriBildirim user={user} />} />
-        <Route path="/admin" element={user?.rol === "super_admin" ? <SuperAdmin /> : <Navigate to="/" replace />} />
         <Route path="/destek" element={<Destek />} />
       </Routes>
       <BottomNav />
@@ -223,7 +222,7 @@ export default function App() {
         <Route path="/giris" element={<Login />} />
         <Route path="/kayit" element={<Kayit />} />
         <Route path="/*" element={
-          <Korumali>{(user) => <AppRoutes user={user} />}</Korumali>
+          <Korumali>{(user) => user.rol === "super_admin" ? <SuperAdmin /> : <AppRoutes user={user} />}</Korumali>
         } />
       </Routes>
     </BrowserRouter>
