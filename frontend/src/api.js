@@ -90,6 +90,19 @@ async function getWithToken(path, token) {
   return res.json();
 }
 
+async function postWithToken(path, body, token) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 // Excel/PDF gibi ikili dosya indirmeleri — request()'in JSON parse'ını atlar.
 async function downloadFile(path, filename) {
   const token = getToken();
@@ -376,6 +389,14 @@ export const api = {
   musteriKayit: (slug, body) => post(`/public/dukkan/${slug}/musteri/kayit`, body),
   musteriGiris: (slug, body) => post(`/public/dukkan/${slug}/musteri/giris`, body),
   musteriPanelim: (slug, token) => getWithToken(`/public/dukkan/${slug}/musteri/panelim`, token),
+  musteriBorcOdemeleri: (slug, borcId, token) => getWithToken(`/public/dukkan/${slug}/musteri/borc/${borcId}/odemeler`, token),
+  musteriMesajlarim: (slug, token) => getWithToken(`/public/dukkan/${slug}/musteri/mesajlarim`, token),
+  musteriMesajGonder: (slug, mesaj, token) => postWithToken(`/public/dukkan/${slug}/musteri/mesajlarim`, { mesaj }, token),
+
+  // Müşteri mesajları (dükkan tarafı)
+  vitrinMusteriMesajlari: () => get("/vitrin/musteri-mesajlari"),
+  vitrinMusteriMesajGecmisi: (customerId) => get(`/vitrin/musteri-mesajlari/${customerId}`),
+  vitrinMusteriMesajYanitla: (customerId, mesaj) => post(`/vitrin/musteri-mesajlari/${customerId}`, { mesaj }),
 
   // E-posta doğrulama (kayıt)
   emailDogrulamaDurumu: () => get("/auth/email-dogrulama-durumu"),

@@ -49,6 +49,17 @@ CREATE TABLE IF NOT EXISTS customers (
     created_at TIMESTAMP DEFAULT now()
 );
 
+-- Müşteri <-> dükkan yazışması (platform destek sohbetinden ayrı).
+CREATE TABLE IF NOT EXISTS musteri_mesajlari (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    gonderen TEXT NOT NULL,          -- 'musteri' | 'dukkan'
+    mesaj TEXT NOT NULL,
+    okundu BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS repairs (
     id SERIAL PRIMARY KEY,
     dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,

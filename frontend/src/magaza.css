@@ -1,0 +1,249 @@
+/* ══════════════════════════════════════════════════════════════
+   MAĞAZA VİTRİNİ (/magaza/:slug) + MÜŞTERİ PORTALI (/panelim)
+
+   VarmiStok'un VitrinView / CustomerApp düzeninin OCAK token'larıyla
+   yeniden yazımı. framer-motion bilerek KULLANILMADI — saf CSS
+   animasyonu: bazı tarayıcılarda JS tabanlı giriş animasyonu hiç
+   tetiklenmeyip içerik opacity:0'da takılı kalabiliyor (VarmiStok'un
+   kendi kodunda da aynı not düşülmüş), ayrıca yeni bir bağımlılık
+   eklemeden aynı his elde ediliyor.
+   ══════════════════════════════════════════════════════════════ */
+
+@keyframes mpFadeUp {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: none; }
+}
+
+.mp-reveal { animation: mpFadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.mp-reveal-1 { animation-delay: 0.06s; }
+.mp-reveal-2 { animation-delay: 0.12s; }
+.mp-reveal-3 { animation-delay: 0.18s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mp-reveal, .mp-product { animation: none; }
+}
+
+.mp-container { max-width: 940px; margin: 0 auto; padding: 0 20px; }
+
+/* ── Hero ─────────────────────────────────────────────────── */
+
+.mp-hero {
+  position: relative; overflow: hidden; text-align: center;
+  padding: 40px 0 30px;
+  background: linear-gradient(180deg, var(--surf-hi), var(--bg));
+  border-bottom: 1px solid var(--divider);
+}
+.mp-hero-cover {
+  position: absolute; inset: 0; opacity: 0.28;
+  background-size: cover; background-position: center;
+}
+.mp-hero-inner { position: relative; }
+
+.mp-logo {
+  width: 84px; height: 84px; border-radius: 50%; object-fit: cover; margin-bottom: 12px;
+  border: 3px solid var(--bg); box-shadow: var(--lift);
+}
+.mp-logo-fallback {
+  width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 12px;
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
+  display: flex; align-items: center; justify-content: center;
+}
+.mp-title { font-weight: 800; font-size: 25px; color: var(--text-strong); letter-spacing: -0.01em; }
+.mp-desc {
+  font-size: 13.5px; color: var(--hint); margin: 7px auto 0; max-width: 480px; line-height: 1.5;
+}
+
+.mp-info-row {
+  display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;
+  margin-top: 12px; font-size: 12.5px; color: var(--hint);
+}
+.mp-info-row span { display: flex; align-items: center; gap: 5px; }
+
+.mp-hizmet-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 12px; }
+
+.mp-stats-row { display: flex; justify-content: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+.mp-stat {
+  min-width: 90px; padding: 10px 16px; border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
+}
+.mp-stat b { display: block; font-size: 19px; font-weight: 800; color: var(--gold); }
+.mp-stat span { font-size: 10.5px; color: var(--hint); text-transform: uppercase; letter-spacing: 0.08em; }
+
+.mp-cta-row { display: flex; justify-content: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+
+/* ── Bölümler ─────────────────────────────────────────────── */
+
+.mp-section-title {
+  font-weight: 800; font-size: 17px; color: var(--text-strong);
+  margin: 30px 0 12px; display: flex; align-items: center; gap: 8px;
+}
+
+.mp-guven-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.mp-guven-card {
+  padding: 14px; border-radius: var(--radius-sm); text-align: center;
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
+}
+.mp-guven-baslik { font-weight: 700; font-size: 13.5px; margin-top: 8px; }
+.mp-guven-aciklama { font-size: 12px; color: var(--hint); margin-top: 3px; line-height: 1.45; }
+
+/* ── Ürün vitrini ─────────────────────────────────────────── */
+
+.mp-chip-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+.mp-chip {
+  padding: 7px 13px; border-radius: 999px; border: none; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; font-family: inherit; color: var(--hint);
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark);
+}
+.mp-chip.active { color: #191b20; background: var(--gold); box-shadow: none; }
+
+.mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px; }
+
+.mp-product {
+  border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; text-align: left;
+  border: none; padding: 0; font-family: inherit; color: var(--text); width: 100%;
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
+  transition: transform 0.18s ease;
+  animation: mpFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.mp-product:hover { transform: translateY(-3px); }
+.mp-product-img {
+  position: relative; aspect-ratio: 4 / 3;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--inset-lo); color: var(--dim);
+}
+.mp-product-img img { width: 100%; height: 100%; object-fit: cover; }
+.mp-badge-tl { position: absolute; top: 7px; left: 7px; }
+.mp-product-body { padding: 10px 11px 12px; }
+.mp-product-name { font-weight: 700; font-size: 13.5px; line-height: 1.3; }
+.mp-product-meta { font-size: 11.5px; color: var(--hint); margin-top: 3px; }
+.mp-product-price { font-weight: 800; font-size: 15.5px; color: var(--orange); margin-top: 7px; }
+
+.mp-empty { text-align: center; color: var(--hint); font-size: 13px; padding: 26px 0; }
+
+/* ── Servis araçları (sorgu kısayolları) ──────────────────── */
+
+.mp-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 10px; }
+.mp-tool-btn {
+  display: flex; align-items: center; gap: 11px; text-align: left; cursor: pointer;
+  padding: 13px 14px; border-radius: var(--radius-sm); border: none; font-family: inherit;
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
+  color: var(--text); transition: transform 0.15s ease;
+}
+.mp-tool-btn:hover { transform: translateY(-2px); }
+.mp-tool-baslik { font-weight: 700; font-size: 13.5px; }
+.mp-tool-aciklama { font-size: 11.5px; color: var(--hint); margin-top: 2px; }
+
+/* ── Modal ────────────────────────────────────────────────── */
+
+.mp-modal-overlay {
+  position: fixed; inset: 0; z-index: 300; background: rgba(0, 0, 0, 0.62);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.mp-modal {
+  width: 100%; max-width: 440px; max-height: 86vh; overflow-y: auto;
+  border-radius: var(--radius); padding: 18px;
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
+  animation: mpFadeUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.mp-modal-title { font-weight: 800; font-size: 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+.mp-footer {
+  text-align: center; font-size: 12px; color: var(--dim);
+  padding: 26px 20px 34px; margin-top: 30px; border-top: 1px solid var(--divider);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MÜŞTERİ PORTALI — alt gezinmeli sekmeli mini uygulama
+   ══════════════════════════════════════════════════════════════ */
+
+.cp-root { min-height: 100dvh; background: var(--bg); padding-bottom: 80px; }
+
+.cp-header {
+  padding: 22px 20px 18px; border-bottom: 1px solid var(--divider);
+  background: linear-gradient(180deg, var(--surf-hi), var(--bg));
+}
+.cp-header-inner {
+  max-width: 620px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.cp-hello { font-size: 12px; color: var(--hint); }
+.cp-name { font-weight: 800; font-size: 19px; color: var(--text-strong); }
+
+.cp-body { max-width: 620px; margin: 0 auto; padding: 18px 20px 24px; }
+
+.cp-summary-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 10px; margin-bottom: 6px;
+}
+.cp-summary-card {
+  padding: 13px 15px; border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
+}
+.cp-summary-card .val { font-size: 21px; font-weight: 800; line-height: 1.15; }
+.cp-summary-card .lbl { font-size: 11.5px; color: var(--hint); margin-top: 3px; }
+
+.cp-section-title {
+  font-weight: 800; font-size: 15px; margin: 22px 0 10px;
+  display: flex; align-items: center; gap: 7px;
+}
+
+/* Tamir adım çizelgesi (Kayıt → Tamirde → Hazır → Teslim) */
+.cp-steps { display: flex; align-items: flex-start; margin-top: 14px; }
+.cp-step { flex: 1; text-align: center; position: relative; }
+.cp-step::before {
+  content: ""; position: absolute; top: 12px; left: -50%; width: 100%; height: 2px;
+  background: var(--divider);
+}
+.cp-step:first-child::before { display: none; }
+.cp-step.done::before { background: var(--gold); }
+.cp-step-dot {
+  position: relative; z-index: 1;
+  width: 26px; height: 26px; border-radius: 50%; margin: 0 auto 5px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); color: var(--dim); border: 2px solid var(--divider);
+}
+.cp-step.done .cp-step-dot { background: var(--gold); border-color: var(--gold); color: #191b20; }
+.cp-step.current .cp-step-dot { border-color: var(--gold); color: var(--gold); }
+.cp-step-label { font-size: 10.5px; color: var(--hint); line-height: 1.25; }
+.cp-step.done .cp-step-label,
+.cp-step.current .cp-step-label { color: var(--text); font-weight: 600; }
+
+/* Dükkanla sohbet */
+.cp-chat { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.cp-msg { max-width: 78%; padding: 9px 12px; border-radius: 14px; font-size: 13.5px; line-height: 1.4; }
+.cp-msg-time { font-size: 10px; opacity: 0.65; margin-top: 3px; }
+.cp-msg.ben { align-self: flex-end; background: var(--gold); color: #191b20; border-bottom-right-radius: 4px; }
+.cp-msg.dukkan {
+  align-self: flex-start; border-bottom-left-radius: 4px; color: var(--text);
+  background: linear-gradient(135deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: var(--edge-lit), var(--edge-dark);
+}
+
+.cp-bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
+  display: flex; justify-content: center; gap: 2px;
+  padding: 7px 8px calc(7px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, var(--surf-hi), var(--surf-lo));
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.05), 0 -8px 24px rgba(0, 0, 0, 0.45);
+}
+.cp-nav-btn {
+  position: relative; flex: 1; max-width: 118px; border: none; cursor: pointer;
+  background: none; font-family: inherit; color: var(--dim);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 2px; font-size: 10px; font-weight: 700;
+}
+.cp-nav-btn.active { color: var(--gold); }
+.cp-nav-badge {
+  position: absolute; top: 0; right: 50%; margin-right: -20px;
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
+  background: var(--red); color: #191b20; font-size: 9.5px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}

@@ -165,6 +165,72 @@ async def takas_teklifleri(
     return [dict(r) for r in rows]
 
 
+# ── MÜŞTERİ MESAJLARI (dükkan tarafı) ────────────────────────────────────
+
+@router.get("/musteri-mesajlari")
+async def musteri_mesaj_konusmalari(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Müşteri başına son mesaj + okunmamış sayısı — sohbet listesi."""
+    rows = await db.fetch(
+        """SELECT m.customer_id, c.name AS musteri_adi, c.phone AS telefon,
+                  MAX(m.created_at) AS son_mesaj_at,
+                  COUNT(*) FILTER (WHERE m.gonderen = 'musteri' AND m.okundu = false) AS okunmamis
+           FROM musteri_mesajlari m JOIN customers c ON c.id = m.customer_id
+           WHERE m.dukkan_id = $1
+           GROUP BY m.customer_id, c.name, c.phone
+           ORDER BY son_mesaj_at DESC""",
+        dukkan_id,
+    )
+    return [dict(r) for r in rows]
+
+
+@router.get("/musteri-mesajlari/{customer_id}")
+async def musteri_mesaj_gecmisi(
+    customer_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch(
+        """SELECT id, gonderen, mesaj, created_at FROM musteri_mesajlari
+           WHERE dukkan_id = $1 AND customer_id = $2 ORDER BY created_at""",
+        dukkan_id, customer_id,
+    )
+    await db.execute(
+        """UPDATE musteri_mesajlari SET okundu = true
+           WHERE dukkan_id = $1 AND customer_id = $2 AND gonderen = 'musteri' AND okundu = false""",
+        dukkan_id, customer_id,
+    )
+    return [dict(r) for r in rows]
+
+
+@router.post("/musteri-mesajlari/{customer_id}")
+async def musteri_mesaj_yanitla(
+    customer_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    mesaj = (body.get("mesaj") or "").strip()
+    if not mesaj:
+        raise HTTPException(400, "Mesaj boş olamaz")
+    sahibi = await db.fetchval(
+        "SELECT 1 FROM customers WHERE id = $1 AND dukkan_id = $2", customer_id, dukkan_id
+    )
+    if not sahibi:
+        raise HTTPException(404, "Müşteri bulunamadı")
+    await db.execute(
+        """INSERT INTO musteri_mesajlari (dukkan_id, customer_id, gonderen, mesaj)
+           VALUES ($1, $2, 'dukkan', $3)""",
+        dukkan_id, customer_id, mesaj,
+    )
+    return {"ok": True}
+
+
 @router.put("/takas-teklifleri/{id}")
 async def takas_teklifi_guncelle(
     id: int,

@@ -318,6 +318,18 @@ async def musteri_panelim(
            FROM takas_teklifleri WHERE dukkan_id = $1 AND telefon = $2 ORDER BY created_at DESC""",
         d["id"], musteri["phone"],
     )
+    borclar = await db.fetch(
+        """SELECT id, notes, amount, total_amount, paid_amount, payment_type,
+                  installment_count, due_date, created_at
+           FROM debts WHERE customer_id = $1 AND dukkan_id = $2 AND borc_turu = 'alacak'
+           ORDER BY created_at DESC""",
+        musteri["id"], d["id"],
+    )
+    okunmamis = await db.fetchval(
+        """SELECT COUNT(*) FROM musteri_mesajlari
+           WHERE customer_id = $1 AND gonderen = 'dukkan' AND okundu = false""",
+        musteri["id"],
+    )
     return {
         "ad": musteri["name"],
         "tamirler": [dict(r) for r in tamirler],
@@ -329,4 +341,72 @@ async def musteri_panelim(
         },
         "randevularim": [dict(r) for r in randevularim],
         "takaslarim": [dict(r) for r in takaslarim],
+        "borclar": [dict(r) for r in borclar],
+        "okunmamis_mesaj": okunmamis or 0,
     }
+
+
+@router.get("/dukkan/{slug}/musteri/borc/{borc_id}/odemeler")
+async def musteri_borc_odemeleri(
+    slug: str,
+    borc_id: int,
+    musteri: dict = Depends(get_current_musteri),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    d = await _dukkan_by_slug(db, slug)
+    if musteri["dukkan_id"] != d["id"]:
+        raise HTTPException(403, "Bu mağazaya ait bir oturum değil")
+    sahibi = await db.fetchval(
+        "SELECT 1 FROM debts WHERE id = $1 AND customer_id = $2 AND dukkan_id = $3",
+        borc_id, musteri["id"], d["id"],
+    )
+    if not sahibi:
+        raise HTTPException(404, "Borç bulunamadı")
+    rows = await db.fetch(
+        "SELECT amount, payment_type, paid_at FROM debt_payments WHERE debt_id = $1 ORDER BY paid_at DESC",
+        borc_id,
+    )
+    return [dict(r) for r in rows]
+
+
+@router.get("/dukkan/{slug}/musteri/mesajlarim")
+async def musteri_mesajlarim(
+    slug: str,
+    musteri: dict = Depends(get_current_musteri),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    d = await _dukkan_by_slug(db, slug)
+    if musteri["dukkan_id"] != d["id"]:
+        raise HTTPException(403, "Bu mağazaya ait bir oturum değil")
+    rows = await db.fetch(
+        """SELECT id, gonderen, mesaj, created_at FROM musteri_mesajlari
+           WHERE customer_id = $1 AND dukkan_id = $2 ORDER BY created_at""",
+        musteri["id"], d["id"],
+    )
+    await db.execute(
+        """UPDATE musteri_mesajlari SET okundu = true
+           WHERE customer_id = $1 AND gonderen = 'dukkan' AND okundu = false""",
+        musteri["id"],
+    )
+    return [dict(r) for r in rows]
+
+
+@router.post("/dukkan/{slug}/musteri/mesajlarim")
+async def musteri_mesaj_gonder(
+    slug: str,
+    body: dict,
+    musteri: dict = Depends(get_current_musteri),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    d = await _dukkan_by_slug(db, slug)
+    if musteri["dukkan_id"] != d["id"]:
+        raise HTTPException(403, "Bu mağazaya ait bir oturum değil")
+    mesaj = (body.get("mesaj") or "").strip()
+    if not mesaj:
+        raise HTTPException(400, "Mesaj boş olamaz")
+    await db.execute(
+        """INSERT INTO musteri_mesajlari (dukkan_id, customer_id, gonderen, mesaj)
+           VALUES ($1, $2, 'musteri', $3)""",
+        d["id"], musteri["id"], mesaj,
+    )
+    return {"ok": True}
