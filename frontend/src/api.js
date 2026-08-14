@@ -317,4 +317,17 @@ export const api = {
   destekHesapSilmeTalebi: () => post("/destek/hesap-silme-talebi", {}),
   destekHesapSilmeTalebiIptal: () => post("/destek/hesap-silme-talebi/iptal", {}),
   destekHesapDurumu: () => get("/destek/hesap-durumu"),
+
+  // Vitrin (dükkan ayarları + randevu talepleri)
+  vitrinAyarlarim: () => get("/vitrin/ayarlarim"),
+  vitrinAyarlariGuncelle: (body) => put("/vitrin/ayarlarim", body),
+  vitrinRandevuTalepleri: () => get("/vitrin/randevu-talepleri"),
+  vitrinRandevuDurumGuncelle: (id, durum) => put(`/vitrin/randevu-talepleri/${id}/durum`, { durum }),
+
+  // Public (kayıtsız erişim — Landing + Mağaza portalı)
+  publicPlanlar: () => get("/public/planlar"),
+  publicDukkan: (slug) => get(`/public/dukkan/${slug}`),
+  publicTamirDurumu: (slug, q) => get(`/public/dukkan/${slug}/tamir-durumu?q=${encodeURIComponent(q)}`),
+  publicCihazlar: (slug) => get(`/public/dukkan/${slug}/cihazlar`),
+  publicRandevuTalebi: (slug, body) => post(`/public/dukkan/${slug}/randevu`, body),
 };

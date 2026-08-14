@@ -4,6 +4,8 @@ import { Clock, User, TriangleAlert, Wrench } from "lucide-react";
 import { api, getToken, setToken } from "./api";
 import Login from "./pages/Login";
 import Kayit from "./pages/Kayit";
+import Landing from "./pages/Landing";
+import MagazaPublic from "./pages/MagazaPublic";
 
 function BekleyenEkran({ user }) {
   return (
@@ -54,6 +56,8 @@ import Stats from "./pages/Stats";
 import Search from "./pages/Search";
 import SuperAdmin from "./pages/SuperAdmin";
 import Destek from "./pages/Destek";
+import VitrinAyarlari from "./pages/VitrinAyarlari";
+import RandevuTalepleri from "./pages/RandevuTalepleri";
 import "./index.css";
 
 // Kenar kaydırma (sol kenardan sağa → geri) + geri butonu
@@ -151,6 +155,8 @@ function AppRoutes({ user }) {
         <Route path="/search" element={<Search />} />
         <Route path="/geri-bildirim" element={<GeriBildirim user={user} />} />
         <Route path="/destek" element={<Destek />} />
+        <Route path="/vitrin-ayarlari" element={<VitrinAyarlari />} />
+        <Route path="/randevu-talepleri" element={<RandevuTalepleri />} />
       </Routes>
       <BottomNav />
     </NavShell>
@@ -215,15 +221,19 @@ function Korumali({ children }) {
   return children(user);
 }
 
+function AuthedRoot() {
+  return <Korumali>{(user) => user.rol === "super_admin" ? <SuperAdmin /> : <AppRoutes user={user} />}</Korumali>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/giris" element={<Login />} />
         <Route path="/kayit" element={<Kayit />} />
-        <Route path="/*" element={
-          <Korumali>{(user) => user.rol === "super_admin" ? <SuperAdmin /> : <AppRoutes user={user} />}</Korumali>
-        } />
+        <Route path="/magaza/:slug" element={<MagazaPublic />} />
+        <Route path="/" element={getToken() ? <AuthedRoot /> : <Landing />} />
+        <Route path="/*" element={<AuthedRoot />} />
       </Routes>
     </BrowserRouter>
   );

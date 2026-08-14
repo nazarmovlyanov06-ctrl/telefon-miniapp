@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS dukkanlar (
     silme_talep_tarihi TIMESTAMP,
     plan TEXT DEFAULT 'deneme',
     referans_kod TEXT,
+    vitrin_aktif BOOLEAN DEFAULT true,
+    vitrin_aciklama TEXT,
+    calisma_saatleri TEXT,
+    hizmetler TEXT,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -500,6 +504,17 @@ CREATE TABLE IF NOT EXISTS platform_planlar (
     tur TEXT PRIMARY KEY,
     ad TEXT NOT NULL,
     fiyat REAL NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS randevu_talepleri (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    musteri_adi TEXT NOT NULL,
+    telefon TEXT NOT NULL,
+    cihaz_model TEXT,
+    aciklama TEXT,
+    durum TEXT DEFAULT 'yeni',
+    created_at TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS platform_duyurular (

@@ -4,7 +4,7 @@ import {
   Landmark, TrendingDown, Target, CreditCard,
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
-  Banknote, BarChart3, ScanLine, Settings, LogOut,
+  Banknote, BarChart3, ScanLine, Settings, LogOut, Store, CalendarClock,
 } from "lucide-react";
 import { setToken } from "../api";
 
@@ -36,6 +36,11 @@ const MUSTERI = [
   { path: "/loaner", icon: PhoneCall, label: "Yedek Telefon" },
   { path: "/karalist", icon: Ban, label: "Kara Liste" },
   { path: "/geri-bildirim", icon: MessageSquareWarning, label: "Şikayet / Övgü" },
+];
+
+const MAGAZA = [
+  { path: "/vitrin-ayarlari", icon: Store, label: "Vitrin Ayarları" },
+  { path: "/randevu-talepleri", icon: CalendarClock, label: "Randevu Talepleri" },
 ];
 
 const ARACLAR = [
@@ -87,6 +92,7 @@ export default function Sidebar({ dukkanAdi, user }) {
       <Grup label="Finans" items={FINANS} pathname={pathname} navigate={navigate} />
       <Grup label="Satış & Stok" items={SATIS_STOK} pathname={pathname} navigate={navigate} />
       <Grup label="Müşteri" items={MUSTERI} pathname={pathname} navigate={navigate} />
+      <Grup label="Mağaza" items={MAGAZA} pathname={pathname} navigate={navigate} />
       <Grup label="Araçlar" items={ARACLAR} pathname={pathname} navigate={navigate} />
       <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--divider)" }}>
         {user && (

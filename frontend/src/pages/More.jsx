@@ -6,6 +6,7 @@ import {
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
   Banknote, BarChart3, ScanLine, Settings, LogOut, LifeBuoy, Megaphone, X,
+  Store, CalendarClock,
 } from "lucide-react";
 
 const ITEMS = [
@@ -25,6 +26,9 @@ const ITEMS = [
   { icon: PhoneCall, label: "Yedek Tel", path: "/loaner", color: "var(--blue)" },
   { icon: Ban, label: "Kara Liste", path: "/karalist", color: "var(--red)" },
   { icon: MessageSquareWarning, label: "Şikayet/Övgü", path: "/geri-bildirim", color: "var(--orange)", badge: true },
+  // Mağaza
+  { icon: Store, label: "Vitrin Ayarları", path: "/vitrin-ayarlari", color: "var(--gold)" },
+  { icon: CalendarClock, label: "Randevu Talepleri", path: "/randevu-talepleri", color: "var(--blue)" },
   // Çalışan
   { icon: Banknote, label: "Maaş", path: "/maas", color: "var(--purple)" },
   // Araçlar
