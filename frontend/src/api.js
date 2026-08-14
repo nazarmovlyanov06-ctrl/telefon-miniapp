@@ -46,6 +46,35 @@ const put = (path, body) => request(path, { method: "PUT", body: JSON.stringify(
 const patch = (path, body) => request(path, { method: "PATCH", body: JSON.stringify(body) });
 const del = (path) => request(path, { method: "DELETE" });
 
+async function uploadFile(path, file) {
+  const token = getToken();
+  const form = new FormData();
+  form.append("dosya", file);
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// Excel/PDF gibi ikili dosya indirmeleri — request()'in JSON parse'ını atlar.
+async function downloadFile(path, filename) {
+  const token = getToken();
+  const res = await fetch(`${BASE}${path}`, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   // Auth
   me: () => get("/auth/me"),
@@ -262,13 +291,30 @@ export const api = {
   adminDestekKonusmalari: () => get("/admin/destek"),
   adminDestekGecmisi: (dukkanId) => get(`/admin/destek/${dukkanId}`),
   adminDestekYanitla: (dukkanId, mesaj) => post(`/admin/destek/${dukkanId}`, { mesaj }),
+  adminDestekDosyaYanitla: (dukkanId, file) => uploadFile(`/admin/destek/${dukkanId}/dosya`, file),
   adminAudit: () => get("/admin/audit"),
+  adminAuditExport: () => downloadFile("/admin/audit/export", "aktivite.xlsx"),
   adminDuyuruGonder: (dukkan_ids, mesaj) => post("/admin/duyuru-gonder", { dukkan_ids, mesaj }),
   adminDuyurular: () => get("/admin/duyurular"),
+  adminSilinecekDukkanlar: () => get("/admin/silinecek-dukkanlar"),
+  adminSilmeIptal: (id) => post(`/admin/dukkanlar/${id}/silme-iptal`, {}),
+  adminKaliciSil: (id, onay_adi) => post(`/admin/dukkanlar/${id}/kalici-sil`, { onay_adi }),
+  adminPlanlar: () => get("/admin/planlar"),
+  adminPlanFiyatGuncelle: (tur, fiyat) => put(`/admin/planlar/${tur}`, { fiyat }),
+  adminSetPlan: (id, plan) => put(`/admin/dukkanlar/${id}/plan`, { plan }),
+  adminMaliDurumExport: () => downloadFile("/admin/mali-durum/export", "mali-durum.xlsx"),
+  adminReferansKodlari: () => get("/admin/referans-kodlari"),
+  adminReferansKoduEkle: (body) => post("/admin/referans-kodlari", body),
+  adminReferansKoduAktiflik: (id) => put(`/admin/referans-kodlari/${id}/aktif`, {}),
+  adminReferansKoduSil: (id) => del(`/admin/referans-kodlari/${id}`),
 
   // Destek (dükkan tarafı)
   destekMesajlarim: () => get("/destek/mesajlarim"),
   destekMesajGonder: (mesaj) => post("/destek/mesajlarim", { mesaj }),
+  destekMesajDosyaGonder: (file) => uploadFile("/destek/mesajlarim/dosya", file),
   destekDuyurularim: () => get("/destek/duyurularim"),
   destekDuyuruGorundu: (id) => post(`/destek/duyurularim/${id}/gorundu`, {}),
+  destekHesapSilmeTalebi: () => post("/destek/hesap-silme-talebi", {}),
+  destekHesapSilmeTalebiIptal: () => post("/destek/hesap-silme-talebi/iptal", {}),
+  destekHesapDurumu: () => get("/destek/hesap-durumu"),
 };

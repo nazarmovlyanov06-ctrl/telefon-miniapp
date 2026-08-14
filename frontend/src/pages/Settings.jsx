@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { Crown, Wrench, ShoppingBag, GraduationCap, Settings2, CircleX, Plus, ClipboardList, User, Pause, Play, Trash2 } from "lucide-react";
+import { Crown, Wrench, ShoppingBag, GraduationCap, Settings2, CircleX, Plus, ClipboardList, User, Pause, Play, Trash2, AlertTriangle } from "lucide-react";
 
 const ROLES = [
   { key: "patron", label: "Patron", icon: Crown },
@@ -24,18 +24,42 @@ export default function Settings({ user }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ email: "", ad: "", sifre: "", rol: "cirak" });
   const [err, setErr] = useState("");
+  const [hesapDurumu, setHesapDurumu] = useState(null);
+  const [silmeBusy, setSilmeBusy] = useState(false);
   const navigate = useNavigate();
 
   const load = () => {
     if (user?.rol === "patron") {
       api.users().then(setUsers).finally(() => setLoading(false));
       api.aktiviteFeed().then(setFeed).catch(() => {});
+      api.destekHesapDurumu().then(setHesapDurumu).catch(() => {});
     } else {
       setLoading(false);
     }
   };
 
   useEffect(() => { load(); }, [user]);
+
+  async function silmeTalebi() {
+    if (!confirm("Dükkânınız için silme talebinde bulunmak istediğinize emin misiniz? 30 gün sonra tüm verileriniz kalıcı olarak silinir. Bu süre içinde istediğiniz zaman iptal edebilirsiniz.")) return;
+    setSilmeBusy(true);
+    try {
+      await api.destekHesapSilmeTalebi();
+      const d = await api.destekHesapDurumu();
+      setHesapDurumu(d);
+    } catch (e) { alert(e.message); }
+    finally { setSilmeBusy(false); }
+  }
+
+  async function silmeIptal() {
+    setSilmeBusy(true);
+    try {
+      await api.destekHesapSilmeTalebiIptal();
+      const d = await api.destekHesapDurumu();
+      setHesapDurumu(d);
+    } catch (e) { alert(e.message); }
+    finally { setSilmeBusy(false); }
+  }
 
   async function changeRole(u, rol) {
     await api.changeRole(u.id, rol);
@@ -188,6 +212,30 @@ export default function Settings({ user }) {
               )}
             </div>
           ))}
+
+          <div className="card" style={{ marginTop: 20, borderLeft: "3px solid var(--danger)" }}>
+            <div style={{ fontWeight: 700, marginBottom: 8, color: "var(--danger)", display: "flex", alignItems: "center", gap: 7 }}>
+              <AlertTriangle size={15} strokeWidth={2} /> Tehlikeli Bölge
+            </div>
+            {hesapDurumu?.silme_talep_tarihi ? (
+              <>
+                <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 10 }}>
+                  Hesap silme talebiniz alındı. {new Date(hesapDurumu.kalici_silme_tarihi).toLocaleDateString("tr-TR")} tarihinde
+                  tüm verileriniz kalıcı olarak silinecek. İstediğiniz zaman iptal edebilirsiniz.
+                </div>
+                <button className="btn btn-ghost btn-sm" disabled={silmeBusy} onClick={silmeIptal}>Silme Talebini İptal Et</button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 10 }}>
+                  Dükkânınızı ve tüm verilerinizi silmek isterseniz talepte bulunun — 30 gün bekleme
+                  süresi sonunda kalıcı olarak silinir, bu süre içinde vazgeçebilirsiniz.
+                </div>
+                <button className="btn btn-sm" style={{ background: "var(--red)", color: "#fff" }}
+                  disabled={silmeBusy} onClick={silmeTalebi}>Hesap Silme Talebinde Bulun</button>
+              </>
+            )}
+          </div>
         </>
       )}
     </div>

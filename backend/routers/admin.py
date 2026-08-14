@@ -1,13 +1,18 @@
+import io
+import math
 from datetime import datetime, timedelta
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from database import get_db
 from auth import require_super_admin
+from photo_storage import save_upload
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 _GECERLI_DURUMLAR = ("deneme", "aktif", "askida", "iptal")
+_SILME_BEKLEME_GUN = 30
 
 
 async def _audit(db: asyncpg.Connection, dukkan_id: int | None, dukkan_ad: str | None, aksiyon: str, detay: str | None = None):
@@ -21,7 +26,6 @@ def _kalan_gun(abonelik_bitis) -> int | None:
     if abonelik_bitis is None:
         return None
     delta = abonelik_bitis - datetime.utcnow()
-    import math
     return math.ceil(delta.total_seconds() / 86400)
 
 
@@ -34,13 +38,14 @@ async def list_dukkanlar(
 ):
     rows = await db.fetch(
         """SELECT d.id, d.ad, d.slug, d.telefon, d.sehir, d.abonelik_durumu,
-                  d.abonelik_bitis, d.created_at,
+                  d.abonelik_bitis, d.created_at, d.plan, d.referans_kod, d.silme_talep_tarihi,
                   (SELECT COUNT(*) FROM kullanicilar k WHERE k.dukkan_id = d.id) AS kullanici_sayisi,
                   (SELECT COUNT(*) FROM repairs r WHERE r.dukkan_id = d.id) AS tamir_sayisi,
                   (SELECT ad FROM kullanicilar k WHERE k.dukkan_id = d.id AND k.rol = 'patron' ORDER BY k.id LIMIT 1) AS patron_ad,
                   (SELECT email FROM kullanicilar k WHERE k.dukkan_id = d.id AND k.rol = 'patron' ORDER BY k.id LIMIT 1) AS patron_email,
                   (SELECT MAX(son_giris_at) FROM kullanicilar k WHERE k.dukkan_id = d.id) AS son_giris
            FROM dukkanlar d
+           WHERE d.silme_talep_tarihi IS NULL
            ORDER BY d.created_at DESC"""
     )
     out = []
@@ -66,6 +71,25 @@ async def set_abonelik_durumu(
         raise HTTPException(404, "Dükkan bulunamadı")
     await db.execute("UPDATE dukkanlar SET abonelik_durumu = $1 WHERE id = $2", durum, dukkan_id)
     await _audit(db, dukkan_id, row["ad"], "durum", f"-> {durum}")
+    return {"ok": True}
+
+
+@router.put("/dukkanlar/{dukkan_id}/plan")
+async def set_plan(
+    dukkan_id: int,
+    body: dict,
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    plan = body.get("plan")
+    gecerli = await db.fetchval("SELECT 1 FROM platform_planlar WHERE tur = $1", plan)
+    if not gecerli:
+        raise HTTPException(400, "Geçersiz plan")
+    row = await db.fetchrow("SELECT ad FROM dukkanlar WHERE id = $1", dukkan_id)
+    if not row:
+        raise HTTPException(404, "Dükkan bulunamadı")
+    await db.execute("UPDATE dukkanlar SET plan = $1 WHERE id = $2", plan, dukkan_id)
+    await _audit(db, dukkan_id, row["ad"], "plan", f"-> {plan}")
     return {"ok": True}
 
 
@@ -122,6 +146,65 @@ async def toplu_sure_uzat(
     return {"ok": True, "guncellenen": len(ids)}
 
 
+# ── HESAP KALICI SİLME ─────────────────────────────────────────────────────
+
+@router.get("/silinecek-dukkanlar")
+async def silinecek_dukkanlar(
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch(
+        "SELECT id, ad, silme_talep_tarihi FROM dukkanlar WHERE silme_talep_tarihi IS NOT NULL ORDER BY silme_talep_tarihi"
+    )
+    out = []
+    for r in rows:
+        d = dict(r)
+        kalici_tarih = d["silme_talep_tarihi"] + timedelta(days=_SILME_BEKLEME_GUN)
+        d["kalici_silme_tarihi"] = kalici_tarih
+        d["silinebilir"] = datetime.utcnow() >= kalici_tarih
+        out.append(d)
+    return out
+
+
+@router.post("/dukkanlar/{dukkan_id}/silme-iptal")
+async def silme_iptal(
+    dukkan_id: int,
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    row = await db.fetchrow("SELECT ad FROM dukkanlar WHERE id = $1", dukkan_id)
+    if not row:
+        raise HTTPException(404, "Dükkan bulunamadı")
+    await db.execute("UPDATE dukkanlar SET silme_talep_tarihi = NULL WHERE id = $1", dukkan_id)
+    await _audit(db, dukkan_id, row["ad"], "silme_iptal")
+    return {"ok": True}
+
+
+@router.post("/dukkanlar/{dukkan_id}/kalici-sil")
+async def kalici_sil(
+    dukkan_id: int,
+    body: dict,
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    row = await db.fetchrow("SELECT ad, silme_talep_tarihi FROM dukkanlar WHERE id = $1", dukkan_id)
+    if not row:
+        raise HTTPException(404, "Dükkan bulunamadı")
+    if not row["silme_talep_tarihi"]:
+        raise HTTPException(400, "Bu dükkan için silme talebi yok")
+    kalici_tarih = row["silme_talep_tarihi"] + timedelta(days=_SILME_BEKLEME_GUN)
+    if datetime.utcnow() < kalici_tarih:
+        raise HTTPException(400, f"30 günlük bekleme süresi dolmadı (bitiş: {kalici_tarih.date()})")
+    if (body.get("onay_adi") or "").strip() != row["ad"]:
+        raise HTTPException(400, "Onay için dükkan adını birebir aynı yazmalısınız")
+
+    # dukkan_id kolonlu tüm tablolar ON DELETE CASCADE ile bağlı — dükkan silinince
+    # otomatik temizlenir. platform_audit_log SET NULL ile ayrık tutulur (geçmiş kalsın).
+    await db.execute("DELETE FROM dukkanlar WHERE id = $1", dukkan_id)
+    await _audit(db, None, row["ad"], "kalici_silme", f"dukkan_id={dukkan_id} kalıcı silindi")
+    return {"ok": True}
+
+
 # ── İSTATİSTİK ───────────────────────────────────────────────────────────
 
 @router.get("/istatistik")
@@ -176,7 +259,40 @@ async def ozet(
     destek_okunmamis = await db.fetchval(
         "SELECT COUNT(*) FROM destek_mesajlari WHERE gonderen_rol = 'dukkan' AND okundu = false"
     )
-    return {"abonelik_yaklasan": yaklasan or 0, "destek_okunmamis": destek_okunmamis or 0}
+    silme_bekleyen = await db.fetchval("SELECT COUNT(*) FROM dukkanlar WHERE silme_talep_tarihi IS NOT NULL")
+    return {
+        "abonelik_yaklasan": yaklasan or 0,
+        "destek_okunmamis": destek_okunmamis or 0,
+        "silme_bekleyen": silme_bekleyen or 0,
+    }
+
+
+# ── PLANLAR ──────────────────────────────────────────────────────────────
+
+@router.get("/planlar")
+async def planlar(
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch("SELECT tur, ad, fiyat FROM platform_planlar ORDER BY fiyat")
+    return [dict(r) for r in rows]
+
+
+@router.put("/planlar/{tur}")
+async def plan_fiyat_guncelle(
+    tur: str,
+    body: dict,
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    fiyat = body.get("fiyat")
+    if fiyat is None:
+        raise HTTPException(400, "fiyat gerekli")
+    result = await db.execute("UPDATE platform_planlar SET fiyat = $1 WHERE tur = $2", float(fiyat), tur)
+    if result == "UPDATE 0":
+        raise HTTPException(404, "Plan bulunamadı")
+    await _audit(db, None, None, "plan_fiyat", f"{tur} -> {fiyat}₺")
+    return {"ok": True}
 
 
 # ── MALİ DURUM ───────────────────────────────────────────────────────────
@@ -187,11 +303,18 @@ async def mali_durum(
     db: asyncpg.Connection = Depends(get_db),
 ):
     aktif_sayisi = await db.fetchval("SELECT COUNT(*) FROM dukkanlar WHERE abonelik_durumu = 'aktif'")
+    gelir = await db.fetchval(
+        """SELECT COALESCE(SUM(p.fiyat), 0) FROM dukkanlar d
+           JOIN platform_planlar p ON p.tur = d.plan
+           WHERE d.abonelik_durumu = 'aktif'"""
+    )
     giderler = await db.fetch("SELECT id, tur, tutar, aciklama, tarih FROM platform_giderler ORDER BY tarih DESC, id DESC")
     toplam_gider = sum((g["tutar"] or 0) for g in giderler)
     return {
         "aktif_dukkan_sayisi": aktif_sayisi,
+        "tahmini_aylik_gelir": gelir or 0,
         "toplam_gider": toplam_gider,
+        "net": (gelir or 0) - toplam_gider,
         "giderler": [dict(g) for g in giderler],
     }
 
@@ -226,6 +349,30 @@ async def gider_sil(
     return {"ok": True}
 
 
+@router.get("/mali-durum/export")
+async def mali_durum_export(
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    from openpyxl import Workbook
+
+    giderler = await db.fetch("SELECT tur, tutar, aciklama, tarih FROM platform_giderler ORDER BY tarih DESC")
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Giderler"
+    ws.append(["Tür", "Tutar (₺)", "Açıklama", "Tarih"])
+    for g in giderler:
+        ws.append([g["tur"], g["tutar"], g["aciklama"] or "", g["tarih"]])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=mali-durum.xlsx"},
+    )
+
+
 # ── DESTEK ───────────────────────────────────────────────────────────────
 
 @router.get("/destek")
@@ -256,7 +403,8 @@ async def destek_gecmisi(
         dukkan_id,
     )
     rows = await db.fetch(
-        "SELECT id, gonderen_rol, gonderen_ad, mesaj, created_at FROM destek_mesajlari WHERE dukkan_id = $1 ORDER BY id",
+        """SELECT id, gonderen_rol, gonderen_ad, mesaj, dosya_url, dosya_adi, dosya_tipi, created_at
+           FROM destek_mesajlari WHERE dukkan_id = $1 ORDER BY id""",
         dukkan_id,
     )
     return [dict(r) for r in rows]
@@ -283,6 +431,29 @@ async def destek_yanitla(
     return {"ok": True}
 
 
+@router.post("/destek/{dukkan_id}/dosya")
+async def destek_dosya_yanitla(
+    dukkan_id: int,
+    dosya: UploadFile = File(...),
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    dukkan = await db.fetchrow("SELECT ad FROM dukkanlar WHERE id = $1", dukkan_id)
+    if not dukkan:
+        raise HTTPException(404, "Dükkan bulunamadı")
+    try:
+        url, ad, tip = await save_upload(dosya, "destek", dukkan_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await db.execute(
+        """INSERT INTO destek_mesajlari (dukkan_id, gonderen_rol, gonderen_ad, mesaj, okundu, dosya_url, dosya_adi, dosya_tipi)
+           VALUES ($1, 'platform', 'Destek', '', true, $2, $3, $4)""",
+        dukkan_id, url, ad, tip,
+    )
+    await _audit(db, dukkan_id, dukkan["ad"], "destek_yanit", f"[dosya: {ad}]")
+    return {"ok": True, "dosya_url": url}
+
+
 # ── AKTİVİTE ─────────────────────────────────────────────────────────────
 
 @router.get("/audit")
@@ -294,6 +465,32 @@ async def audit_log(
         "SELECT id, dukkan_id, dukkan_ad, aksiyon, detay, created_at FROM platform_audit_log ORDER BY created_at DESC LIMIT 100"
     )
     return [dict(r) for r in rows]
+
+
+@router.get("/audit/export")
+async def audit_export(
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    from openpyxl import Workbook
+
+    rows = await db.fetch(
+        "SELECT dukkan_ad, aksiyon, detay, created_at FROM platform_audit_log ORDER BY created_at DESC"
+    )
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Aktivite"
+    ws.append(["Tarih", "Dükkân", "İşlem", "Detay"])
+    for r in rows:
+        ws.append([r["created_at"].strftime("%Y-%m-%d %H:%M"), r["dukkan_ad"] or "—", r["aksiyon"], r["detay"] or ""])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=aktivite.xlsx"},
+    )
 
 
 # ── DUYURU ───────────────────────────────────────────────────────────────
@@ -331,3 +528,67 @@ async def duyuru_gecmisi(
            FROM platform_duyurular d ORDER BY d.created_at DESC LIMIT 30"""
     )
     return [dict(r) for r in rows]
+
+
+# ── İŞBİRLİĞİ / REFERANS KODLARI ─────────────────────────────────────────
+
+@router.get("/referans-kodlari")
+async def referans_kodlari(
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch("SELECT id, kod, sahip_adi, aciklama, indirim_yuzdesi, komisyon_yuzdesi, aktif FROM referans_kodlari ORDER BY created_at DESC")
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["kayit"] = await db.fetchval("SELECT COUNT(*) FROM dukkanlar WHERE referans_kod = $1", r["kod"])
+        out.append(d)
+    return out
+
+
+@router.post("/referans-kodlari")
+async def referans_kodu_ekle(
+    body: dict,
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    kod = (body.get("kod") or "").strip()
+    sahip_adi = (body.get("sahip_adi") or "").strip()
+    if not kod or not sahip_adi:
+        raise HTTPException(400, "kod ve sahip_adi gerekli")
+    var_mi = await db.fetchval("SELECT 1 FROM referans_kodlari WHERE kod = $1", kod)
+    if var_mi:
+        raise HTTPException(400, "Bu kod zaten var")
+    await db.execute(
+        """INSERT INTO referans_kodlari (kod, sahip_adi, aciklama, indirim_yuzdesi, komisyon_yuzdesi)
+           VALUES ($1, $2, $3, $4, $5)""",
+        kod, sahip_adi, body.get("aciklama"),
+        int(body.get("indirim_yuzdesi") or 0), int(body.get("komisyon_yuzdesi") or 0),
+    )
+    await _audit(db, None, None, "referans_ekle", kod)
+    return {"ok": True}
+
+
+@router.put("/referans-kodlari/{ref_id}/aktif")
+async def referans_kodu_aktiflik(
+    ref_id: int,
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    row = await db.fetchrow("SELECT aktif FROM referans_kodlari WHERE id = $1", ref_id)
+    if not row:
+        raise HTTPException(404, "Kod bulunamadı")
+    await db.execute("UPDATE referans_kodlari SET aktif = $1 WHERE id = $2", not row["aktif"], ref_id)
+    return {"ok": True}
+
+
+@router.delete("/referans-kodlari/{ref_id}")
+async def referans_kodu_sil(
+    ref_id: int,
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    result = await db.execute("DELETE FROM referans_kodlari WHERE id = $1", ref_id)
+    if result == "DELETE 0":
+        raise HTTPException(404, "Kod bulunamadı")
+    return {"ok": True}

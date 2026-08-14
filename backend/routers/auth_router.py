@@ -22,6 +22,7 @@ class KayitBody(BaseModel):
     email: EmailStr
     sifre: str
     telefon: str | None = None
+    referans_kod: str | None = None
 
 
 class GirisBody(BaseModel):
@@ -45,10 +46,17 @@ async def kayit_ol(body: KayitBody, db: asyncpg.Connection = Depends(get_db)):
         i += 1
         slug = f"{slug_base}-{i}"
 
+    referans_kod = None
+    if body.referans_kod:
+        gecerli = await db.fetchval(
+            "SELECT kod FROM referans_kodlari WHERE kod = $1 AND aktif = true", body.referans_kod.strip()
+        )
+        referans_kod = gecerli  # geçersizse sessizce yok sayılır, kayıt engellenmez
+
     async with db.transaction():
         dukkan = await db.fetchrow(
-            "INSERT INTO dukkanlar (ad, slug, telefon, abonelik_durumu) VALUES ($1, $2, $3, 'deneme') RETURNING id",
-            body.dukkan_adi, slug, body.telefon,
+            "INSERT INTO dukkanlar (ad, slug, telefon, abonelik_durumu, referans_kod) VALUES ($1, $2, $3, 'deneme', $4) RETURNING id",
+            body.dukkan_adi, slug, body.telefon, referans_kod,
         )
         kullanici = await db.fetchrow(
             """INSERT INTO kullanicilar (dukkan_id, email, sifre_hash, ad, rol, durum)

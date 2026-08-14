@@ -17,7 +17,8 @@ export default function Kayit({ onGiris }) {
     if (form.sifre.length < 6) { setErr("Şifre en az 6 karakter olmalı"); return; }
     setLoading(true);
     try {
-      const r = await api.kayitOl({ ...form, email: form.email.trim().toLowerCase() });
+      const refKod = new URLSearchParams(window.location.search).get("ref") || undefined;
+      const r = await api.kayitOl({ ...form, email: form.email.trim().toLowerCase(), referans_kod: refKod });
       setToken(r.token);
       onGiris?.();
       navigate("/");

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { LifeBuoy, Send } from "lucide-react";
+import { LifeBuoy, Send, Paperclip, Bot } from "lucide-react";
+import DestekMesajIcerik from "../components/DestekMesajIcerik";
 
 export default function Destek() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export default function Destek() {
   const [yeni, setYeni] = useState("");
   const [busy, setBusy] = useState(false);
   const bottomRef = useRef(null);
+  const dosyaInputRef = useRef(null);
 
   function load() {
     api.destekMesajlarim().then(setMesajlar).finally(() => setLoading(false));
@@ -25,6 +27,18 @@ export default function Destek() {
       setYeni("");
       load();
     } finally { setBusy(false); }
+  }
+
+  async function dosyaSec(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    try {
+      await api.destekMesajDosyaGonder(file);
+      load();
+    } catch (e) { alert(e.message); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -49,7 +63,12 @@ export default function Destek() {
               background: m.gonderen_rol === "dukkan" ? "var(--accent)" : "var(--card)",
               color: m.gonderen_rol === "dukkan" ? "#fff" : "var(--text)", fontSize: 14, lineHeight: 1.5,
             }}>
-              {m.mesaj}
+              {m.gonderen_rol === "ai" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, opacity: 0.75, marginBottom: 3, fontWeight: 600 }}>
+                  <Bot size={11} strokeWidth={2} /> Destek Asistanı
+                </div>
+              )}
+              <DestekMesajIcerik mesaj={m.mesaj} dosyaUrl={m.dosya_url} dosyaAdi={m.dosya_adi} dosyaTipi={m.dosya_tipi} />
               <div style={{ fontSize: 10, opacity: 0.7, marginTop: 4 }}>{new Date(m.created_at).toLocaleString("tr-TR")}</div>
             </div>
           </div>
@@ -59,9 +78,15 @@ export default function Destek() {
 
       <div style={{ flexShrink: 0, background: "var(--bg)", padding: "10px 16px 16px", borderTop: "1px solid var(--border)" }}>
         <div style={{ display: "flex", gap: 8 }}>
+          <input type="file" ref={dosyaInputRef} onChange={dosyaSec} style={{ display: "none" }}
+            accept="image/*,.pdf,audio/*,video/*" />
+          <button className="btn btn-ghost" disabled={busy} onClick={() => dosyaInputRef.current?.click()}
+            style={{ borderRadius: 24, width: 44, height: 44, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Paperclip size={16} strokeWidth={2} />
+          </button>
           <input className="form-input" style={{ flex: 1, borderRadius: 24 }} placeholder="Mesajınızı yazın..."
             value={yeni} onChange={e => setYeni(e.target.value)} onKeyDown={e => e.key === "Enter" && gonder()} disabled={busy} />
-          <button className="btn btn-primary" style={{ borderRadius: 24, width: 44, height: 44, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+          <button className="btn btn-primary" style={{ borderRadius: 24, width: 44, height: 44, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
             onClick={gonder} disabled={busy || !yeni.trim()}>
             <Send size={16} strokeWidth={2} />
           </button>

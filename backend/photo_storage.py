@@ -30,6 +30,36 @@ def save_photo(data_uri: str, subdir: str, entity_id: int) -> str:
     return f"/uploads/{subdir}/{entity_id}/{dosya_adi}"
 
 
+_IZINLI_UZANTILAR = {
+    "jpg": "image", "jpeg": "image", "png": "image", "webp": "image", "gif": "image",
+    "pdf": "pdf",
+    "mp3": "audio", "wav": "audio", "m4a": "audio", "ogg": "audio", "webm": "audio",
+    "mp4": "video", "mov": "video",
+}
+
+
+async def save_upload(upload, subdir: str, entity_id: int) -> tuple[str, str, str]:
+    """FastAPI UploadFile'ı diske yazar. (url_path, dosya_adi, dosya_tipi) döner.
+    dosya_tipi: image/pdf/audio/video — frontend'de doğru önizlemeyi seçmek için."""
+    orijinal_ad = upload.filename or "dosya"
+    ext = orijinal_ad.rsplit(".", 1)[-1].lower() if "." in orijinal_ad else ""
+    tip = _IZINLI_UZANTILAR.get(ext)
+    if not tip:
+        raise ValueError(f"Desteklenmeyen dosya türü: .{ext}")
+
+    icerik = await upload.read()
+    if len(icerik) > 15 * 1024 * 1024:
+        raise ValueError("Dosya çok büyük (max 15MB)")
+
+    klasor = os.path.join(_UPLOAD_ROOT, subdir, str(entity_id))
+    os.makedirs(klasor, exist_ok=True)
+    dosya_adi = f"{uuid.uuid4().hex}.{ext}"
+    with open(os.path.join(klasor, dosya_adi), "wb") as f:
+        f.write(icerik)
+
+    return f"/uploads/{subdir}/{entity_id}/{dosya_adi}", orijinal_ad, tip
+
+
 def delete_photo(url_path: str) -> None:
     """Diskteki dosyayı siler; bulunamazsa/eskiyse (eski base64 kayıtları) sessizce geçer."""
     if not url_path or not url_path.startswith("/uploads/"):

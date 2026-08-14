@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, setToken } from "../api";
+import DestekMesajIcerik from "../components/DestekMesajIcerik";
 import {
-  ShieldAlert, Store, BarChart3, Wallet, LifeBuoy, Activity,
+  ShieldAlert, Store, BarChart3, Wallet, LifeBuoy, Activity, Handshake,
   Users, Wrench, TrendingUp, CircleX, Clock, Search, Send, Trash2,
   Plus, X, ChevronUp, ChevronDown, Megaphone, Infinity as InfinityIcon, LogOut,
+  Download, Paperclip, AlertTriangle,
 } from "lucide-react";
 
 const TABS = [
@@ -12,6 +14,7 @@ const TABS = [
   { key: "mali", label: "Mali Durum", icon: Wallet },
   { key: "destek", label: "Destek", icon: LifeBuoy },
   { key: "aktivite", label: "Aktivite", icon: Activity },
+  { key: "isbirligi", label: "İşbirliği", icon: Handshake },
 ];
 
 const DURUM_META = {
@@ -47,10 +50,11 @@ function KalanRozet({ d }) {
 
 // ── Dükkânlar sekmesi ────────────────────────────────────────────────────
 
-function TenantYonet({ dukkan, onClose, onChanged }) {
+function TenantYonet({ dukkan, planlar, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [kesinTarih, setKesinTarih] = useState("");
+  const [plan, setPlan] = useState(dukkan.plan || "deneme");
 
   async function islem(fn) {
     setBusy(true); setErr("");
@@ -100,7 +104,7 @@ function TenantYonet({ dukkan, onClose, onChanged }) {
         </div>
 
         <div className="section-title">Abonelik Durumu</div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
           {Object.entries(DURUM_META).map(([key, m]) => (
             <button key={key} disabled={busy || dukkan.abonelik_durumu === key}
               onClick={() => islem(() => api.adminSetAbonelik(dukkan.id, key))}
@@ -110,6 +114,19 @@ function TenantYonet({ dukkan, onClose, onChanged }) {
             </button>
           ))}
         </div>
+
+        {planlar && planlar.length > 0 && (
+          <>
+            <div className="section-title">Plan</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <select className="form-select" value={plan} onChange={e => setPlan(e.target.value)} style={{ flex: 1 }}>
+                {planlar.map(p => <option key={p.tur} value={p.tur}>{p.ad} — {p.fiyat.toLocaleString("tr-TR")}₺/ay</option>)}
+              </select>
+              <button className="btn btn-primary btn-sm" disabled={busy || plan === dukkan.plan}
+                onClick={() => islem(() => api.adminSetPlan(dukkan.id, plan))}>Kaydet</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -151,6 +168,60 @@ function DuyuruYaz({ aliciSayisi, onGonder, onClose }) {
   );
 }
 
+function SilinecekDukkanlarPaneli({ onChanged }) {
+  const [liste, setListe] = useState([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+
+  function yukle() {
+    api.adminSilinecekDukkanlar().then(setListe).catch(() => {}).finally(() => setYukleniyor(false));
+  }
+  useEffect(() => { yukle(); }, []);
+
+  async function iptalEt(d) {
+    setBusyId(d.id);
+    try { await api.adminSilmeIptal(d.id); yukle(); onChanged(); }
+    catch (e) { alert(e.message); }
+    finally { setBusyId(null); }
+  }
+
+  async function kaliciSil(d) {
+    const girilen = prompt(`"${d.ad}" dükkanına ait TÜM veriler (müşteri, tamir, stok, kullanıcı — her şey) kalıcı olarak silinecek. Bu işlem GERİ ALINAMAZ.\n\nOnaylamak için dükkan adını aynen yazın:`);
+    if (girilen === null) return;
+    if (girilen.trim() !== d.ad) { alert("Girilen ad eşleşmedi, işlem iptal edildi."); return; }
+    setBusyId(d.id);
+    try { await api.adminKaliciSil(d.id, girilen.trim()); yukle(); onChanged(); }
+    catch (e) { alert(e.message); }
+    finally { setBusyId(null); }
+  }
+
+  if (yukleniyor || liste.length === 0) return null;
+
+  return (
+    <div className="card" style={{ marginBottom: 14, borderLeft: "3px solid var(--danger)" }}>
+      <div style={{ fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 7, color: "var(--danger)" }}>
+        <AlertTriangle size={15} strokeWidth={2} /> Silme Talebi Olan Dükkânlar ({liste.length})
+      </div>
+      {liste.map(d => (
+        <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--divider)" }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{d.ad}</div>
+            <div style={{ fontSize: 11.5, color: "var(--hint)" }}>
+              Talep: {tarihFmt(d.silme_talep_tarihi)} · Kalıcı silme: {tarihFmt(d.kalici_silme_tarihi)}
+              {!d.silinebilir && " · bekleme süresi dolmadı"}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <button className="btn btn-ghost btn-sm" disabled={busyId === d.id} onClick={() => iptalEt(d)}>İptal Et</button>
+            <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff" }}
+              disabled={!d.silinebilir || busyId === d.id} onClick={() => kaliciSil(d)}>Kalıcı Sil</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SortTh({ label, col, sort, setSort }) {
   const active = sort.col === col;
   return (
@@ -171,8 +242,9 @@ function DukkanlarTab({ ozet, onOzetChanged }) {
   const [duyuruAcik, setDuyuruAcik] = useState(false);
   const [topluBusy, setTopluBusy] = useState(false);
   const [sort, setSort] = useState({ col: "created_at", dir: "desc" });
+  const [planlar, setPlanlar] = useState([]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); api.adminPlanlar().then(setPlanlar).catch(() => {}); }, []);
 
   async function load() {
     setLoading(true);
@@ -229,6 +301,7 @@ function DukkanlarTab({ ozet, onOzetChanged }) {
 
   return (
     <>
+      <SilinecekDukkanlarPaneli onChanged={load} />
       <div className="stats-grid" style={{ marginBottom: 14 }}>
         <div className="stat-card"><div style={{ fontSize: 24, fontWeight: 800 }}>{list.length}</div><div className="stat-label">Toplam Dükkân</div></div>
         <div className="stat-card"><div style={{ fontSize: 24, fontWeight: 800, color: "var(--green)" }}>{aktifSayisi}</div><div className="stat-label">Aktif</div></div>
@@ -326,7 +399,7 @@ function DukkanlarTab({ ozet, onOzetChanged }) {
       )}
 
       {detay && (
-        <TenantYonet dukkan={detay} onClose={() => setDetay(null)}
+        <TenantYonet dukkan={detay} planlar={planlar} onClose={() => setDetay(null)}
           onChanged={() => { setDetay(null); load(); onOzetChanged(); }} />
       )}
       {duyuruAcik && (
@@ -416,14 +489,59 @@ const GIDER_TURLERI = [
   { value: "diger", label: "Diğer" },
 ];
 
+function PlanFiyatlari() {
+  const [planlar, setPlanlar] = useState([]);
+  const [duzenle, setDuzenle] = useState(false);
+  const [taslak, setTaslak] = useState({});
+
+  function load() { api.adminPlanlar().then(p => { setPlanlar(p); setTaslak(Object.fromEntries(p.map(x => [x.tur, x.fiyat]))); }); }
+  useEffect(() => { load(); }, []);
+
+  async function kaydet() {
+    for (const p of planlar) {
+      if (taslak[p.tur] !== p.fiyat) await api.adminPlanFiyatGuncelle(p.tur, parseFloat(taslak[p.tur]));
+    }
+    setDuzenle(false);
+    load();
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: duzenle ? 10 : 0 }}>
+        <div className="section-title" style={{ margin: 0 }}>Plan Fiyatları</div>
+        <button className="btn btn-ghost btn-sm" onClick={() => duzenle ? kaydet() : setDuzenle(true)}>{duzenle ? "Kaydet" : "Düzenle"}</button>
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: duzenle ? 0 : 10 }}>
+        {planlar.map(p => (
+          <div key={p.tur} style={{ fontSize: 13 }}>
+            <span style={{ color: "var(--hint)" }}>{p.ad}: </span>
+            {duzenle ? (
+              <input className="form-input" type="number" style={{ width: 90, display: "inline-block" }}
+                value={taslak[p.tur] ?? p.fiyat} onChange={e => setTaslak(t => ({ ...t, [p.tur]: e.target.value }))} />
+            ) : (
+              <span style={{ fontWeight: 700 }}>{p.fiyat.toLocaleString("tr-TR")}₺</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MaliDurumTab() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [form, setForm] = useState({ tur: "sunucu", tutar: "", aciklama: "", tarih: new Date().toISOString().slice(0, 10) });
   const [formErr, setFormErr] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   function load() { api.adminMaliDurum().then(setData).catch(e => setErr(e.message)); }
   useEffect(() => { load(); }, []);
+
+  async function disaAktar() {
+    setExporting(true);
+    try { await api.adminMaliDurumExport(); } catch (e) { alert(e.message); } finally { setExporting(false); }
+  }
 
   async function ekle(e) {
     e.preventDefault(); setFormErr("");
@@ -445,13 +563,22 @@ function MaliDurumTab() {
 
   return (
     <>
-      <div className="stats-grid" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 14 }}>
+      <div className="stats-grid" style={{ marginBottom: 14 }}>
         <div className="stat-card"><div style={{ fontSize: 24, fontWeight: 800, color: "var(--green)" }}>{data.aktif_dukkan_sayisi}</div><div className="stat-label">Aktif Abone</div></div>
+        <div className="stat-card"><div style={{ fontSize: 24, fontWeight: 800, color: "var(--blue)" }}>{data.tahmini_aylik_gelir.toLocaleString("tr-TR")}₺</div><div className="stat-label">Tahmini Aylık Gelir</div></div>
         <div className="stat-card"><div style={{ fontSize: 24, fontWeight: 800, color: "var(--red)" }}>{data.toplam_gider.toLocaleString("tr-TR")}₺</div><div className="stat-label">Toplam Gider</div></div>
+        <div className="stat-card"><div style={{ fontSize: 24, fontWeight: 800, color: data.net >= 0 ? "var(--green)" : "var(--red)" }}>{data.net.toLocaleString("tr-TR")}₺</div><div className="stat-label">Net</div></div>
       </div>
 
+      <PlanFiyatlari />
+
       <div className="card" style={{ marginBottom: 14 }}>
-        <div className="section-title" style={{ marginTop: 0 }}>Yeni Gider Ekle</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 0, marginBottom: 10 }}>
+          <div className="section-title" style={{ margin: 0 }}>Yeni Gider Ekle</div>
+          <button className="btn btn-ghost btn-sm" disabled={exporting} onClick={disaAktar} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <Download size={12} strokeWidth={2} /> Excel
+          </button>
+        </div>
         <form onSubmit={ekle}>
           {formErr && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>{formErr}</div>}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
@@ -495,6 +622,7 @@ function DestekTab() {
   const [mesajlar, setMesajlar] = useState([]);
   const [yeniMesaj, setYeniMesaj] = useState("");
   const [busy, setBusy] = useState(false);
+  const dosyaInputRef = useRef(null);
 
   function loadKonusmalar() { api.adminDestekKonusmalari().then(setKonusmalar).catch(() => {}); }
   useEffect(() => { loadKonusmalar(); }, []);
@@ -515,6 +643,19 @@ function DestekTab() {
       const data = await api.adminDestekGecmisi(secili.dukkan_id);
       setMesajlar(data);
     } finally { setBusy(false); }
+  }
+
+  async function dosyaSec(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !secili) return;
+    setBusy(true);
+    try {
+      await api.adminDestekDosyaYanitla(secili.dukkan_id, file);
+      const data = await api.adminDestekGecmisi(secili.dukkan_id);
+      setMesajlar(data);
+    } catch (e) { alert(e.message); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -549,12 +690,18 @@ function DestekTab() {
                 background: m.gonderen_rol === "platform" ? "var(--accent)" : "var(--bg2)",
                 color: m.gonderen_rol === "platform" ? "#fff" : "var(--text)",
               }}>
-                <div style={{ fontSize: 13 }}>{m.mesaj}</div>
+                <DestekMesajIcerik mesaj={m.mesaj} dosyaUrl={m.dosya_url} dosyaAdi={m.dosya_adi} dosyaTipi={m.dosya_tipi} />
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 3 }}>{new Date(m.created_at).toLocaleString("tr-TR")}</div>
               </div>
             ))}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            <input type="file" ref={dosyaInputRef} onChange={dosyaSec} style={{ display: "none" }}
+              accept="image/*,.pdf,audio/*,video/*" />
+            <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => dosyaInputRef.current?.click()}
+              style={{ display: "flex", alignItems: "center", padding: "0 10px" }}>
+              <Paperclip size={14} strokeWidth={2} />
+            </button>
             <input className="form-input" style={{ flex: 1 }} placeholder="Yanıt yaz..." value={yeniMesaj}
               onChange={e => setYeniMesaj(e.target.value)} onKeyDown={e => e.key === "Enter" && gonder()} />
             <button className="btn btn-primary btn-sm" disabled={busy || !yeniMesaj.trim()} onClick={gonder}><Send size={14} strokeWidth={2} /></button>
@@ -573,12 +720,25 @@ const AKSIYON_ETIKET = {
 
 function AktiviteTab() {
   const [kayitlar, setKayitlar] = useState(null);
+  const [exporting, setExporting] = useState(false);
   useEffect(() => { api.adminAudit().then(setKayitlar).catch(() => setKayitlar([])); }, []);
+
+  async function disaAktar() {
+    setExporting(true);
+    try { await api.adminAuditExport(); } catch (e) { alert(e.message); } finally { setExporting(false); }
+  }
+
   if (!kayitlar) return <div className="loading">Yükleniyor...</div>;
-  if (kayitlar.length === 0) return <div className="empty">Henüz aktivite yok</div>;
 
   return (
     <>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+        <button className="btn btn-ghost btn-sm" disabled={exporting} onClick={disaAktar} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <Download size={12} strokeWidth={2} /> Excel
+        </button>
+      </div>
+      {kayitlar.length === 0 ? <div className="empty">Henüz aktivite yok</div> : (
+      <>
       <div className="mobile-list">
         {kayitlar.map(k => (
           <div key={k.id} className="list-item">
@@ -605,6 +765,94 @@ function AktiviteTab() {
           </tbody>
         </table>
       </div>
+      </>
+      )}
+    </>
+  );
+}
+
+// ── İşbirliği sekmesi ────────────────────────────────────────────────────
+
+function IsbirligiTab() {
+  const [liste, setListe] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ kod: "", sahip_adi: "", aciklama: "", indirim_yuzdesi: "0", komisyon_yuzdesi: "0" });
+  const [showForm, setShowForm] = useState(false);
+  const [err, setErr] = useState("");
+
+  function load() { api.adminReferansKodlari().then(setListe).finally(() => setLoading(false)); }
+  useEffect(() => { load(); }, []);
+
+  async function ekle(e) {
+    e.preventDefault(); setErr("");
+    try {
+      await api.adminReferansKoduEkle({
+        ...form,
+        indirim_yuzdesi: parseInt(form.indirim_yuzdesi) || 0,
+        komisyon_yuzdesi: parseInt(form.komisyon_yuzdesi) || 0,
+      });
+      setForm({ kod: "", sahip_adi: "", aciklama: "", indirim_yuzdesi: "0", komisyon_yuzdesi: "0" });
+      setShowForm(false);
+      load();
+    } catch (e) { setErr(e.message); }
+  }
+
+  async function aktiflikDegistir(id) { await api.adminReferansKoduAktiflik(id); load(); }
+  async function sil(id) { if (!confirm("Bu kod silinsin mi?")) return; await api.adminReferansKoduSil(id); load(); }
+
+  if (loading) return <div className="loading">Yükleniyor...</div>;
+
+  return (
+    <>
+      <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 14, lineHeight: 1.5 }}>
+        Kayıt linkine <code>?ref=kod</code> eklenerek paylaşılan referans kodları — dükkân o linkten
+        kayıt olduğunda kodu otomatik alır. Kayıt sayısı burada, tıklama sayısı için Faz 4'te
+        tanıtım sitesine bağlanacak.
+      </div>
+
+      <button className="btn btn-primary btn-sm" style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}
+        onClick={() => setShowForm(v => !v)}><Plus size={13} strokeWidth={2.4} /> Yeni Referans Kodu</button>
+
+      {showForm && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <form onSubmit={ekle}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>{err}</div>}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <input className="form-input" placeholder="Kod (örn: ahmet10)" required value={form.kod}
+                onChange={e => setForm(f => ({ ...f, kod: e.target.value }))} />
+              <input className="form-input" placeholder="Sahibi" required value={form.sahip_adi}
+                onChange={e => setForm(f => ({ ...f, sahip_adi: e.target.value }))} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <input className="form-input" type="number" placeholder="İndirim %" value={form.indirim_yuzdesi}
+                onChange={e => setForm(f => ({ ...f, indirim_yuzdesi: e.target.value }))} />
+              <input className="form-input" type="number" placeholder="Komisyon %" value={form.komisyon_yuzdesi}
+                onChange={e => setForm(f => ({ ...f, komisyon_yuzdesi: e.target.value }))} />
+            </div>
+            <input className="form-input" placeholder="Not (opsiyonel)" value={form.aciklama}
+              onChange={e => setForm(f => ({ ...f, aciklama: e.target.value }))} style={{ marginBottom: 10 }} />
+            <button type="submit" className="btn btn-primary btn-sm">Ekle</button>
+          </form>
+        </div>
+      )}
+
+      {liste.length === 0 ? (
+        <div className="empty"><div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}><Handshake size={40} stroke="var(--dim)" strokeWidth={1.5} /></div>Henüz referans kodu yok</div>
+      ) : liste.map(k => (
+        <div key={k.id} className="list-item">
+          <div className="list-item-body">
+            <div className="list-item-title">{k.kod} — {k.sahip_adi}</div>
+            <div className="list-item-sub">İndirim %{k.indirim_yuzdesi} · Komisyon %{k.komisyon_yuzdesi} · {k.kayit} kayıt{k.aciklama ? ` · ${k.aciklama}` : ""}</div>
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span className="badge" style={{ background: k.aktif ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.15)", color: k.aktif ? "var(--green)" : "var(--red)" }}>
+              {k.aktif ? "Aktif" : "Pasif"}
+            </span>
+            <button className="btn btn-ghost btn-sm" onClick={() => aktiflikDegistir(k.id)}>{k.aktif ? "Pasifleştir" : "Aktifleştir"}</button>
+            <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => sil(k.id)}><Trash2 size={13} strokeWidth={2} /></button>
+          </div>
+        </div>
+      ))}
     </>
   );
 }
@@ -675,6 +923,7 @@ export default function SuperAdmin() {
       {tab === "mali" && <MaliDurumTab />}
       {tab === "destek" && <DestekTab />}
       {tab === "aktivite" && <AktiviteTab />}
+      {tab === "isbirligi" && <IsbirligiTab />}
       </div>
     </div>
   );

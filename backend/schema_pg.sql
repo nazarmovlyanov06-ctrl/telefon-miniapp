@@ -11,6 +11,9 @@ CREATE TABLE IF NOT EXISTS dukkanlar (
     sehir TEXT,
     abonelik_durumu TEXT DEFAULT 'deneme',   -- deneme / aktif / askida / iptal
     abonelik_bitis TIMESTAMP,
+    silme_talep_tarihi TIMESTAMP,
+    plan TEXT DEFAULT 'deneme',
+    referans_kod TEXT,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -476,7 +479,27 @@ CREATE TABLE IF NOT EXISTS destek_mesajlari (
     gonderen_ad TEXT,
     mesaj TEXT NOT NULL,
     okundu BOOLEAN DEFAULT false,
+    dosya_url TEXT,
+    dosya_adi TEXT,
+    dosya_tipi TEXT,
     created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS referans_kodlari (
+    id SERIAL PRIMARY KEY,
+    kod TEXT UNIQUE NOT NULL,
+    sahip_adi TEXT NOT NULL,
+    aciklama TEXT,
+    indirim_yuzdesi INTEGER DEFAULT 0,
+    komisyon_yuzdesi INTEGER DEFAULT 0,
+    aktif BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS platform_planlar (
+    tur TEXT PRIMARY KEY,
+    ad TEXT NOT NULL,
+    fiyat REAL NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS platform_duyurular (
