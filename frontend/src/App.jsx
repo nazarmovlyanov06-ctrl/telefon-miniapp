@@ -53,11 +53,12 @@ import SifirCihaz from "./pages/SifirCihaz";
 import Stats from "./pages/Stats";
 import Search from "./pages/Search";
 import SuperAdmin from "./pages/SuperAdmin";
+import Destek from "./pages/Destek";
 import "./index.css";
 
 // Kenar kaydırma (sol kenardan sağa → geri) + geri butonu
 // Bu sayfalarda geri butonu ve paddingTop gösterilmez (kendi header'ları var)
-const ROOT_PATHS = ["/", "/repairs", "/customers", "/parts", "/more", "/search", "/ai"];
+const ROOT_PATHS = ["/", "/repairs", "/customers", "/parts", "/more", "/search", "/ai", "/destek"];
 
 function NavShell({ children, user }) {
   const navigate = useNavigate();
@@ -150,6 +151,7 @@ function AppRoutes({ user }) {
         <Route path="/search" element={<Search />} />
         <Route path="/geri-bildirim" element={<GeriBildirim user={user} />} />
         <Route path="/admin" element={user?.rol === "super_admin" ? <SuperAdmin /> : <Navigate to="/" replace />} />
+        <Route path="/destek" element={<Destek />} />
       </Routes>
       <BottomNav />
     </NavShell>

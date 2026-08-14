@@ -73,6 +73,8 @@ async def giris_yap(body: GirisBody, db: asyncpg.Connection = Depends(get_db)):
     if row["durum"] == "bekliyor":
         raise HTTPException(403, "Hesabiniz onay bekliyor")
 
+    await db.execute("UPDATE kullanicilar SET son_giris_at = now() WHERE id = $1", row["id"])
+
     token = olustur_token(row["id"], row["dukkan_id"], row["rol"])
 
     dukkan_slug = None

@@ -5,7 +5,7 @@ import {
   Landmark, TrendingDown, Target, CreditCard,
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
-  Banknote, BarChart3, ScanLine, Settings, ShieldAlert, LogOut,
+  Banknote, BarChart3, ScanLine, Settings, ShieldAlert, LogOut, LifeBuoy, Megaphone, X,
 } from "lucide-react";
 
 const ITEMS = [
@@ -30,6 +30,7 @@ const ITEMS = [
   // Araçlar
   { icon: BarChart3, label: "İstatistik", path: "/stats", color: "var(--gold)" },
   { icon: ScanLine, label: "IMEI", path: "/imei", color: "var(--gray)" },
+  { icon: LifeBuoy, label: "Destek", path: "/destek", color: "var(--blue2)" },
   { icon: Settings, label: "Ayarlar", path: "/settings", color: "var(--gray)" },
 ];
 
@@ -41,13 +42,17 @@ const ROLE_LABELS = {
 export default function More({ user }) {
   const navigate = useNavigate();
   const [bildirimSayisi, setBildirimSayisi] = useState(0);
+  const [duyurular, setDuyurular] = useState([]);
   const items = user?.rol === "super_admin"
     ? [...ITEMS, { icon: ShieldAlert, label: "Süper Admin", path: "/admin", color: "var(--red)" }]
     : ITEMS;
 
   useEffect(() => {
     api.geriBildirimBekleyen().then(r => setBildirimSayisi(r.bekleyen || 0)).catch(() => {});
-  }, []);
+    if (user?.rol !== "super_admin") {
+      api.destekDuyurularim().then(setDuyurular).catch(() => {});
+    }
+  }, [user]);
 
   function cikisYap() {
     if (!confirm("Çıkış yapmak istediğine emin misin?")) return;
@@ -55,8 +60,25 @@ export default function More({ user }) {
     window.location.href = "/giris";
   }
 
+  function duyuruGordum(id) {
+    api.destekDuyuruGorundu(id).catch(() => {});
+    setDuyurular(d => d.filter(x => x.id !== id));
+  }
+
   return (
     <div className="page" style={{ paddingBottom: 90 }}>
+      {duyurular.map(d => (
+        <div key={d.id} className="card" style={{ marginBottom: 10, background: "rgba(99,102,241,0.1)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <Megaphone size={16} stroke="var(--accent)" strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, lineHeight: 1.4 }}>{d.mesaj}</div>
+            <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 3 }}>{new Date(d.created_at).toLocaleDateString("tr-TR")}</div>
+          </div>
+          <button onClick={() => duyuruGordum(d.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex", flexShrink: 0 }}>
+            <X size={15} strokeWidth={2} />
+          </button>
+        </div>
+      ))}
       {user && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, padding: "4px 0" }}>
           <div style={{

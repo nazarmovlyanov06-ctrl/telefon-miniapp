@@ -66,6 +66,13 @@ async def get_current_user(
     if row["durum"] == "bekliyor":
         raise HTTPException(status_code=403, detail="Hesabiniz onay bekliyor")
 
+    if row["dukkan_id"] is not None and row["rol"] != ROLE_SUPER_ADMIN:
+        durum = await db.fetchval("SELECT abonelik_durumu FROM dukkanlar WHERE id = $1", row["dukkan_id"])
+        if durum == "askida":
+            raise HTTPException(status_code=403, detail="Dükkânınız askıya alınmış, lütfen destek ile iletişime geçin")
+        if durum == "iptal":
+            raise HTTPException(status_code=403, detail="Aboneliğiniz iptal edilmiş, lütfen destek ile iletişime geçin")
+
     return dict(row)
 
 

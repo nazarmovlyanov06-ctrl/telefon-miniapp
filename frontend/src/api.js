@@ -252,5 +252,23 @@ export const api = {
   // Super Admin
   adminDukkanlar: () => get("/admin/dukkanlar"),
   adminSetAbonelik: (id, durum) => patch(`/admin/dukkanlar/${id}/abonelik`, { durum }),
+  adminSureUzat: (id, body) => post(`/admin/dukkanlar/${id}/sure`, body),
+  adminTopluSureUzat: (dukkan_ids, gun) => post("/admin/dukkanlar/toplu-sure", { dukkan_ids, gun }),
   adminIstatistik: () => get("/admin/istatistik"),
+  adminOzet: () => get("/admin/ozet"),
+  adminMaliDurum: () => get("/admin/mali-durum"),
+  adminGiderEkle: (body) => post("/admin/giderler", body),
+  adminGiderSil: (id) => del(`/admin/giderler/${id}`),
+  adminDestekKonusmalari: () => get("/admin/destek"),
+  adminDestekGecmisi: (dukkanId) => get(`/admin/destek/${dukkanId}`),
+  adminDestekYanitla: (dukkanId, mesaj) => post(`/admin/destek/${dukkanId}`, { mesaj }),
+  adminAudit: () => get("/admin/audit"),
+  adminDuyuruGonder: (dukkan_ids, mesaj) => post("/admin/duyuru-gonder", { dukkan_ids, mesaj }),
+  adminDuyurular: () => get("/admin/duyurular"),
+
+  // Destek (dükkan tarafı)
+  destekMesajlarim: () => get("/destek/mesajlarim"),
+  destekMesajGonder: (mesaj) => post("/destek/mesajlarim", { mesaj }),
+  destekDuyurularim: () => get("/destek/duyurularim"),
+  destekDuyuruGorundu: (id) => post(`/destek/duyurularim/${id}/gorundu`, {}),
 };

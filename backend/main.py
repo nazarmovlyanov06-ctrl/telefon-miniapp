@@ -13,7 +13,7 @@ from routers import auth_router, users, customers, repairs, parts, shopping, ime
 from routers import (
     toptanci, ikinciel, garanti, kasa, gider, loaner,
     aksesuar, hedef, maas, karalist, parca_iade, ai_chat, sifir_cihaz,
-    arama, sablonlar, geri_bildirim, admin,
+    arama, sablonlar, geri_bildirim, admin, destek,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -76,6 +76,7 @@ app.include_router(arama.router)
 app.include_router(sablonlar.router)
 app.include_router(geri_bildirim.router)
 app.include_router(admin.router)
+app.include_router(destek.router)
 
 _uploads_dir = os.path.join(os.path.dirname(__file__), "..", "data", "uploads")
 os.makedirs(_uploads_dir, exist_ok=True)
