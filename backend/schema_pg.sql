@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
     rol TEXT DEFAULT 'cirak',        -- super_admin / patron / satis / teknisyen / cirak
     durum TEXT DEFAULT 'aktif',      -- aktif / bekliyor / pasif
     aktif BOOLEAN DEFAULT true,
+    son_giris_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT now(),
     UNIQUE(dukkan_id, email)
 );
@@ -447,6 +448,48 @@ CREATE TABLE IF NOT EXISTS calisan_geri_bildirim (
     mesaj TEXT NOT NULL,
     goruldu BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT now()
+);
+
+-- Süper admin paneli (Faz 3) — bkz. migrate_admin.sql (mevcut kurulumlar için)
+CREATE TABLE IF NOT EXISTS platform_audit_log (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER REFERENCES dukkanlar(id) ON DELETE SET NULL,
+    dukkan_ad TEXT,
+    aksiyon TEXT NOT NULL,
+    detay TEXT,
+    created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS platform_giderler (
+    id SERIAL PRIMARY KEY,
+    tur TEXT NOT NULL,
+    tutar REAL NOT NULL,
+    aciklama TEXT,
+    tarih TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS destek_mesajlari (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    gonderen_rol TEXT NOT NULL,
+    gonderen_ad TEXT,
+    mesaj TEXT NOT NULL,
+    okundu BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS platform_duyurular (
+    id SERIAL PRIMARY KEY,
+    mesaj TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS platform_duyuru_alicilari (
+    id SERIAL PRIMARY KEY,
+    duyuru_id INTEGER NOT NULL REFERENCES platform_duyurular(id) ON DELETE CASCADE,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    gorundu BOOLEAN DEFAULT false
 );
 
 -- Performans için tenant kolonlarına index

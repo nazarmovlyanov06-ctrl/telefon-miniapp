@@ -7,8 +7,8 @@ import {
 } from "lucide-react";
 import BrandModelPicker from "../components/BrandModelPicker";
 import PartTypePicker from "../components/PartTypePicker";
-import BrandLogo from "../components/BrandLogo";
 import PartsBrowser from "../components/PartsBrowser";
+import { partTypeIcon } from "../partTypeIcons";
 
 const TABS = [
   { key: "stok", label: "Stok" },
@@ -524,12 +524,18 @@ export default function Parts({ user }) {
             function renderPart(p) {
               const isSelected = selectedPart?.id === p.id;
               const SEBEP_LABEL = { tamir: "Tamire", satis: "Satış", hasar: "Hasar", diger: "Diğer", satin_alma: "Satın Alındı" };
+              const PartIcon = partTypeIcon(p.part_type);
               return (
                 <div key={p.id}>
                   {/* Parça satırı */}
                   <div className="list-item" style={{ background: isSelected ? "var(--bg2)" : undefined }}>
-                    <div style={{ display: "flex", position: "relative", zIndex: 1 }}>
-                      <BrandLogo marka={(p.device_model || "").split(" ")[0]} size={28} />
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      width: 30, height: 30, borderRadius: 9, flexShrink: 0, position: "relative", zIndex: 1,
+                      background: "linear-gradient(135deg, var(--surf-hi), var(--surf-lo))",
+                      boxShadow: "var(--edge-lit), var(--edge-dark)",
+                    }}>
+                      <PartIcon size={16} stroke="var(--hint)" strokeWidth={1.8} />
                     </div>
                     <div className="list-item-body" style={{ cursor: "pointer" }} onClick={() => openPanel(p, "ekle")}>
                       <div className="list-item-title">{p.name}</div>
