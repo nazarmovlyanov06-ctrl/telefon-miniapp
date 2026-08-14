@@ -1,8 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Smartphone, BatteryCharging, Camera, Box, Volume2, Zap, Settings, Radio, Package,
-  ChevronRight,
-} from "lucide-react";
+import { ChevronRight, Package } from "lucide-react";
 import BrandLogo from "./BrandLogo";
 
 const DIGER = "Diğer";
@@ -26,19 +23,6 @@ function grupla(products, keyFn) {
     .sort((a, b) => b.count - a.count);
 }
 
-function parcaTipiIkon(tip) {
-  const t = (tip || "").toLowerCase();
-  if (t.includes("ekran") || t.includes("cam")) return Smartphone;
-  if (t.includes("batarya") || t.includes("pil") || t.includes("şarj")) return BatteryCharging;
-  if (t.includes("kamera")) return Camera;
-  if (t.includes("kasa") || t.includes("kapak") || t.includes("vida") || t.includes("çıta")) return Box;
-  if (t.includes("hoparlör") || t.includes("ses") || t.includes("mikrofon") || t.includes("ahize") || t.includes("kulaklık")) return Volume2;
-  if (t.includes("flex")) return Zap;
-  if (t.includes("tuş") || t.includes("motor") || t.includes("sensör")) return Settings;
-  if (t.includes("anten") || t.includes("entegre") || t.includes("şebeke")) return Radio;
-  return Package;
-}
-
 function Kart({ children, onClick }) {
   return (
     <button type="button" onClick={onClick} className="brand-card">
@@ -48,14 +32,15 @@ function Kart({ children, onClick }) {
 }
 
 /**
- * Stok listesini Marka → Model → Parça Tipi katmanlı gezdirir (VarmiStok'un
- * BrandBrowser deseni). `parts`: {device_model, part_type, ...} listesi.
- * `renderLeaf(filteredParts)`: son katmanda (parça tipi seçilince) render edilecek.
+ * Stok listesini Marka → Model katmanlı gezdirir (VarmiStok'un BrandBrowser
+ * deseni, sadeleştirilmiş — parça tipi ayrı bir tıklama gerektirmiyor,
+ * modele girince parçalar direkt listelenir, tür her satırda etiket olarak görünür).
+ * `parts`: {device_model, part_type, ...} listesi.
+ * `renderLeaf(filteredParts)`: model seçilince render edilecek.
  */
 export default function PartsBrowser({ parts, renderLeaf }) {
   const [marka, setMarka] = useState(null);
   const [model, setModel] = useState(null);
-  const [parcaTipi, setParcaTipi] = useState(null);
 
   const markalar = useMemo(() => grupla(parts, p => (p.device_model || "").split(" ")[0]), [parts]);
 
@@ -67,35 +52,22 @@ export default function PartsBrowser({ parts, renderLeaf }) {
     );
   }, [parts, marka]);
 
-  const parcaTipleri = useMemo(() => {
-    if (!marka || !model) return [];
-    return grupla(
-      parts.filter(p => {
-        const pm = (p.device_model || "").split(" ")[0];
-        const md = (p.device_model || "").split(" ").slice(1).join(" ") || p.device_model;
-        return normKey(pm) === marka.key && normKey(md) === model.key;
-      }),
-      p => p.part_type
-    );
-  }, [parts, marka, model]);
-
   const leafParts = useMemo(() => {
-    if (!marka || !model || !parcaTipi) return [];
+    if (!marka || !model) return [];
     return parts.filter(p => {
       const pm = (p.device_model || "").split(" ")[0];
       const md = (p.device_model || "").split(" ").slice(1).join(" ") || p.device_model;
-      return normKey(pm) === marka.key && normKey(md) === model.key && normKey(p.part_type) === parcaTipi.key;
+      return normKey(pm) === marka.key && normKey(md) === model.key;
     });
-  }, [parts, marka, model, parcaTipi]);
+  }, [parts, marka, model]);
 
   if (parts.length === 0) {
     return <div className="empty"><div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}><Package size={40} stroke="var(--dim)" strokeWidth={1.5} /></div>Stokta parça yok</div>;
   }
 
-  const crumbs = [{ label: "Markalar", onClick: () => { setMarka(null); setModel(null); setParcaTipi(null); } }];
-  if (marka) crumbs.push({ label: marka.label, onClick: () => { setModel(null); setParcaTipi(null); } });
-  if (marka && model) crumbs.push({ label: model.label, onClick: () => setParcaTipi(null) });
-  if (marka && model && parcaTipi) crumbs.push({ label: parcaTipi.label, onClick: null });
+  const crumbs = [{ label: "Markalar", onClick: () => { setMarka(null); setModel(null); } }];
+  if (marka) crumbs.push({ label: marka.label, onClick: () => setModel(null) });
+  if (marka && model) crumbs.push({ label: model.label, onClick: null });
 
   return (
     <div>
@@ -138,22 +110,7 @@ export default function PartsBrowser({ parts, renderLeaf }) {
         </div>
       )}
 
-      {marka && model && !parcaTipi && (
-        <div className="brand-grid">
-          {parcaTipleri.map(t => {
-            const Icon = parcaTipiIkon(t.label);
-            return (
-              <Kart key={t.key} onClick={() => setParcaTipi(t)}>
-                <span className="brand-card-logo"><Icon size={26} stroke="var(--text)" strokeWidth={1.6} /></span>
-                <span className="brand-card-name">{t.label}</span>
-                <span className="brand-card-count">{t.count} parça</span>
-              </Kart>
-            );
-          })}
-        </div>
-      )}
-
-      {marka && model && parcaTipi && renderLeaf(leafParts)}
+      {marka && model && renderLeaf(leafParts)}
     </div>
   );
 }
