@@ -104,7 +104,15 @@
 .mp-hizmet-row { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin-top: 16px; }
 
 .mp-cta-row { display: flex; justify-content: center; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
-.mp-btn-lg { padding: 12px 24px !important; font-size: 14.5px !important; }
+/* .btn varsayılanı width:100% — hero'da yan yana durmaları için auto'ya çekiliyor. */
+.mp-cta-row .btn { width: auto; }
+.mp-btn-lg { padding: 13px 26px !important; font-size: 14.5px !important; min-height: 48px; }
+/* Hero'daki ghost buton arka planı olmadığı için düz yazı gibi görünüyordu. */
+.mp-cta-row .btn-ghost {
+  border: 1px solid var(--divider); color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+.mp-cta-row .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
 
 .mp-stats-row {
   display: flex; justify-content: center; gap: 34px; flex-wrap: wrap;
