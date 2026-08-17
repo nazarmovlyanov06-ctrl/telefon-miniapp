@@ -1,8 +1,26 @@
 import { useState } from "react";
 import { BRAND_SLUGS, BRAND_LOGO_FILES } from "../brands.js";
 
+// Ürün hattı adı ≠ marka adı. Stok/parça listelerinde marka, model adının ilk
+// kelimesinden çıkarılıyor ("iPhone 13" → "iPhone"), ama logo tablosunda karşılığı
+// "apple". Bu eşleme olmadan iPhone, Redmi, Galaxy gibi yaygın satırlarda logo
+// yerine baş-harf rozeti çıkıyordu.
+const MARKA_TAKMA_ADLARI = {
+  iphone: "apple", ipad: "apple", macbook: "apple", airpods: "apple", imac: "apple",
+  redmi: "xiaomi", poco: "xiaomi", mi: "xiaomi",
+  galaxy: "samsung",
+  nova: "huawei", mate: "huawei",
+  reno: "oppo", find: "oppo",
+  narzo: "realme",
+  spark: "tecno", camon: "tecno", pova: "tecno",
+  hot: "infinix", note: "infinix",
+  pixel: "google",
+  moto: "motorola", edge: "motorola",
+};
+
 function brandLogoUrl(marka, renk) {
-  const key = (marka || "").trim().toLowerCase();
+  const ham = (marka || "").trim().toLowerCase();
+  const key = MARKA_TAKMA_ADLARI[ham] || ham;
   const slug = BRAND_SLUGS[key];
   if (slug) return `https://cdn.simpleicons.org/${slug}/${renk}`;
   const yerelDosya = BRAND_LOGO_FILES[key];

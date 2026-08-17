@@ -561,6 +561,24 @@ async def main():
             random.choice([t[0] for t in TOPTANCILAR]), patron_id, g(random.randint(30, YIL)))
     print(f"Parça: {len(part_id)}")
 
+    # ── Parça siparişleri (Stok > Siparişler sekmesi) ────────────────
+    siparisler = []
+    for i in range(38):
+        parca = random.choice(PARCALAR)
+        gun = random.randint(0, 200)
+        geldi = i >= 9                     # 9 tanesi hâlâ yolda
+        siparisler.append((
+            dukkan_id, random.choice(toptanci_id), parca[0], parca[1],
+            random.randint(1, 6), parca[5],
+            "geldi" if geldi else "bekliyor",
+            random.choice([None, None, "Müşteri bekliyor", "Acil", "Kargo takip no verildi"]),
+            patron_id, g(gun), g(max(gun - random.randint(2, 6), 0)) if geldi else None))
+    await db.executemany(
+        """INSERT INTO part_orders (dukkan_id, supplier_id, part_name, device_model, quantity,
+               estimated_price, status, notes, ordered_by, ordered_at, arrived_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)""", siparisler)
+    print(f"Parça siparişi: {len(siparisler)}")
+
     # ── Tamirler ──────────────────────────────────────────────────────
     tamir_kayit, teslim_bilgi = [], []
     for i in range(TAMIR_SAYISI):
