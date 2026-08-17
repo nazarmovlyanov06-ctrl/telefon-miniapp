@@ -747,14 +747,18 @@ async def main():
     giderler = []
     for ay in range(12):
         temel = ay * 30 + random.randint(1, 8)
-        for kategori, tutar, aciklama in [
+        kalemler = [
             ("Kira", 28000, "Dükkan kirası"), ("Elektrik", random.randint(2800, 4200), "Elektrik faturası"),
             ("Su", random.randint(480, 780), "Su faturası"), ("İnternet", 890, "Fiber internet"),
-            ("Maaş", 106000, "Personel maaşları"),
             ("Malzeme", random.randint(4000, 12000), "Sarf malzeme"),
             ("Kargo", random.randint(800, 2400), "Kargo giderleri"),
             ("Vergi", random.randint(3000, 9000), "Vergi / SGK"),
-        ]:
+        ]
+        # Maaş ay sonunda ödenir — içinde bulunulan ay için henüz ödenmedi
+        # (maas_odemeleri'nde de o ay 'odendi=false' işaretli, tutarlı olsun).
+        if ay > 0:
+            kalemler.append(("Maaş", 106000, "Personel maaşları"))
+        for kategori, tutar, aciklama in kalemler:
             giderler.append((dukkan_id, kategori, tutar, aciklama, gs(temel), g(temel)))
             kasa.append((dukkan_id, gs(temel), "gider", "havale", tutar,
                          f"{kategori} — {aciklama}", "gider", g(temel)))
