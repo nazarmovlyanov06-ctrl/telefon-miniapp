@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, fotoUrl } from "../api";
-import { Store, CircleX, ExternalLink, Image, ImagePlus } from "lucide-react";
+import { Store, CircleX, ExternalLink, Image, ImagePlus, Images, Trash2 } from "lucide-react";
 
 export default function VitrinAyarlari() {
   const navigate = useNavigate();
@@ -10,10 +10,32 @@ export default function VitrinAyarlari() {
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [gorselYukleniyor, setGorselYukleniyor] = useState(null);
+  const [galeri, setGaleri] = useState([]);
   const logoInputRef = useRef(null);
   const kapakInputRef = useRef(null);
+  const galeriInputRef = useRef(null);
 
-  useEffect(() => { api.vitrinAyarlarim().then(setForm).catch(e => setErr(e.message)); }, []);
+  useEffect(() => {
+    api.vitrinAyarlarim().then(setForm).catch(e => setErr(e.message));
+    api.vitrinGaleri().then(setGaleri).catch(() => {});
+  }, []);
+
+  async function galeriEkle(file) {
+    setErr(""); setGorselYukleniyor("galeri");
+    try {
+      await api.vitrinGaleriEkle(file);
+      setGaleri(await api.vitrinGaleri());
+    } catch (e) { setErr(e.message); }
+    finally { setGorselYukleniyor(null); }
+  }
+
+  async function galeriSil(id) {
+    if (!confirm("Bu fotoğrafı galeriden kaldır?")) return;
+    try {
+      await api.vitrinGaleriSil(id);
+      setGaleri(g => g.filter(x => x.id !== id));
+    } catch (e) { setErr(e.message); }
+  }
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); setSaved(false); }
 
@@ -94,6 +116,45 @@ export default function VitrinAyarlari() {
           <input ref={kapakInputRef} type="file" accept="image/*" style={{ display: "none" }}
             onChange={e => { if (e.target.files[0]) gorselYukle("kapak", e.target.files[0]); e.target.value = ""; }} />
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--hint)", display: "flex", alignItems: "center", gap: 7 }}>
+            <Images size={14} strokeWidth={2} /> GALERİ
+          </div>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => galeriInputRef.current?.click()}
+            disabled={gorselYukleniyor === "galeri"}>
+            {gorselYukleniyor === "galeri" ? "Yükleniyor..." : "+ Fotoğraf"}
+          </button>
+        </div>
+        <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 10 }}>
+          Dükkân içi, ekip veya yaptığınız işlerden fotoğraflar — mağaza sayfanızda galeri bölümünde görünür.
+        </div>
+        <input ref={galeriInputRef} type="file" accept="image/*" style={{ display: "none" }}
+          onChange={e => { if (e.target.files[0]) galeriEkle(e.target.files[0]); e.target.value = ""; }} />
+
+        {galeri.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--hint)", textAlign: "center", padding: "10px 0" }}>
+            Henüz fotoğraf eklenmedi
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8 }}>
+            {galeri.map(g => (
+              <div key={g.id} style={{ position: "relative", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden" }}>
+                <img src={fotoUrl(g.foto_url)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <button type="button" onClick={() => galeriSil(g.id)}
+                  style={{
+                    position: "absolute", top: 4, right: 4, border: "none", cursor: "pointer",
+                    background: "rgba(0,0,0,0.65)", color: "var(--red)", borderRadius: 6,
+                    width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                  <Trash2 size={13} strokeWidth={2} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <form onSubmit={kaydet}>

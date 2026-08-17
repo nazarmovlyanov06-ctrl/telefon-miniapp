@@ -5,6 +5,13 @@ from auth import get_current_user, get_dukkan_id
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
+# sifre_hash ASLA istemciye gitmemeli (müşteri portalı şifresinin bcrypt
+# hash'i) — bu yüzden SELECT * yerine açık kolon listesi kullanılıyor.
+# portal_uye: müşteri kendi portal hesabını oluşturmuş mu.
+_MUSTERI_KOLONLARI = """id, dukkan_id, name, phone, notes, visit_count,
+       portal_kayit_at, dukkan_gordu, created_at,
+       (sifre_hash IS NOT NULL) AS portal_uye"""
+
 
 @router.get("/")
 async def list_customers(
@@ -15,17 +22,46 @@ async def list_customers(
 ):
     if q:
         rows = await db.fetch(
-            """SELECT * FROM customers
+            f"""SELECT {_MUSTERI_KOLONLARI} FROM customers
                WHERE dukkan_id = $1 AND (name ILIKE $2 OR phone ILIKE $2)
                ORDER BY created_at DESC LIMIT 50""",
             dukkan_id, f"%{q}%",
         )
     else:
         rows = await db.fetch(
-            "SELECT * FROM customers WHERE dukkan_id = $1 ORDER BY created_at DESC LIMIT 100",
+            f"SELECT {_MUSTERI_KOLONLARI} FROM customers WHERE dukkan_id = $1 ORDER BY created_at DESC LIMIT 100",
             dukkan_id,
         )
     return [dict(r) for r in rows]
+
+
+@router.get("/yeni-uyeler")
+async def yeni_uyeler(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Portalden kendisi kaydolmuş, dükkanın henüz görmediği müşteriler."""
+    rows = await db.fetch(
+        """SELECT id, name, phone, portal_kayit_at FROM customers
+           WHERE dukkan_id = $1 AND portal_kayit_at IS NOT NULL AND dukkan_gordu = false
+           ORDER BY portal_kayit_at DESC""",
+        dukkan_id,
+    )
+    return {"sayi": len(rows), "musteriler": [dict(r) for r in rows]}
+
+
+@router.post("/yeni-uyeleri-gordum")
+async def yeni_uyeleri_gordum(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    await db.execute(
+        "UPDATE customers SET dukkan_gordu = true WHERE dukkan_id = $1 AND dukkan_gordu = false",
+        dukkan_id,
+    )
+    return {"ok": True}
 
 
 @router.get("/{customer_id}")
@@ -36,7 +72,8 @@ async def get_customer(
     db: asyncpg.Connection = Depends(get_db),
 ):
     row = await db.fetchrow(
-        "SELECT * FROM customers WHERE id = $1 AND dukkan_id = $2", customer_id, dukkan_id
+        f"SELECT {_MUSTERI_KOLONLARI} FROM customers WHERE id = $1 AND dukkan_id = $2",
+        customer_id, dukkan_id,
     )
     if not row:
         raise HTTPException(404, "Musteri bulunamadi")

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Wrench, Home, Users, Package, Search, Sparkles,
@@ -7,7 +8,7 @@ import {
   Banknote, BarChart3, ScanLine, Settings, LogOut, Store, CalendarClock,
   Star, Repeat, MessageCircle,
 } from "lucide-react";
-import { setToken } from "../api";
+import { api, setToken } from "../api";
 
 const ANA = [
   { path: "/", icon: Home, label: "Ana Sayfa" },
@@ -55,12 +56,14 @@ const ARACLAR = [
   { path: "/settings", icon: Settings, label: "Ayarlar" },
 ];
 
-function Grup({ label, items, pathname, navigate }) {
+function Grup({ label, items, pathname, navigate, rozetler }) {
   return (
     <>
       {label && <div className="sidebar-group-label">{label}</div>}
+      {/* rozetler: { "/yol": sayi } — okunmamış bildirim rozeti */}
       {items.map((item) => {
         const Icon = item.icon;
+        const rozet = rozetler?.[item.path];
         return (
           <button
             key={item.path}
@@ -69,6 +72,14 @@ function Grup({ label, items, pathname, navigate }) {
           >
             <Icon />
             {item.label}
+            {rozet > 0 && (
+              <span style={{
+                marginLeft: "auto", minWidth: 18, height: 18, padding: "0 5px",
+                borderRadius: 999, background: "var(--red)", color: "#191b20",
+                fontSize: 10.5, fontWeight: 800,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>{rozet}</span>
+            )}
           </button>
         );
       })}
@@ -85,6 +96,15 @@ function cikisYap() {
 export default function Sidebar({ dukkanAdi, user }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const [rozetler, setRozetler] = useState({});
+
+  // Portalden kaydolan yeni müşteri bildirimi. Müşteriler sayfası açıldığında
+  // backend "görüldü" işaretlediği için rozet kendiliğinden sıfırlanır.
+  useEffect(() => {
+    api.yeniUyeler()
+      .then(r => setRozetler(x => ({ ...x, "/customers": r.sayi })))
+      .catch(() => {});
+  }, [pathname]);
 
   return (
     <nav className="sidebar">
@@ -92,7 +112,7 @@ export default function Sidebar({ dukkanAdi, user }) {
         <Wrench size={20} />
         {dukkanAdi || "Telefon Servis"}
       </div>
-      <Grup items={ANA} pathname={pathname} navigate={navigate} />
+      <Grup items={ANA} pathname={pathname} navigate={navigate} rozetler={rozetler} />
       <Grup label="Finans" items={FINANS} pathname={pathname} navigate={navigate} />
       <Grup label="Satış & Stok" items={SATIS_STOK} pathname={pathname} navigate={navigate} />
       <Grup label="Müşteri" items={MUSTERI} pathname={pathname} navigate={navigate} />

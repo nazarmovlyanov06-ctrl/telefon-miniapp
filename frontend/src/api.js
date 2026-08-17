@@ -364,6 +364,18 @@ export const api = {
   vitrinAyarlariGuncelle: (body) => put("/vitrin/ayarlarim", body),
   vitrinLogoYukle: (file) => uploadFile("/vitrin/logo", file),
   vitrinKapakYukle: (file) => uploadFile("/vitrin/kapak", file),
+  vitrinGaleri: () => get("/vitrin/galeri"),
+  vitrinGaleriEkle: (file) => uploadFile("/vitrin/galeri", file),
+  vitrinGaleriSil: (id) => del(`/vitrin/galeri/${id}`),
+
+  // Ürün görselleri (vitrinde gösterilir)
+  ikinciElGorselYukle: (id, file) => uploadFile(`/ikinciel/${id}/gorsel`, file),
+  sifirCihazGorselYukle: (id, file) => uploadFile(`/sifir-cihaz/${id}/gorsel`, file),
+  aksesuarGorselYukle: (id, file) => uploadFile(`/aksesuarlar/${id}/gorsel`, file),
+
+  // Portalden kaydolan yeni müşteriler (bildirim)
+  yeniUyeler: () => get("/customers/yeni-uyeler"),
+  yeniUyeleriGordum: () => post("/customers/yeni-uyeleri-gordum", {}),
   vitrinRandevuTalepleri: () => get("/vitrin/randevu-talepleri"),
   vitrinRandevuDurumGuncelle: (id, durum) => put(`/vitrin/randevu-talepleri/${id}/durum`, { durum }),
   vitrinDegerlendirmeler: () => get("/vitrin/degerlendirmeler"),
@@ -387,6 +399,7 @@ export const api = {
 
   // Müşteri portalı
   musteriKayit: (slug, body) => post(`/public/dukkan/${slug}/musteri/kayit`, body),
+  musteriAcikKayit: (slug, body) => post(`/public/dukkan/${slug}/musteri/kayit-ol`, body),
   musteriGiris: (slug, body) => post(`/public/dukkan/${slug}/musteri/giris`, body),
   musteriPanelim: (slug, token) => getWithToken(`/public/dukkan/${slug}/musteri/panelim`, token),
   musteriBorcOdemeleri: (slug, borcId, token) => getWithToken(`/public/dukkan/${slug}/musteri/borc/${borcId}/odemeler`, token),

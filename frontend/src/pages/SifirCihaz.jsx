@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import UrunGorsel from "../components/UrunGorsel";
 import ImeiInput from "../components/ImeiInput";
 import {
   Store, Package, CheckCircle2, CircleX, Smartphone, Trash2, Banknote,
@@ -257,7 +258,8 @@ export default function SifirCihaz({ user }) {
                 <div className="card" onClick={() => { setSelected(isSelected ? null : c); setShowSat(false); }} style={{ cursor: "pointer" }}>
                   <div className="card-row">
                     <div>
-                      <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 7 }}>
+                      <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                        <UrunGorsel url={c.gorsel_url} yukle={f => api.sifirCihazGorselYukle(c.id, f)} boyut={38} />
                         <Smartphone size={15} strokeWidth={2} /> {c.model}
                       </div>
                       {(c.renk || c.depolama) && (

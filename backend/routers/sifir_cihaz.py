@@ -1,7 +1,8 @@
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from database import get_db
 from auth import get_current_user, get_dukkan_id
+from photo_storage import save_upload
 from datetime import date
 
 router = APIRouter(prefix="/sifir-cihaz", tags=["sifir-cihaz"])
@@ -190,3 +191,28 @@ async def sat_cihaz(
                 dukkan_id, satis_tarihi, odeme, satis_fiyati, aciklama,
             )
     return {"ok": True}
+
+
+@router.post("/{kayit_id}/gorsel")
+async def gorsel_yukle(
+    kayit_id: int,
+    dosya: UploadFile = File(...),
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Vitrinde gosterilecek urun fotografi."""
+    var_mi = await db.fetchval(
+        "SELECT 1 FROM sifir_cihazlar WHERE id = $1 AND dukkan_id = $2", kayit_id, dukkan_id
+    )
+    if not var_mi:
+        raise HTTPException(404, "Kayit bulunamadi")
+    try:
+        url, _, _ = await save_upload(dosya, "sifir", dukkan_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await db.execute(
+        "UPDATE sifir_cihazlar SET gorsel_url = $1 WHERE id = $2 AND dukkan_id = $3",
+        url, kayit_id, dukkan_id,
+    )
+    return {"url": url}

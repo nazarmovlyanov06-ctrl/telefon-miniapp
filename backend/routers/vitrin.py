@@ -1,5 +1,5 @@
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from database import get_db
 from auth import get_current_user, get_dukkan_id, require_patron
 from photo_storage import save_upload
@@ -163,6 +163,53 @@ async def takas_teklifleri(
         dukkan_id,
     )
     return [dict(r) for r in rows]
+
+
+# ── GALERİ ───────────────────────────────────────────────────────────────
+
+@router.get("/galeri")
+async def galeri_listele(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch(
+        "SELECT id, foto_url, baslik, created_at FROM dukkan_galeri WHERE dukkan_id = $1 ORDER BY id DESC",
+        dukkan_id,
+    )
+    return [dict(r) for r in rows]
+
+
+@router.post("/galeri")
+async def galeri_ekle(
+    dosya: UploadFile = File(...),
+    baslik: str = Form(""),
+    dukkan_id: int = Depends(get_dukkan_id),
+    _patron: dict = Depends(require_patron),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    try:
+        url, _, _ = await save_upload(dosya, "galeri", dukkan_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    row = await db.fetchrow(
+        "INSERT INTO dukkan_galeri (dukkan_id, foto_url, baslik) VALUES ($1, $2, $3) RETURNING id",
+        dukkan_id, url, baslik or None,
+    )
+    return {"id": row["id"], "foto_url": url}
+
+
+@router.delete("/galeri/{foto_id}")
+async def galeri_sil(
+    foto_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    _patron: dict = Depends(require_patron),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    sonuc = await db.execute("DELETE FROM dukkan_galeri WHERE id = $1 AND dukkan_id = $2", foto_id, dukkan_id)
+    if sonuc == "DELETE 0":
+        raise HTTPException(404, "Fotoğraf bulunamadı")
+    return {"ok": True}
 
 
 # ── MÜŞTERİ MESAJLARI (dükkan tarafı) ────────────────────────────────────

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import ImeiInput from "../components/ImeiInput";
+import UrunGorsel from "../components/UrunGorsel";
 import {
   Store, Package, CheckCircle2, Search, CircleX, User, Smartphone,
   HardDrive, Cpu, Wrench, Trash2, Banknote, Phone, Radio, History,
@@ -307,8 +308,11 @@ export default function IkinciEl({ user }) {
               <div key={c.id}>
                 <div className="card" onClick={() => selectCihaz(c)} style={{ cursor: "pointer" }}>
                   <div className="card-row" style={{ marginBottom: 6, alignItems: "flex-start" }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 7 }}>
-                      <Smartphone size={16} strokeWidth={2} /> {c.model}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <UrunGorsel url={c.gorsel_url} yukle={f => api.ikinciElGorselYukle(c.id, f)} />
+                      <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 7 }}>
+                        <Smartphone size={16} strokeWidth={2} /> {c.model}
+                      </div>
                     </div>
                     <div style={{ textAlign: "right", minWidth: 80 }}>
                       <div style={{ fontWeight: 700 }}>

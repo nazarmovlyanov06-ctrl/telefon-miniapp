@@ -46,6 +46,16 @@ CREATE TABLE IF NOT EXISTS customers (
     notes TEXT,
     visit_count INTEGER DEFAULT 0,
     sifre_hash TEXT,
+    portal_kayit_at TIMESTAMP,          -- doluysa müşteri portalden kendisi kaydolmuş
+    dukkan_gordu BOOLEAN DEFAULT true,  -- yeni üye bildirimi görüldü mü
+    created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS dukkan_galeri (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    foto_url TEXT NOT NULL,
+    baslik TEXT,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -251,6 +261,7 @@ CREATE TABLE IF NOT EXISTS ikinci_el (
     musteri_telefon TEXT,
     kaynak TEXT DEFAULT 'dukkan',
     customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+    gorsel_url TEXT,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -328,7 +339,8 @@ CREATE TABLE IF NOT EXISTS aksesuarlar (
     stok INTEGER DEFAULT 0,
     alis_fiyati REAL NOT NULL,
     satis_fiyati REAL NOT NULL,
-    kategori TEXT DEFAULT 'Diğer'
+    kategori TEXT DEFAULT 'Diğer',
+    gorsel_url TEXT
 );
 
 CREATE TABLE IF NOT EXISTS aksesuar_satislar (
@@ -414,6 +426,7 @@ CREATE TABLE IF NOT EXISTS sifir_cihazlar (
     odeme_yontemi TEXT DEFAULT 'nakit',
     notlar TEXT,
     customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+    gorsel_url TEXT,
     created_at TIMESTAMP DEFAULT now()
 );
 

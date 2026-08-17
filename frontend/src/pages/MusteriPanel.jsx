@@ -66,9 +66,12 @@ function AdimCizelgesi({ status }) {
 function GirisKayitForm({ slug, onGiris }) {
   const [tab, setTab] = useState("giris");
   const [giris, setGiris] = useState({ telefon: "", sifre: "" });
+  const [yeni, setYeni] = useState({ ad: "", telefon: "", sifre: "" });
   const [kayit, setKayit] = useState({ repair_no: "", telefon: "", yeni_sifre: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+
+  function sekmeDegis(t) { setTab(t); setErr(""); }
 
   async function girisYap(e) {
     e.preventDefault(); setErr(""); setBusy(true);
@@ -77,6 +80,24 @@ function GirisKayitForm({ slug, onGiris }) {
       localStorage.setItem(tokenKey(slug), r.token);
       onGiris();
     } catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  /** Tamir kaydı olmayan yeni müşteri. Numaranın geçmişi varsa backend
+   * reddeder ve kullanıcıyı "Tamir No ile" sekmesine yönlendiririz. */
+  async function yeniKayit(e) {
+    e.preventDefault(); setErr(""); setBusy(true);
+    try {
+      const r = await api.musteriAcikKayit(slug, yeni);
+      localStorage.setItem(tokenKey(slug), r.token);
+      onGiris();
+    } catch (e) {
+      setErr(e.message);
+      if (/servis kaydı/i.test(e.message)) {
+        setKayit(k => ({ ...k, telefon: yeni.telefon }));
+        setTab("tamirno");
+      }
+    }
     finally { setBusy(false); }
   }
 
@@ -102,12 +123,34 @@ function GirisKayitForm({ slug, onGiris }) {
 
       <div className="card">
         <div className="tabs" style={{ marginBottom: 14 }}>
-          <button className={`tab ${tab === "giris" ? "active" : ""}`} onClick={() => { setTab("giris"); setErr(""); }}>Giriş Yap</button>
-          <button className={`tab ${tab === "kayit" ? "active" : ""}`} onClick={() => { setTab("kayit"); setErr(""); }}>Kayıt Ol</button>
+          <button className={`tab ${tab === "giris" ? "active" : ""}`} onClick={() => sekmeDegis("giris")}>Giriş</button>
+          <button className={`tab ${tab === "yeni" ? "active" : ""}`} onClick={() => sekmeDegis("yeni")}>Kayıt Ol</button>
+          <button className={`tab ${tab === "tamirno" ? "active" : ""}`} onClick={() => sekmeDegis("tamirno")}>Tamir No ile</button>
         </div>
-        {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={13} strokeWidth={2} /> {err}</div>}
+        {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 10, display: "flex", alignItems: "flex-start", gap: 6 }}><CircleX size={13} strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} /> {err}</div>}
 
-        {tab === "giris" ? (
+        {tab === "yeni" ? (
+          <form onSubmit={yeniKayit}>
+            <div style={{ fontSize: 12.5, color: "var(--hint)", marginBottom: 10 }}>
+              Daha önce hiç işlem yaptırmadıysanız buradan hesap oluşturun.
+            </div>
+            <div className="form-group">
+              <input className="form-input" required placeholder="Adınız Soyadınız" autoFocus
+                value={yeni.ad} onChange={e => setYeni(f => ({ ...f, ad: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <input className="form-input" required type="tel" placeholder="Telefon"
+                value={yeni.telefon} onChange={e => setYeni(f => ({ ...f, telefon: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <input className="form-input" required type="password" placeholder="Şifre (en az 6 karakter)"
+                value={yeni.sifre} onChange={e => setYeni(f => ({ ...f, sifre: e.target.value }))} />
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ marginTop: 12, width: "100%" }} disabled={busy}>
+              {busy ? "..." : "Hesap Oluştur"}
+            </button>
+          </form>
+        ) : tab === "giris" ? (
           <form onSubmit={girisYap}>
             <div className="form-group">
               <input className="form-input" required type="tel" placeholder="Telefon"
@@ -124,7 +167,8 @@ function GirisKayitForm({ slug, onGiris }) {
         ) : (
           <form onSubmit={kayitOl}>
             <div style={{ fontSize: 12.5, color: "var(--hint)", marginBottom: 10 }}>
-              Kayıt olmak için daha önce yaptırdığınız bir tamirin numarasını girin.
+              Daha önce burada işlem yaptırdıysanız, geçmişinizin hesabınıza bağlanması
+              için bir tamir numaranızla doğrulayın.
             </div>
             <div className="form-group">
               <input className="form-input" required placeholder="Tamir No (#T...)"

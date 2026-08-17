@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { Tag, CircleX, TriangleAlert, Trash2 } from "lucide-react";
+import UrunGorsel from "../components/UrunGorsel";
 
 const DEFAULT_CATS = ["Şarj Aleti", "Kılıf", "Kırılmaz Cam", "Kulaklık", "Powerbank", "Diğer"];
 
@@ -211,7 +212,10 @@ export default function Aksesuar({ user }) {
           <div className="card-row">
             <div>
               <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, marginBottom: 2 }}>{a.kategori || "Diğer"}</div>
-              <div style={{ fontWeight: 600 }}>{a.ad}</div>
+              <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                <UrunGorsel url={a.gorsel_url} yukle={f => api.aksesuarGorselYukle(a.id, f)} boyut={38} />
+                {a.ad}
+              </div>
               <div style={{ fontSize: 13, color: "var(--hint)" }}>
                 Alış: {a.alis_fiyati} ₺ · Satış: {a.satis_fiyati} ₺
               </div>

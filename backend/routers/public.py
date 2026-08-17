@@ -27,7 +27,13 @@ async def _dukkan_by_slug(db: asyncpg.Connection, slug: str):
 @router.get("/dukkan/{slug}")
 async def dukkan_vitrin(slug: str, db: asyncpg.Connection = Depends(get_db)):
     d = await _dukkan_by_slug(db, slug)
-    return dict(d)
+    galeri = await db.fetch(
+        "SELECT foto_url, baslik FROM dukkan_galeri WHERE dukkan_id = $1 ORDER BY id DESC",
+        d["id"],
+    )
+    out = dict(d)
+    out["galeri"] = [dict(g) for g in galeri]
+    return out
 
 
 @router.get("/dukkan/{slug}/tamir-durumu")
@@ -52,17 +58,17 @@ async def tamir_durumu(slug: str, q: str, db: asyncpg.Connection = Depends(get_d
 async def satilik_cihazlar(slug: str, db: asyncpg.Connection = Depends(get_db)):
     d = await _dukkan_by_slug(db, slug)
     ikinci_el = await db.fetch(
-        """SELECT id, model, renk, depolama, ram, satis_fiyati, 'ikinci_el' AS kaynak
+        """SELECT id, model, renk, depolama, ram, satis_fiyati, gorsel_url, 'ikinci_el' AS kaynak
            FROM ikinci_el WHERE dukkan_id = $1 AND durum = 'stokta' ORDER BY created_at DESC""",
         d["id"],
     )
     sifir = await db.fetch(
-        """SELECT id, model, renk, depolama, satis_fiyati, 'sifir' AS kaynak
+        """SELECT id, model, renk, depolama, satis_fiyati, gorsel_url, 'sifir' AS kaynak
            FROM sifir_cihazlar WHERE dukkan_id = $1 AND durum = 'stokta' ORDER BY created_at DESC""",
         d["id"],
     )
     aksesuar = await db.fetch(
-        """SELECT id, ad, kategori, satis_fiyati FROM aksesuarlar
+        """SELECT id, ad, kategori, satis_fiyati, gorsel_url FROM aksesuarlar
            WHERE dukkan_id = $1 AND stok > 0 ORDER BY kategori, ad""",
         d["id"],
     )
@@ -251,6 +257,62 @@ async def musteri_kayit(slug: str, body: dict, db: asyncpg.Connection = Depends(
     await db.execute("UPDATE customers SET sifre_hash = $1 WHERE id = $2", hash_sifre(yeni_sifre), row["customer_id"])
     token = olustur_musteri_token(row["customer_id"], d["id"])
     return {"token": token}
+
+
+@router.post("/dukkan/{slug}/musteri/kayit-ol")
+async def musteri_acik_kayit(slug: str, body: dict, db: asyncpg.Connection = Depends(get_db)):
+    """Tamir kaydı olmayan yeni müşteri için açık kayıt.
+
+    GÜVENLİK: Bu numaraya ait GEÇMİŞİ olan bir kayıt varsa (tamir/satış/garanti),
+    buradan sahiplenmeye izin VERİLMEZ — yoksa yabancı biri telefon numarası
+    tahmin ederek başkasının tamir geçmişini görebilirdi. O durumda müşteri
+    tamir no ile doğrulayan /musteri/kayit akışına yönlendirilir.
+    """
+    d = await _dukkan_by_slug(db, slug)
+    ad = (body.get("ad") or "").strip()
+    telefon = (body.get("telefon") or "").strip()
+    sifre = body.get("sifre") or ""
+    if not ad or not telefon:
+        raise HTTPException(400, "Ad ve telefon gerekli")
+    if len(sifre) < 6:
+        raise HTTPException(400, "Şifre en az 6 karakter olmalı")
+
+    mevcut = await db.fetchrow(
+        "SELECT id, sifre_hash FROM customers WHERE dukkan_id = $1 AND phone = $2 ORDER BY id LIMIT 1",
+        d["id"], telefon,
+    )
+    if mevcut:
+        if mevcut["sifre_hash"]:
+            raise HTTPException(400, "Bu telefon numarası zaten kayıtlı, giriş yapın")
+        gecmisi_var = await db.fetchval(
+            """SELECT 1 WHERE EXISTS (SELECT 1 FROM repairs WHERE customer_id = $1)
+                          OR EXISTS (SELECT 1 FROM ikinci_el WHERE customer_id = $1)
+                          OR EXISTS (SELECT 1 FROM sifir_cihazlar WHERE customer_id = $1)
+                          OR EXISTS (SELECT 1 FROM aksesuar_satislar WHERE customer_id = $1)""",
+            mevcut["id"],
+        )
+        if gecmisi_var:
+            raise HTTPException(
+                400,
+                "Bu numaraya ait servis kaydı bulunuyor. Güvenlik için "
+                "'Tamir No ile Kayıt' seçeneğinden devam edin.",
+            )
+        # Geçmişi olmayan boş kayıt — sahiplenmesinde sakınca yok.
+        await db.execute(
+            """UPDATE customers SET name = $1, sifre_hash = $2,
+                      portal_kayit_at = now(), dukkan_gordu = false WHERE id = $3""",
+            ad, hash_sifre(sifre), mevcut["id"],
+        )
+        customer_id = mevcut["id"]
+    else:
+        row = await db.fetchrow(
+            """INSERT INTO customers (dukkan_id, name, phone, sifre_hash, portal_kayit_at, dukkan_gordu)
+               VALUES ($1, $2, $3, $4, now(), false) RETURNING id""",
+            d["id"], ad, telefon, hash_sifre(sifre),
+        )
+        customer_id = row["id"]
+
+    return {"token": olustur_musteri_token(customer_id, d["id"])}
 
 
 @router.post("/dukkan/{slug}/musteri/giris")

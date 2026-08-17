@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { Users, Search, CircleX, Star, User, Ban, Plus, ChevronUp, ChevronDown } from "lucide-react";
+import { Users, Search, CircleX, Star, User, Ban, Plus, ChevronUp, ChevronDown, UserPlus, X } from "lucide-react";
 
 function SortTh({ label, col, sort, setSort }) {
   const active = sort.col === col;
@@ -23,7 +23,19 @@ export default function Customers() {
   const [form, setForm] = useState({ name: "", phone: "", notes: "" });
   const [err, setErr] = useState("");
   const [sort, setSort] = useState({ col: "name", dir: "asc" });
+  const [yeniUyeler, setYeniUyeler] = useState([]);
   const navigate = useNavigate();
+
+  // Portalden kendisi kaydolan müşteriler — dükkan sayfayı açınca bildirimi
+  // gösterip "görüldü" işaretliyoruz.
+  useEffect(() => {
+    api.yeniUyeler()
+      .then(r => {
+        setYeniUyeler(r.musteriler || []);
+        if (r.sayi > 0) api.yeniUyeleriGordum().catch(() => {});
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -71,6 +83,28 @@ export default function Customers() {
           {showForm ? "İptal" : <><Plus size={14} strokeWidth={2.4} /> Yeni Müşteri</>}
         </button>
       </div>
+
+      {yeniUyeler.length > 0 && (
+        <div className="card" style={{ marginBottom: 12, background: "rgba(74,222,128,0.08)", borderLeft: "3px solid var(--green)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10 }}>
+              <UserPlus size={17} stroke="var(--green)" strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>
+                  {yeniUyeler.length} yeni müşteri mağaza sayfanızdan kayıt oldu
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--hint)", marginTop: 4 }}>
+                  {yeniUyeler.map(u => `${u.name}${u.phone ? ` (${u.phone})` : ""}`).join(" · ")}
+                </div>
+              </div>
+            </div>
+            <button onClick={() => setYeniUyeler([])}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex", flexShrink: 0 }}>
+              <X size={15} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="card" style={{ marginBottom: 12 }}>
@@ -133,7 +167,10 @@ export default function Customers() {
                     : <User size={22} stroke="var(--hint)" strokeWidth={1.7} />}
                 </div>
                 <div className="list-item-body">
-                  <div className="list-item-title">{c.name}</div>
+                  <div className="list-item-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {c.name}
+                    {c.portal_uye && <UserPlus size={13} stroke="var(--green)" strokeWidth={2} title="Portal üyesi" />}
+                  </div>
                   <div className="list-item-sub">{c.phone || "Telefon yok"} · {c.visit_count} ziyaret</div>
                 </div>
                 {c.is_blacklisted ? (
@@ -164,7 +201,12 @@ export default function Customers() {
                         ? <Star size={16} stroke="var(--gold)" fill="var(--gold)" strokeWidth={1.5} />
                         : <User size={16} stroke="var(--hint)" strokeWidth={1.7} />}
                     </td>
-                    <td>{c.name}</td>
+                    <td>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        {c.name}
+                        {c.portal_uye && <UserPlus size={13} stroke="var(--green)" strokeWidth={2} title="Portal üyesi" />}
+                      </span>
+                    </td>
                     <td>{c.phone || "—"}</td>
                     <td>{c.visit_count || 0}</td>
                     <td>
