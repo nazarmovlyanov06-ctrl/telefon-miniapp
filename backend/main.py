@@ -105,8 +105,20 @@ _dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 if os.path.exists(_dist):
     app.mount("/assets", StaticFiles(directory=os.path.join(_dist, "assets")), name="assets")
 
+    _dist_kok = os.path.realpath(_dist)
+
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
+        # frontend/public altındaki dosyalar (marka logoları, favicon, robots.txt...)
+        # build'de dist köküne kopyalanıyor ama sadece /assets mount edilmişti;
+        # bu yüzden /logos/realme.svg gibi istekler HTML (index.html) dönüyordu ve
+        # marka logoları yüklenemiyordu. Gerçek dosya varsa onu servis et.
+        if full_path:
+            aday = os.path.realpath(os.path.join(_dist_kok, full_path))
+            # Dizin dışına çıkmayı engelle (path traversal)
+            if aday.startswith(_dist_kok + os.sep) and os.path.isfile(aday):
+                return FileResponse(aday)
+
         # index.html ASLA önbelleğe alınmamalı: içindeki <script src> her build'de
         # hash'li yeni bir dosyaya işaret ediyor. Cache-Control verilmezse tarayıcı
         # sezgisel önbellekleme yapıp eski index.html'i (dolayısıyla silinmiş eski
