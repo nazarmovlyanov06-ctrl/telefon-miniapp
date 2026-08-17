@@ -107,4 +107,12 @@ if os.path.exists(_dist):
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
-        return FileResponse(os.path.join(_dist, "index.html"))
+        # index.html ASLA önbelleğe alınmamalı: içindeki <script src> her build'de
+        # hash'li yeni bir dosyaya işaret ediyor. Cache-Control verilmezse tarayıcı
+        # sezgisel önbellekleme yapıp eski index.html'i (dolayısıyla silinmiş eski
+        # JS paketini) sunuyor ve kullanıcı güncellemeleri hiç alamıyor.
+        # /assets altındaki hash'li dosyalar değişmez, onlar uzun süre cache'lenebilir.
+        return FileResponse(
+            os.path.join(_dist, "index.html"),
+            headers={"Cache-Control": "no-cache, must-revalidate"},
+        )
