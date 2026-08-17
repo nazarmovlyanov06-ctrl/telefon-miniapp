@@ -50,6 +50,8 @@ GALERI_SAYFA = {
     "Tamir Masamız": ["Soldering", "Soldering iron"],
     "Teşhir Reyonu": ["Display case", "Retail"],
     "Ekibimiz": ["Technician", "Electronics technician"],
+    "Yedek Parça Deposu": ["Warehouse", "Spare part"],
+    "Mikroskop Altında Onarım": ["Stereo microscope", "Microscope"],
 }
 
 
@@ -71,8 +73,15 @@ def _wiki_gorsel(baslik: str):
     return None
 
 
+_onbellek = {}
+
+
 def indir(adaylar, subdir: str, dukkan_id: int):
-    """Aday makale başlıklarını sırayla dener, ilk bulduğu görseli indirir."""
+    """Aday makale başlıklarını sırayla dener, ilk bulduğu görseli indirir.
+    Aynı model/kategori için tekrar indirmez (onbellek)."""
+    anahtar = (adaylar[0] if adaylar else "", subdir)
+    if anahtar in _onbellek:
+        return _onbellek[anahtar]
     for baslik in adaylar:
         url = _wiki_gorsel(baslik)
         time.sleep(BEKLEME)
@@ -92,7 +101,8 @@ def indir(adaylar, subdir: str, dukkan_id: int):
             with open(os.path.join(klasor, ad), "wb") as f:
                 f.write(icerik)
             print(f"   -> {baslik}")
-            return f"/uploads/{subdir}/{dukkan_id}/{ad}"
+            _onbellek[anahtar] = f"/uploads/{subdir}/{dukkan_id}/{ad}"
+            return _onbellek[anahtar]
         except Exception as e:
             print(f"   indirme hata ({baslik}): {e}")
         time.sleep(BEKLEME)

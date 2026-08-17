@@ -570,7 +570,8 @@ async def main():
         # Son 20 gün: karışık durumlar. Öncesi: hepsi teslim.
         if i < TAMIR_SAYISI - 14:
             durum = "teslim"
-            acilis = random.randint(21, YIL)
+            # 2..YIL: cari ay da payini alsin, yoksa "bu ay geliri" bos kaliyor
+            acilis = random.randint(2, YIL)
         else:
             durum = random.choice(["bekliyor", "bekliyor", "bekliyor", "tamirde", "tamirde",
                                    "tamirde", "parca_bekleniyor", "parca_bekleniyor", "hazir", "hazir", "hazir"])
