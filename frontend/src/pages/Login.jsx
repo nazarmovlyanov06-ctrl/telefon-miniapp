@@ -44,7 +44,10 @@ export default function Login({ onGiris }) {
         <button type="submit" className="btn btn-primary" disabled={loading}>
           {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
         </button>
-        <div style={{ textAlign: "center", fontSize: 13, color: "var(--hint)", marginTop: 8 }}>
+        <div style={{ textAlign: "center", fontSize: 13, marginTop: 4 }}>
+          <Link to="/sifremi-unuttum" style={{ color: "var(--hint)" }}>Şifremi unuttum</Link>
+        </div>
+        <div style={{ textAlign: "center", fontSize: 13, color: "var(--hint)", marginTop: 4 }}>
           Hesabın yok mu? <Link to="/kayit">Dükkânını Kaydet</Link>
         </div>
       </form>

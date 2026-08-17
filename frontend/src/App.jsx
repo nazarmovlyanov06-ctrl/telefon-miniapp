@@ -4,6 +4,7 @@ import { Clock, User, TriangleAlert, Wrench } from "lucide-react";
 import { api, getToken, setToken } from "./api";
 import Login from "./pages/Login";
 import Kayit from "./pages/Kayit";
+import SifremiUnuttum from "./pages/SifremiUnuttum";
 import Landing from "./pages/Landing";
 import MagazaPublic from "./pages/MagazaPublic";
 import MagazaFis from "./pages/MagazaFis";
@@ -239,6 +240,7 @@ export default function App() {
       <Routes>
         <Route path="/giris" element={<Login />} />
         <Route path="/kayit" element={<Kayit />} />
+        <Route path="/sifremi-unuttum" element={<SifremiUnuttum />} />
         <Route path="/magaza/:slug" element={<MagazaPublic />} />
         <Route path="/magaza/:slug/fis" element={<MagazaFis />} />
         <Route path="/magaza/:slug/fis/:repairNo" element={<MagazaFis />} />

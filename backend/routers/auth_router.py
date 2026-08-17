@@ -8,7 +8,9 @@ from pydantic import BaseModel, EmailStr
 
 from database import get_db
 from auth import hash_sifre, dogrula_sifre, olustur_token, get_current_user
-from email_service import email_yapilandirildi, dogrulama_kodu_gonder
+from email_service import (
+    email_yapilandirildi, dogrulama_kodu_gonder, sifre_sifirlama_kodu_gonder,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -46,6 +48,12 @@ class GirisBody(BaseModel):
     sifre: str
 
 
+class SifreSifirlaBody(BaseModel):
+    email: EmailStr
+    kod: str
+    yeni_sifre: str
+
+
 @router.get("/email-dogrulama-durumu")
 async def email_dogrulama_durumu():
     return {"aktif": email_yapilandirildi()}
@@ -59,10 +67,60 @@ async def kod_gonder(body: KodGonderBody, db: asyncpg.Connection = Depends(get_d
     if var_mi:
         raise HTTPException(400, "Bu e-posta zaten kayitli")
     kod = f"{random.randint(0, 999999):06d}"
-    await db.execute("INSERT INTO email_dogrulama_kodlari (email, kod) VALUES ($1, $2)", body.email, kod)
+    await db.execute(
+        "INSERT INTO email_dogrulama_kodlari (email, kod, amac) VALUES ($1, $2, 'kayit')",
+        body.email, kod,
+    )
     gonderildi = dogrulama_kodu_gonder(body.email, kod)
     if not gonderildi:
         raise HTTPException(500, "Doğrulama e-postası gönderilemedi, lütfen tekrar deneyin")
+    return {"ok": True}
+
+
+@router.post("/sifre-sifirla/kod-gonder")
+async def sifre_sifirla_kod_gonder(body: KodGonderBody, db: asyncpg.Connection = Depends(get_db)):
+    if not email_yapilandirildi():
+        raise HTTPException(
+            400,
+            "E-posta ile şifre sıfırlama şu an aktif değil. Lütfen destek ile iletişime geçin.",
+        )
+    row = await db.fetchrow("SELECT id FROM kullanicilar WHERE email = $1", body.email)
+    # Hesabın var olup olmadığını SIZDIRMA — kayıtlı olmayan e-postada da aynı
+    # cevabı dön, sadece gerçekten kayıtlıysa kod üret/gönder.
+    if row:
+        kod = f"{random.randint(0, 999999):06d}"
+        await db.execute(
+            "INSERT INTO email_dogrulama_kodlari (email, kod, amac) VALUES ($1, $2, 'sifre_sifirlama')",
+            body.email, kod,
+        )
+        sifre_sifirlama_kodu_gonder(body.email, kod)
+    return {"ok": True}
+
+
+@router.post("/sifre-sifirla/onayla")
+async def sifre_sifirla_onayla(body: SifreSifirlaBody, db: asyncpg.Connection = Depends(get_db)):
+    if len(body.yeni_sifre) < 6:
+        raise HTTPException(400, "Şifre en az 6 karakter olmalı")
+    sinir = datetime.utcnow() - timedelta(minutes=_KOD_GECERLILIK_DK)
+    row = await db.fetchrow(
+        """SELECT id FROM email_dogrulama_kodlari
+           WHERE email = $1 AND kod = $2 AND amac = 'sifre_sifirlama'
+             AND dogrulandi = false AND created_at >= $3
+           ORDER BY id DESC LIMIT 1""",
+        body.email, body.kod.strip(), sinir,
+    )
+    if not row:
+        raise HTTPException(400, "Kod geçersiz veya süresi dolmuş")
+    kullanici = await db.fetchrow("SELECT id FROM kullanicilar WHERE email = $1", body.email)
+    if not kullanici:
+        raise HTTPException(400, "Kod geçersiz veya süresi dolmuş")
+    async with db.transaction():
+        await db.execute(
+            "UPDATE kullanicilar SET sifre_hash = $1 WHERE id = $2",
+            hash_sifre(body.yeni_sifre), kullanici["id"],
+        )
+        # Kod tek kullanımlık — aynı kodla ikinci kez şifre değiştirilemesin.
+        await db.execute("UPDATE email_dogrulama_kodlari SET dogrulandi = true WHERE id = $1", row["id"])
     return {"ok": True}
 
 
@@ -71,7 +129,7 @@ async def kod_dogrula(body: KodDogrulaBody, db: asyncpg.Connection = Depends(get
     sinir = datetime.utcnow() - timedelta(minutes=_KOD_GECERLILIK_DK)
     row = await db.fetchrow(
         """SELECT id FROM email_dogrulama_kodlari
-           WHERE email = $1 AND kod = $2 AND created_at >= $3
+           WHERE email = $1 AND kod = $2 AND amac = 'kayit' AND created_at >= $3
            ORDER BY id DESC LIMIT 1""",
         body.email, body.kod, sinir,
     )
@@ -94,7 +152,7 @@ async def kayit_ol(body: KayitBody, db: asyncpg.Connection = Depends(get_db)):
         sinir = datetime.utcnow() - timedelta(minutes=_KOD_GECERLILIK_DK)
         dogrulandi = await db.fetchval(
             """SELECT 1 FROM email_dogrulama_kodlari
-               WHERE email = $1 AND dogrulandi = true AND created_at >= $2
+               WHERE email = $1 AND amac = 'kayit' AND dogrulandi = true AND created_at >= $2
                ORDER BY id DESC LIMIT 1""",
             body.email, sinir,
         )

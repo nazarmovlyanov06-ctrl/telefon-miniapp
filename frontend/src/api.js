@@ -402,4 +402,9 @@ export const api = {
   emailDogrulamaDurumu: () => get("/auth/email-dogrulama-durumu"),
   kodGonder: (email) => post("/auth/kod-gonder", { email }),
   kodDogrula: (email, kod) => post("/auth/kod-dogrula", { email, kod }),
+
+  // Şifre sıfırlama (e-posta kodu ile)
+  sifreSifirlaKodGonder: (email) => post("/auth/sifre-sifirla/kod-gonder", { email }),
+  sifreSifirlaOnayla: (email, kod, yeni_sifre) => post("/auth/sifre-sifirla/onayla", { email, kod, yeni_sifre }),
+  adminSifreSifirla: (dukkanId) => post(`/admin/dukkanlar/${dukkanId}/sifre-sifirla`, {}),
 };

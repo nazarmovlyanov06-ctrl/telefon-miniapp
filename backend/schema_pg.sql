@@ -563,6 +563,7 @@ CREATE TABLE IF NOT EXISTS email_dogrulama_kodlari (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL,
     kod TEXT NOT NULL,
+    amac TEXT DEFAULT 'kayit',       -- kayit / sifre_sifirlama
     dogrulandi BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT now()
 );

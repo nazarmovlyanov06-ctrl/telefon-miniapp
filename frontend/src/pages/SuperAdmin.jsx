@@ -55,6 +55,17 @@ function TenantYonet({ dukkan, planlar, onClose, onChanged }) {
   const [err, setErr] = useState("");
   const [kesinTarih, setKesinTarih] = useState("");
   const [plan, setPlan] = useState(dukkan.plan || "deneme");
+  const [gecici, setGecici] = useState(null);
+
+  async function sifreSifirla() {
+    if (!confirm(`"${dukkan.ad}" dükkanının patron şifresi sıfırlanacak ve yeni bir geçici şifre üretilecek. Mevcut şifresiyle artık giremeyecek.\n\nDevam edilsin mi?`)) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await api.adminSifreSifirla(dukkan.id);
+      setGecici(r);
+    } catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
 
   async function islem(fn) {
     setBusy(true); setErr("");
@@ -82,6 +93,30 @@ function TenantYonet({ dukkan, planlar, onClose, onChanged }) {
           <KalanRozet d={dukkan} />
           <span style={{ fontSize: 12, color: "var(--hint)" }}>Bitiş: {dukkan.abonelik_bitis ? tarihFmt(dukkan.abonelik_bitis) : "—"}</span>
         </div>
+
+        <div className="section-title">Şifre</div>
+        {gecici ? (
+          <div style={{ background: "var(--bg2)", borderRadius: 10, padding: 12, marginBottom: 14 }}>
+            <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 4 }}>
+              Yeni geçici şifre — bu ekranı kapatınca bir daha gösterilmez, şimdi kopyalayın:
+            </div>
+            <div style={{ fontFamily: "monospace", fontSize: 16, fontWeight: 700, color: "var(--gold)", wordBreak: "break-all" }}>
+              {gecici.gecici_sifre}
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--hint)", marginTop: 4 }}>{gecici.email}</div>
+            <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }}
+              onClick={() => navigator.clipboard?.writeText(gecici.gecici_sifre)}>Kopyala</button>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 14 }}>
+            <button disabled={busy} className="btn btn-ghost btn-sm" onClick={sifreSifirla}>
+              Şifre Sıfırla
+            </button>
+            <div style={{ fontSize: 11.5, color: "var(--hint)", marginTop: 4 }}>
+              Patron şifresini unuttuysa geçici bir şifre üretir.
+            </div>
+          </div>
+        )}
 
         <div className="section-title">Süre Uzat</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>

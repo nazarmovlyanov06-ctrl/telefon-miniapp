@@ -1,12 +1,13 @@
 import io
 import math
+import secrets
 from datetime import datetime, timedelta
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from database import get_db
-from auth import require_super_admin
+from auth import require_super_admin, hash_sifre
 from photo_storage import save_upload
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -164,6 +165,32 @@ async def silinecek_dukkanlar(
         d["silinebilir"] = datetime.utcnow() >= kalici_tarih
         out.append(d)
     return out
+
+
+@router.post("/dukkanlar/{dukkan_id}/sifre-sifirla")
+async def sifre_sifirla(
+    dukkan_id: int,
+    user: dict = Depends(require_super_admin),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Dükkanın patronuna geçici şifre üretir. SMTP gerektirmez — üretilen şifre
+    SADECE burada, bir kez döner; süper admin dükkan sahibine kendisi iletir."""
+    dukkan = await db.fetchrow("SELECT ad FROM dukkanlar WHERE id = $1", dukkan_id)
+    if not dukkan:
+        raise HTTPException(404, "Dükkan bulunamadı")
+    patron = await db.fetchrow(
+        "SELECT id, email FROM kullanicilar WHERE dukkan_id = $1 AND rol = 'patron' ORDER BY id LIMIT 1",
+        dukkan_id,
+    )
+    if not patron:
+        raise HTTPException(404, "Bu dükkanın patron hesabı yok")
+
+    gecici = secrets.token_urlsafe(9)
+    await db.execute(
+        "UPDATE kullanicilar SET sifre_hash = $1 WHERE id = $2", hash_sifre(gecici), patron["id"]
+    )
+    await _audit(db, dukkan_id, dukkan["ad"], "sifre_sifirlandi", f"patron: {patron['email']}")
+    return {"ok": True, "email": patron["email"], "gecici_sifre": gecici}
 
 
 @router.post("/dukkanlar/{dukkan_id}/silme-iptal")
