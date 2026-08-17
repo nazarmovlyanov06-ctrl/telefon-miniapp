@@ -23,8 +23,13 @@ async def bu_ay(
     )
     hedef = row["hedef_tutar"] if row else 0.0
 
+    # kasa_hareketleri.tur için kod tabanında iki değer birden kullanılıyor:
+    # tamir/2.el/sıfır satışları 'gelir', aksesuar/parça alımı 'giris' yazıyor.
+    # Sadece 'giris' sayılırsa gelirin büyük kısmı (tamir + cihaz satışı)
+    # hedefe hiç yansımıyordu. kasa.py de ikisini birden sayıyor.
     gerceklesen = await db.fetchval(
-        "SELECT COALESCE(SUM(tutar), 0) FROM kasa_hareketleri WHERE dukkan_id = $1 AND tur = 'giris' AND tarih >= $2",
+        """SELECT COALESCE(SUM(tutar), 0) FROM kasa_hareketleri
+           WHERE dukkan_id = $1 AND tur IN ('giris', 'gelir') AND tarih >= $2""",
         dukkan_id, ay_basi,
     )
 

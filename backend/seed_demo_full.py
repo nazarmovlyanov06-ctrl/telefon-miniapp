@@ -440,7 +440,12 @@ async def main():
         ad = random.choice(list(musteri_id.keys()))
         model = random.choice(CIHAZ_MODELLERI)
         ariza, teshis = random.choice(ARIZALAR)
-        acilis = random.randint(1, 95) if durum == "teslim" else random.randint(0, 18)
+        # Teslim edilenlerin bir kısmı bilerek SON GÜNLERE denk getiriliyor —
+        # aksi halde "bu ay geliri"/hedef grafikleri demoda boş görünüyor.
+        if durum == "teslim":
+            acilis = random.randint(2, 13) if i % 2 == 0 else random.randint(14, 88)
+        else:
+            acilis = random.randint(0, 18)
         ucret = random.choice([950, 1250, 1650, 1950, 2400, 2900, 3400, 3900, 4600, 5300])
         repair_no = f"T{(BUGUN - timedelta(days=acilis)).strftime('%y%m%d')}{i+1:04d}"
         imei = "35" + "".join(str(random.randint(0, 9)) for _ in range(13))

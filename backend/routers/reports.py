@@ -138,7 +138,7 @@ async def genel_stats(
     for i in range(6, -1, -1):
         gun = (today - datetime.timedelta(days=i)).isoformat()
         gelir = await db.fetchval(
-            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih=$2 AND tur='gelir'",
+            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih=$2 AND tur IN ('gelir','giris')",
             dukkan_id, gun,
         )
         gider = await db.fetchval(
@@ -157,7 +157,7 @@ async def genel_stats(
         ay_basi = f"{yil}-{ay:02d}-01"
         ay_sonu = f"{yil+1}-01-01" if ay == 12 else f"{yil}-{ay+1:02d}-01"
         gelir = await db.fetchval(
-            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih>=$2 AND tarih<$3 AND tur='gelir'",
+            "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih>=$2 AND tarih<$3 AND tur IN ('gelir','giris')",
             dukkan_id, ay_basi, ay_sonu,
         )
         gider = await db.fetchval(
