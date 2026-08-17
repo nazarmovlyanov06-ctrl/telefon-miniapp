@@ -5,6 +5,7 @@ import {
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
   Banknote, BarChart3, ScanLine, Settings, LogOut, Store, CalendarClock,
+  Star, Repeat, MessageCircle,
 } from "lucide-react";
 import { setToken } from "../api";
 
@@ -41,6 +42,9 @@ const MUSTERI = [
 const MAGAZA = [
   { path: "/vitrin-ayarlari", icon: Store, label: "Vitrin Ayarları" },
   { path: "/randevu-talepleri", icon: CalendarClock, label: "Randevu Talepleri" },
+  { path: "/vitrin-degerlendirme", icon: Star, label: "Değerlendirmeler" },
+  { path: "/vitrin-takas", icon: Repeat, label: "Takas Teklifleri" },
+  { path: "/musteri-mesajlari", icon: MessageCircle, label: "Müşteri Mesajları" },
 ];
 
 const ARACLAR = [

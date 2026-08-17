@@ -13,6 +13,7 @@ from email_service import email_yapilandirildi, dogrulama_kodu_gonder
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _KOD_GECERLILIK_DK = 10
+_DENEME_GUN = 14  # yeni kayıtta ücretsiz deneme süresi
 
 
 def slug_uret(ad: str) -> str:
@@ -116,8 +117,10 @@ async def kayit_ol(body: KayitBody, db: asyncpg.Connection = Depends(get_db)):
 
     async with db.transaction():
         dukkan = await db.fetchrow(
-            "INSERT INTO dukkanlar (ad, slug, telefon, abonelik_durumu, referans_kod) VALUES ($1, $2, $3, 'deneme', $4) RETURNING id",
-            body.dukkan_adi, slug, body.telefon, referans_kod,
+            """INSERT INTO dukkanlar (ad, slug, telefon, abonelik_durumu, abonelik_bitis, referans_kod)
+               VALUES ($1, $2, $3, 'deneme', $4, $5) RETURNING id""",
+            body.dukkan_adi, slug, body.telefon,
+            datetime.utcnow() + timedelta(days=_DENEME_GUN), referans_kod,
         )
         kullanici = await db.fetchrow(
             """INSERT INTO kullanicilar (dukkan_id, email, sifre_hash, ad, rol, durum)
