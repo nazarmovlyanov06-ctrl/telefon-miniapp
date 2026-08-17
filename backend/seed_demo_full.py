@@ -432,7 +432,9 @@ async def main():
             random.choice([t[0] for t in TOPTANCILAR]), patron_id, g(random.randint(20, 200)))
 
     # ── Tamirler ──────────────────────────────────────────────────────
-    durumlar = (["teslim"] * 12) + ["hazir", "hazir", "tamirde", "tamirde", "tamirde",
+    # Sağlıklı bir dükkân profili: aylık gider ~150k olduğu için teslim edilen
+    # tamir hacmi de buna göre seçildi, demoda dükkân kârda görünsün.
+    durumlar = (["teslim"] * 30) + ["hazir", "hazir", "hazir", "tamirde", "tamirde", "tamirde",
                                     "parca_bekleniyor", "parca_bekleniyor", "bekliyor", "bekliyor", "bekliyor"]
     random.shuffle(durumlar)
     tamir_bilgi = []
@@ -443,7 +445,7 @@ async def main():
         # Teslim edilenlerin bir kısmı bilerek SON GÜNLERE denk getiriliyor —
         # aksi halde "bu ay geliri"/hedef grafikleri demoda boş görünüyor.
         if durum == "teslim":
-            acilis = random.randint(2, 13) if i % 2 == 0 else random.randint(14, 88)
+            acilis = random.randint(2, 15) if i % 2 == 0 else random.randint(16, 88)
         else:
             acilis = random.randint(0, 18)
         ucret = random.choice([950, 1250, 1650, 1950, 2400, 2900, 3400, 3900, 4600, 5300])
@@ -528,7 +530,13 @@ async def main():
         ("Oppo A78", "Siyah", "128GB", "8GB", 6800, None, "stokta"),
     ]
     for model, renk, dep, ram, alis, satis, durum in ikinci:
-        gun = random.randint(10, 120)
+        # Satılanların satış tarihi son haftalara denk gelsin (alış daha eski) —
+        # böylece cari ay cirosu gerçekçi görünür.
+        if durum == "satildi":
+            satis_gun = random.randint(1, 26)
+            gun = satis_gun + random.randint(14, 45)
+        else:
+            gun, satis_gun = random.randint(5, 90), None
         alici = random.choice(list(musteri_id.keys())) if durum == "satildi" else None
         cid = await db.fetchval(
             """INSERT INTO ikinci_el (dukkan_id, model, imei, renk, depolama, ram, kimden, kimden_telefon,
@@ -539,7 +547,7 @@ async def main():
             renk, dep, ram, random.choice([m[0] for m in MUSTERILER]),
             random.choice([m[1] for m in MUSTERILER]), alis, durum, satis,
             "Dükkan" if durum == "satildi" else None,
-            gs(max(gun - 12, 0)) if durum == "satildi" else None,
+            gs(satis_gun) if durum == "satildi" else None,
             alici, next((m[1] for m in MUSTERILER if m[0] == alici), None) if alici else None,
             musteri_id[alici] if alici else None,
             telefon_gorseli(dukkan_id, model, "ikincel"), g(gun))
@@ -551,7 +559,7 @@ async def main():
             await db.execute(
                 """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak, created_at)
                    VALUES ($1,$2,'gelir','nakit',$3,$4,'2el_satis',$5)""",
-                dukkan_id, gs(max(gun - 12, 0)), satis, f"2.El Satış: {model} → {alici}", g(max(gun - 12, 0)))
+                dukkan_id, gs(satis_gun), satis, f"2.El Satış: {model} → {alici}", g(satis_gun))
 
     # ── Sıfır cihazlar ────────────────────────────────────────────────
     sifir = [
@@ -564,7 +572,11 @@ async def main():
         ("iPhone 14", "Mavi", "128GB", 36000, 43500, "satildi"),
     ]
     for model, renk, dep, alis, satis, durum in sifir:
-        gun = random.randint(8, 90)
+        if durum == "satildi":
+            satis_gun = random.randint(1, 24)
+            gun = satis_gun + random.randint(10, 40)
+        else:
+            gun, satis_gun = random.randint(5, 70), None
         alici = random.choice(list(musteri_id.keys())) if durum == "satildi" else None
         await db.execute(
             """INSERT INTO sifir_cihazlar (dukkan_id, model, imei, renk, depolama, kimden, kaynak,
@@ -574,7 +586,7 @@ async def main():
             dukkan_id, model, "35" + "".join(str(random.randint(0, 9)) for _ in range(13)),
             renk, dep, random.choice([t[0] for t in TOPTANCILAR]), alis, gs(gun), durum,
             satis if durum == "satildi" else None,
-            gs(max(gun - 10, 0)) if durum == "satildi" else None,
+            gs(satis_gun) if durum == "satildi" else None,
             "Dükkan" if durum == "satildi" else None,
             alici, next((m[1] for m in MUSTERILER if m[0] == alici), None) if alici else None,
             musteri_id[alici] if alici else None,
@@ -584,7 +596,7 @@ async def main():
             await db.execute(
                 """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak, created_at)
                    VALUES ($1,$2,'gelir','kart',$3,$4,'sifir_satis',$5)""",
-                dukkan_id, gs(max(gun - 10, 0)), satis, f"Sıfır Satış: {model} → {alici}", g(max(gun - 10, 0)))
+                dukkan_id, gs(satis_gun), satis, f"Sıfır Satış: {model} → {alici}", g(satis_gun))
 
     # ── Aksesuarlar + satışları ──────────────────────────────────────
     for ad, kat, stok, alis, satis in AKSESUARLAR:
