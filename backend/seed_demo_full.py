@@ -603,8 +603,7 @@ async def main():
                warranty_days, screen_lock_type, screen_lock_value, notes, assigned_to,
                created_by, son_guncelleyen_id, created_at, updated_at, tamirde_at, completed_at, delivered_at)
            VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$17,$18,$19,$20,$21,$22)""",
-        [(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12],
-          a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22]) for a in tamir_kayit])
+        tamir_kayit)
     print(f"Tamir: {TAMIR_SAYISI} ({len(teslim_bilgi)} teslim)")
 
     tamirler = {r["repair_no"]: r["id"] for r in
