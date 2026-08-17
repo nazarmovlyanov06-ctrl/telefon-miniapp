@@ -234,6 +234,18 @@ function AuthedRoot() {
   return <Korumali>{(user) => user.rol === "super_admin" ? <SuperAdmin /> : <AppRoutes user={user} />}</Korumali>;
 }
 
+/** "/" için token kontrolü AYRI BİR BİLEŞENDE olmalı — doğrudan
+ * `element={getToken() ? <AuthedRoot/> : <Landing/>}` yazılırsa getToken()
+ * sadece App render olurken BİR KEZ çalışır ve sonuç elemente donar. Giriş
+ * sayfasındayken token yok olduğu için "/" kalıcı olarak <Landing/>'e
+ * kilitleniyor; giriş yapıp navigate("/") deyince App yeniden render
+ * olmadığından kullanıcı tanıtım sayfasını görüyor, ancak sayfayı elle
+ * yenileyince doğru ekran geliyordu. Bileşen olarak sarınca getToken()
+ * her eşleşmede yeniden çalışır. */
+function KokRota() {
+  return getToken() ? <AuthedRoot /> : <Landing />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -245,7 +257,7 @@ export default function App() {
         <Route path="/magaza/:slug/fis" element={<MagazaFis />} />
         <Route path="/magaza/:slug/fis/:repairNo" element={<MagazaFis />} />
         <Route path="/magaza/:slug/panelim" element={<MusteriPanel />} />
-        <Route path="/" element={getToken() ? <AuthedRoot /> : <Landing />} />
+        <Route path="/" element={<KokRota />} />
         <Route path="/*" element={<AuthedRoot />} />
       </Routes>
     </BrowserRouter>
