@@ -8,7 +8,7 @@ import {
   TriangleAlert, Plus, Wrench, X, ArrowRight, TrendingUp,
   ChevronDown, ChevronUp, Landmark, Target, Factory, Undo2, PhoneCall,
   Ban, MessageSquareWarning, Store, CalendarClock, Star, Repeat,
-  MessageCircle, Banknote, ScanLine, Users, SlidersHorizontal, Check, GripVertical,
+  MessageCircle, Banknote, ScanLine, Users, SlidersHorizontal, Check,
 } from "lucide-react";
 
 /* ── Kalıcı tarayıcı tercihleri ──────────────────────────────────────── */
@@ -602,32 +602,21 @@ export default function Dashboard({ user }) {
   }
 
   useEffect(() => {
-    function hareket(e) {
-      const key = basiliAnahtarRef.current;
-      if (!key) return;
-      const dx = e.clientX - basPozRef.current.x;
-      const dy = e.clientY - basPozRef.current.y;
-      if (!suruklemeBasladiRef.current) {
-        if (Math.hypot(dx, dy) > 9) {
-          if (titriyorRef.current) {
-            // Titreme modundayken yeni bir basılı-tutma beklemeden hemen sürüklemeye geç
-            suruklemeBasladiRef.current = true;
-            setSuruklenenBlok(key);
-          } else {
-            // Titreme dışında hareket = sayfa kaydırma, basılı tutma sayacını iptal et
-            clearTimeout(basiliTimerRef.current);
-            basiliAnahtarRef.current = null;
-          }
-        }
-        return;
-      }
+    // Sürükleme sırasında sayfa native kaydırmayı (touchAction:none) devre dışı
+    // bırakıyor; ekran kenarına yaklaşınca aşağı/yukarı otomatik kaydırma bu
+    // yüzden JS ile yapılıyor — yoksa listenin alt kısımlarına ulaşılamıyordu.
+    const pointerYRef = { current: 0 };
+    let kaydirmaFrame = null;
+
+    function swapKontrolEt(key) {
       const sira = blokSirasiRef.current;
+      const y = pointerYRef.current;
       for (const digerKey of sira) {
         if (digerKey === key) continue;
         const el = blokRefs.current[digerKey];
         if (!el) continue;
         const r = el.getBoundingClientRect();
-        if (e.clientY >= r.top && e.clientY <= r.bottom) {
+        if (y >= r.top && y <= r.bottom) {
           const i1 = sira.indexOf(key), i2 = sira.indexOf(digerKey);
           const yeni = [...sira];
           yeni.splice(i1, 1);
@@ -636,6 +625,45 @@ export default function Dashboard({ user }) {
           break;
         }
       }
+    }
+
+    function kaydirmaAdimi() {
+      if (!suruklemeBasladiRef.current) { kaydirmaFrame = null; return; }
+      const y = pointerYRef.current;
+      const h = window.innerHeight;
+      const kenar = 90;
+      let hiz = 0;
+      if (y < kenar) hiz = -Math.ceil((kenar - y) / 3.5);
+      else if (y > h - kenar) hiz = Math.ceil((kenar - (h - y)) / 3.5);
+      if (hiz !== 0) {
+        window.scrollBy(0, hiz);
+        swapKontrolEt(basiliAnahtarRef.current);
+      }
+      kaydirmaFrame = requestAnimationFrame(kaydirmaAdimi);
+    }
+
+    function hareket(e) {
+      const key = basiliAnahtarRef.current;
+      if (!key) return;
+      pointerYRef.current = e.clientY;
+      const dx = e.clientX - basPozRef.current.x;
+      const dy = e.clientY - basPozRef.current.y;
+      if (!suruklemeBasladiRef.current) {
+        if (Math.hypot(dx, dy) > 9) {
+          if (titriyorRef.current) {
+            // Titreme modundayken yeni bir basılı-tutma beklemeden hemen sürüklemeye geç
+            suruklemeBasladiRef.current = true;
+            setSuruklenenBlok(key);
+            if (!kaydirmaFrame) kaydirmaFrame = requestAnimationFrame(kaydirmaAdimi);
+          } else {
+            // Titreme dışında hareket = sayfa kaydırma, basılı tutma sayacını iptal et
+            clearTimeout(basiliTimerRef.current);
+            basiliAnahtarRef.current = null;
+          }
+        }
+        return;
+      }
+      swapKontrolEt(key);
     }
     function birak() {
       clearTimeout(basiliTimerRef.current);
@@ -657,6 +685,7 @@ export default function Dashboard({ user }) {
       window.removeEventListener("pointermove", hareket);
       window.removeEventListener("pointerup", birak);
       window.removeEventListener("pointercancel", birak);
+      if (kaydirmaFrame) cancelAnimationFrame(kaydirmaFrame);
     };
   }, []);
 
@@ -945,23 +974,24 @@ export default function Dashboard({ user }) {
         if (icerik === null) return null;
         const suruklenen = suruklenenBlok === key;
         return (
+          // Dış sarmal SABİT kalır (transform yok) — dokunma/basılı-tutma
+          // izlemesi bu elemanda yapılıyor. Titreşim animasyonu içteki div'e
+          // uygulanıyor, böylece dokunulan eleman sürekli transform almıyor.
           <div key={key}
             ref={el => (blokRefs.current[key] = el)}
             onPointerDown={e => blokBasBasla(e, key)}
-            className={suruklenen ? "dash-blok-suruklenen" : titriyor ? "dash-blok-titriyor" : ""}
+            className="dash-blok-sarmal"
             style={{
               marginBottom: 14,
               touchAction: titriyor ? "none" : "auto",
-              animationDelay: titriyor && !suruklenen ? (i % 2 === 0 ? "0s" : "-0.13s") : undefined,
               position: "relative",
             }}>
-            {titriyor && (
-              <div style={{ position: "absolute", top: -6, right: -4, zIndex: 5, color: "var(--hint)", pointerEvents: "none" }}>
-                <GripVertical size={16} strokeWidth={2.2} />
+            <div
+              className={suruklenen ? "dash-blok-suruklenen" : titriyor ? "dash-blok-titriyor" : ""}
+              style={{ animationDelay: titriyor && !suruklenen ? (i % 2 === 0 ? "0s" : "-0.15s") : undefined }}>
+              <div style={{ pointerEvents: titriyor ? "none" : "auto" }}>
+                {icerik}
               </div>
-            )}
-            <div style={{ pointerEvents: titriyor ? "none" : "auto" }}>
-              {icerik}
             </div>
           </div>
         );

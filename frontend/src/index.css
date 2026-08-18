@@ -453,13 +453,22 @@ body {
 }
 
 /* ── Ana Sayfa blok sıralama (iOS tarzı "titreşim") ───────────────────── */
+/* Titreşim animasyonu, dokunmayı algılayan dış sarmala DEĞİL iç bir div'e
+   uygulanıyor — dokunma sırasında transform'un olduğu elemanı animasyonla
+   sürekli değiştirmek bazı tarayıcılarda aktif dokunma izlemesini kesip
+   "tekrar sürüklemeye çalışınca hemen duruyor" sorununa yol açıyordu. */
 @keyframes dashWiggle {
-  0% { transform: rotate(-1deg); }
-  50% { transform: rotate(1deg); }
-  100% { transform: rotate(-1deg); }
+  0% { transform: rotate(-0.6deg); }
+  50% { transform: rotate(0.6deg); }
+  100% { transform: rotate(-0.6deg); }
+}
+.dash-blok-sarmal {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .dash-blok-titriyor {
-  animation: dashWiggle 0.26s ease-in-out infinite;
+  animation: dashWiggle 0.5s ease-in-out infinite;
 }
 .dash-blok-suruklenen {
   animation: none !important;
