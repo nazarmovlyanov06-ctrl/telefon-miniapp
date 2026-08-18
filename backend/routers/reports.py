@@ -29,11 +29,22 @@ async def dashboard(
     )
     tamir_durumlar = {r["status"]: r["c"] for r in rows}
 
-    rows = await db.fetch(
-        "SELECT tur, COALESCE(SUM(tutar),0) as t FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih=$2 GROUP BY tur",
+    # ⚠️ Uygulama genelinde kasa_hareketleri.tur için İKİ farklı yazım kullanılıyor:
+    # bazı router'lar 'giris'/'cikis' yazıyor (aksesuar, parça iade), bazıları
+    # 'gelir' yazıyor (tamir, 2.el, sıfır), giderler ise hep 'cikis' yazıyor —
+    # literal 'gider' hiçbir yerde YAZILMIYOR. Eskiden burada sadece tur='gelir'/
+    # 'gider' aranıyordu; sonuç: "Bugün Gider" her zaman 0 görünüyordu (gerçek
+    # giderler 'cikis' olarak kayıtlı) ve "Bugün Gelir" aksesuar/parça iade
+    # gelirini kaçırıyordu. IN (...) ile ikisi de kapsanıyor — kasa.py/ozet
+    # endpoint'i zaten bu şekilde doğru hesaplıyordu.
+    kasa_gelir_bugun = await scalar(
+        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih=$2 AND tur IN ('giris','gelir')",
         dukkan_id, today,
     )
-    kasa = {r["tur"]: float(r["t"]) for r in rows}
+    kasa_gider_bugun = await scalar(
+        "SELECT COALESCE(SUM(tutar),0) FROM kasa_hareketleri WHERE dukkan_id=$1 AND tarih=$2 AND tur IN ('cikis','gider')",
+        dukkan_id, today,
+    )
 
     stok_uyari = [dict(r) for r in await db.fetch(
         """SELECT name, quantity, min_quantity FROM parts
@@ -43,14 +54,14 @@ async def dashboard(
     )]
 
     garanti_uyari = [dict(r) for r in await db.fetch(
-        """SELECT musteri_adi, cihaz, bitis_tarihi FROM garantiler
+        """SELECT id, musteri_adi, cihaz, bitis_tarihi FROM garantiler
            WHERE dukkan_id=$1 AND aktif=true AND bitis_tarihi >= $2 AND bitis_tarihi <= $3
            ORDER BY bitis_tarihi ASC LIMIT 5""",
         dukkan_id, today, yedi_gun_sonra,
     )]
 
     borc_uyari = [dict(r) for r in await db.fetch(
-        """SELECT COALESCE(c.name, d.alacakli_adi) as musteri_adi,
+        """SELECT d.id, COALESCE(c.name, d.alacakli_adi) as musteri_adi,
                   d.total_amount - d.paid_amount as kalan, d.due_date
            FROM debts d LEFT JOIN customers c ON d.customer_id = c.id
            WHERE d.dukkan_id=$1 AND d.due_date < $2 AND d.total_amount > d.paid_amount
@@ -76,10 +87,31 @@ async def dashboard(
         dukkan_id,
     )]
 
-    bu_ay_gelir = await scalar(
-        "SELECT COALESCE(SUM(final_price),0) FROM repairs WHERE dukkan_id=$1 AND status='teslim' AND delivered_at >= $2",
-        dukkan_id, month_start_date,
+    # "Bu ay kazanç" — kasa_hareketleri üzerinden, kaynak bazlı döküm ile birlikte
+    # (yalnızca teslim edilmiş tamir gelirini değil, 2.el/sıfır/aksesuar/parça iade
+    # gelirini de kapsar — kart üstündeki toplamla döküm listesi böylece birbirini tutar).
+    kaynak_rows = await db.fetch(
+        """SELECT COALESCE(kaynak,'diger') as k, COALESCE(SUM(tutar),0) as t
+           FROM kasa_hareketleri
+           WHERE dukkan_id=$1 AND tur IN ('giris','gelir') AND tarih>=$2 AND tarih<=$3
+           GROUP BY k ORDER BY t DESC""",
+        dukkan_id, month_start, today,
     )
+    kaynak_ham = {r["k"]: float(r["t"]) for r in kaynak_rows}
+    KAYNAK_LABEL = {
+        "tamir": "Tamir gelirleri", "2el_satis": "2. El satış", "sifir_satis": "Sıfır cihaz",
+        "aksesuar": "Aksesuar satış", "parca_iade": "Parça iade",
+    }
+    bu_ay_kaynaklar = []
+    for k, label in KAYNAK_LABEL.items():
+        t = kaynak_ham.pop(k, 0)
+        if t > 0:
+            bu_ay_kaynaklar.append({"kaynak": k, "label": label, "tutar": t})
+    diger = sum(kaynak_ham.values())
+    if diger > 0:
+        bu_ay_kaynaklar.append({"kaynak": "diger", "label": "Diğer", "tutar": diger})
+    bu_ay_gelir = sum(x["tutar"] for x in bu_ay_kaynaklar)
+
     bu_ay_tamir = await scalar(
         "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND created_at >= $2", dukkan_id, month_start_date
     )
@@ -87,11 +119,11 @@ async def dashboard(
     return {
         "tamir_durumlar": tamir_durumlar,
         "kasa_bugun": {
-            "gelir": kasa.get("gelir", 0),
-            "gider": kasa.get("gider", 0),
-            "net": kasa.get("gelir", 0) - kasa.get("gider", 0),
+            "gelir": kasa_gelir_bugun,
+            "gider": kasa_gider_bugun,
+            "net": kasa_gelir_bugun - kasa_gider_bugun,
         },
-        "bu_ay": {"gelir": bu_ay_gelir, "tamir": bu_ay_tamir},
+        "bu_ay": {"gelir": bu_ay_gelir, "tamir": bu_ay_tamir, "kaynaklar": bu_ay_kaynaklar},
         "uyarilar": {"stok": stok_uyari, "garanti": garanti_uyari, "borc": borc_uyari},
         "aranacaklar": aranacaklar,
         "son_tamirler": son_tamirler,
@@ -102,7 +134,7 @@ async def dashboard(
             "teslim_sayisi": await scalar(
                 "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND DATE(delivered_at)=$2", dukkan_id, today_date
             ),
-            "gelir": kasa.get("gelir", 0),
+            "gelir": kasa_gelir_bugun,
         },
         "bekleyen": {
             "tamir": sum(tamir_durumlar.get(s, 0) for s in ["bekliyor", "tamirde", "parca_bekleniyor"]),

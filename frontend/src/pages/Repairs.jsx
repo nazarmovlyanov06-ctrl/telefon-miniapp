@@ -90,11 +90,21 @@ export default function Repairs() {
   }, [location.search]);
 
   useEffect(() => {
+    // location.search'i okuyan efekt tab'ı setTab ile güncelliyor; aynı render
+    // döngüsünde bu efekt henüz ESKİ tab değeriyle (ör. "") tetiklenip filtresiz
+    // bir istek atıyor, hemen ardından tab değişince YENİ (filtreli) istek de
+    // atılıyordu. Filtresiz istek ağda geç dönerse filtreli sonucun üzerine
+    // yazıp yanlış (karışık durumlu) listeyi gösteriyordu. `iptal` bayrağı geç
+    // kalan/eski isteklerin sonucunu uygulamayı engelliyor.
+    let iptal = false;
     setLoading(true);
     const params = {};
     if (tab) params.status = tab;
     if (q) params.q = q;
-    api.repairs(params).then(setRepairs).finally(() => setLoading(false));
+    api.repairs(params)
+      .then(r => { if (!iptal) setRepairs(r); })
+      .finally(() => { if (!iptal) setLoading(false); });
+    return () => { iptal = true; };
   }, [tab, q]);
 
   const sortedRepairs = useMemo(() => {
