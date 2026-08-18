@@ -222,6 +222,7 @@ body {
 .badge-parca_bekleniyor { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
 .badge-hazir { background: rgba(74, 222, 128, 0.15); color: var(--green); }
 .badge-teslim { background: rgba(123, 133, 150, 0.18); color: var(--locked); }
+.badge-iptal { background: rgba(248, 113, 113, 0.15); color: var(--red); }
 .badge-patron { background: rgba(210, 169, 85, 0.18); color: var(--gold); }
 .badge-teknisyen { background: rgba(94, 168, 255, 0.15); color: var(--blue); }
 .badge-satis { background: rgba(74, 222, 128, 0.15); color: var(--green); }
@@ -435,4 +436,38 @@ body {
   border-radius: var(--radius-sm);
   box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
   overflow: hidden;
+}
+
+/* ── Zorunlu alan uyarısı (NewRepair.jsx) ─────────────────────────────── */
+@keyframes alanShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+.alan-hata {
+  animation: alanShake 0.4s ease;
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.28) !important;
+}
+
+/* ── Ana Sayfa blok sıralama (iOS tarzı "titreşim") ───────────────────── */
+@keyframes dashWiggle {
+  0% { transform: rotate(-1deg); }
+  50% { transform: rotate(1deg); }
+  100% { transform: rotate(-1deg); }
+}
+.dash-blok-titriyor {
+  animation: dashWiggle 0.26s ease-in-out infinite;
+}
+.dash-blok-suruklenen {
+  animation: none !important;
+  opacity: 0.88;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.5) !important;
+  position: relative;
+  z-index: 60;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-blok-titriyor { animation: none; outline: 1.5px dashed var(--hint); }
 }

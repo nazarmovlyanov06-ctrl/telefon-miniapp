@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import {
@@ -8,7 +8,7 @@ import {
   TriangleAlert, Plus, Wrench, X, ArrowRight, TrendingUp,
   ChevronDown, ChevronUp, Landmark, Target, Factory, Undo2, PhoneCall,
   Ban, MessageSquareWarning, Store, CalendarClock, Star, Repeat,
-  MessageCircle, Banknote, ScanLine, Users, SlidersHorizontal, Check,
+  MessageCircle, Banknote, ScanLine, Users, SlidersHorizontal, Check, GripVertical,
 } from "lucide-react";
 
 /* ── Kalıcı tarayıcı tercihleri ──────────────────────────────────────── */
@@ -62,6 +62,22 @@ function hizliErisimOku() {
     if (Array.isArray(v) && v.length) return v;
   } catch { /* ilk kullanım */ }
   return VARSAYILAN_HIZLI;
+}
+
+// Ana sayfa bloklarının (durum/kasa/kazanç/uyarılar/hızlı erişim/bekleyenler/
+// stok) sırası — basılı tutup titretip sürükleyerek değiştirilebilir, cihazda
+// saklanır.
+const BLOK_ANAHTAR = "dashboard_blok_sirasi";
+const VARSAYILAN_BLOK_SIRASI = ["durum", "kasa", "kazanc", "borc", "garanti", "arama", "hizli", "bekleyenler", "stok"];
+function blokSirasiOku() {
+  try {
+    const v = JSON.parse(localStorage.getItem(BLOK_ANAHTAR));
+    if (Array.isArray(v) && v.length) {
+      const eksikler = VARSAYILAN_BLOK_SIRASI.filter(k => !v.includes(k));
+      return [...v.filter(k => VARSAYILAN_BLOK_SIRASI.includes(k)), ...eksikler];
+    }
+  } catch { /* ilk kullanım */ }
+  return VARSAYILAN_BLOK_SIRASI;
 }
 
 const DURUM_RENK = {
@@ -544,6 +560,106 @@ export default function Dashboard({ user }) {
   const [hizliDuzenleAcik, setHizliDuzenleAcik] = useState(false);
   const navigate = useNavigate();
 
+  // ── Basılı tut → titret → sürükleyip sırasını değiştir ────────────────
+  const [blokSirasi, setBlokSirasiState] = useState(blokSirasiOku);
+  const [titriyor, setTitriyor] = useState(false);
+  const [suruklenenBlok, setSuruklenenBlok] = useState(null);
+  const blokRefs = useRef({});
+  const blokSirasiRef = useRef(blokSirasi);
+  const titriyorRef = useRef(false);
+  const basiliTimerRef = useRef(null);
+  const basPozRef = useRef({ x: 0, y: 0 });
+  const basiliAnahtarRef = useRef(null);
+  const suruklemeBasladiRef = useRef(false);
+  const justEnteredWiggleRef = useRef(false);
+
+  function blokSirasiAyarla(yeni) {
+    blokSirasiRef.current = yeni;
+    setBlokSirasiState(yeni);
+    localStorage.setItem(BLOK_ANAHTAR, JSON.stringify(yeni));
+  }
+  function titriyorAyarla(v) {
+    titriyorRef.current = v;
+    setTitriyor(v);
+  }
+
+  function blokBasBasla(e, key) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    basPozRef.current = { x: e.clientX, y: e.clientY };
+    basiliAnahtarRef.current = key;
+    suruklemeBasladiRef.current = false;
+    clearTimeout(basiliTimerRef.current);
+    if (!titriyorRef.current) {
+      basiliTimerRef.current = setTimeout(() => {
+        if (basiliAnahtarRef.current !== key) return;
+        titriyorAyarla(true);
+        suruklemeBasladiRef.current = true;
+        setSuruklenenBlok(key);
+        justEnteredWiggleRef.current = true;
+        if (navigator.vibrate) navigator.vibrate(12);
+      }, 480);
+    }
+  }
+
+  useEffect(() => {
+    function hareket(e) {
+      const key = basiliAnahtarRef.current;
+      if (!key) return;
+      const dx = e.clientX - basPozRef.current.x;
+      const dy = e.clientY - basPozRef.current.y;
+      if (!suruklemeBasladiRef.current) {
+        if (Math.hypot(dx, dy) > 9) {
+          if (titriyorRef.current) {
+            // Titreme modundayken yeni bir basılı-tutma beklemeden hemen sürüklemeye geç
+            suruklemeBasladiRef.current = true;
+            setSuruklenenBlok(key);
+          } else {
+            // Titreme dışında hareket = sayfa kaydırma, basılı tutma sayacını iptal et
+            clearTimeout(basiliTimerRef.current);
+            basiliAnahtarRef.current = null;
+          }
+        }
+        return;
+      }
+      const sira = blokSirasiRef.current;
+      for (const digerKey of sira) {
+        if (digerKey === key) continue;
+        const el = blokRefs.current[digerKey];
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (e.clientY >= r.top && e.clientY <= r.bottom) {
+          const i1 = sira.indexOf(key), i2 = sira.indexOf(digerKey);
+          const yeni = [...sira];
+          yeni.splice(i1, 1);
+          yeni.splice(i2, 0, key);
+          blokSirasiAyarla(yeni);
+          break;
+        }
+      }
+    }
+    function birak() {
+      clearTimeout(basiliTimerRef.current);
+      const surukluyorduMu = suruklemeBasladiRef.current;
+      const girisMiydi = justEnteredWiggleRef.current;
+      justEnteredWiggleRef.current = false;
+      if (titriyorRef.current && !surukluyorduMu && !girisMiydi) {
+        // Titreme modundayken hareket etmeden düz bir tıklama yapıldı — moddan çık
+        titriyorAyarla(false);
+      }
+      setSuruklenenBlok(null);
+      basiliAnahtarRef.current = null;
+      suruklemeBasladiRef.current = false;
+    }
+    window.addEventListener("pointermove", hareket);
+    window.addEventListener("pointerup", birak);
+    window.addEventListener("pointercancel", birak);
+    return () => {
+      window.removeEventListener("pointermove", hareket);
+      window.removeEventListener("pointerup", birak);
+      window.removeEventListener("pointercancel", birak);
+    };
+  }, []);
+
   function bolumToggle(k) {
     setAcikBolum(b => {
       const yeni = { ...b, [k]: !b[k] };
@@ -597,6 +713,201 @@ export default function Dashboard({ user }) {
     .map(p => TUM_MODULLER.find(m => m.path === p))
     .filter(Boolean);
 
+  // Sürüklenip taşınabilen her blok — boş olan bölümler (ör. borç/garanti/
+  // aranacak listesi boşsa) null döner ve hiç render edilmez, böylece boş bir
+  // titreşen kutu görünmez.
+  function blokIcerigi(key) {
+    switch (key) {
+      case "durum":
+        return (
+          <div className="stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+            {["bekliyor", "tamirde", "parca_bekleniyor", "hazir"].map(k => (
+              <div key={k} className="stat-card raised" onClick={() => !titriyor && setAcikDurum(k)}
+                style={{ textAlign: "center", cursor: "pointer", padding: "12px 6px 10px" }}>
+                <div className="stat-value" style={{ fontSize: 20, color: DURUM_RENK[k] }}>
+                  {durumlar[k] || 0}
+                </div>
+                <div className="stat-label" style={{ marginTop: 4 }}>{DURUM_LABEL[k]}</div>
+                <div style={{ height: 2.5, borderRadius: 2, marginTop: 8, background: DURUM_RENK[k], opacity: 0.7 }} />
+              </div>
+            ))}
+          </div>
+        );
+
+      case "kasa":
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div className="card" style={{ margin: 0, cursor: "pointer" }} onClick={() => !titriyor && setAcikKasaTip("gelir")}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                <Wallet size={13} stroke="var(--hint)" strokeWidth={2} />
+                <span style={{ fontSize: 11, color: "var(--hint)" }}>Bugün Gelir</span>
+              </div>
+              <div style={{ fontWeight: 300, fontSize: 20, color: "var(--green)", letterSpacing: -0.5 }}>{fmtH(kasa.gelir)}₺</div>
+            </div>
+            <div className="card" style={{ margin: 0, cursor: "pointer" }} onClick={() => !titriyor && setAcikKasaTip("gider")}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                <TrendingDown size={13} stroke="var(--hint)" strokeWidth={2} />
+                <span style={{ fontSize: 11, color: "var(--hint)" }}>Bugün Gider</span>
+              </div>
+              <div style={{ fontWeight: 300, fontSize: 20, color: "var(--red)", letterSpacing: -0.5 }}>{fmtH(kasa.gider)}₺</div>
+            </div>
+          </div>
+        );
+
+      case "kazanc":
+        return (
+          <div className="card" style={{ cursor: "pointer" }} onClick={() => !titriyor && setKazancAcik(true)}>
+            <div className="card-row">
+              <div>
+                <div style={{ fontWeight: 300, fontSize: 22, color: "var(--orange)", letterSpacing: -0.5 }}>
+                  {numH(bu_ay.gelir)}₺
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--hint)", marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}>
+                  Bu ay kazanç <TrendingUp size={11} strokeWidth={2} />
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontWeight: 700, color: "var(--text)" }}>{bu_ay.tamir || 0} tamir</div>
+                <div style={{ fontSize: 11.5, color: "var(--hint)", marginTop: 2 }}>{bugun.tamir_sayisi || 0} bugün açıldı</div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "borc":
+        if ((uyarilar.borc || []).length === 0) return null;
+        return (
+          <KatlanirBolum baslik="Gecikmiş Borçlar" ikon={CreditCard} renk="var(--red)"
+            sayi={(uyarilar.borc || []).length} acik={acikBolum.borc} onToggle={() => !titriyor && bolumToggle("borc")}>
+            {(uyarilar.borc || []).map((u, i) => (
+              <div key={u.id} onClick={() => !titriyor && setSecilenBorc(u)}
+                style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>{u.musteri_adi}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--red)" }}>{numH(u.kalan)}₺</span>
+              </div>
+            ))}
+          </KatlanirBolum>
+        );
+
+      case "garanti":
+        if ((uyarilar.garanti || []).length === 0) return null;
+        return (
+          <KatlanirBolum baslik="Garanti Bitiyor" ikon={ShieldCheck} renk="var(--blue)"
+            sayi={(uyarilar.garanti || []).length} acik={acikBolum.garanti} onToggle={() => !titriyor && bolumToggle("garanti")}>
+            {(uyarilar.garanti || []).map((u, i) => (
+              <div key={u.id} onClick={() => !titriyor && setSecilenGaranti(u)}
+                style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>{u.musteri_adi} · {u.cihaz}</span>
+                <span style={{ fontSize: 11.5, color: "var(--blue)", flexShrink: 0 }}>{u.bitis_tarihi}</span>
+              </div>
+            ))}
+          </KatlanirBolum>
+        );
+
+      case "arama":
+        if (aranacaklar.length === 0) return null;
+        return (
+          <KatlanirBolum baslik="Aranacaklar" ikon={Phone} renk="var(--green)"
+            sayi={aranacaklar.length} acik={acikBolum.arama} onToggle={() => !titriyor && bolumToggle("arama")}>
+            {aranacaklar.map((a, i) => (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none" }}>
+                <div style={{ flex: 1, fontSize: 12.5, cursor: "pointer", color: "var(--text)" }} onClick={() => !titriyor && setSecilenArama(a)}>
+                  <span style={{ fontWeight: 600 }}>{a.musteri_adi || "—"}</span> — {a.device_model}
+                </div>
+                {a.telefon && (
+                  <a href={`tel:${a.telefon}`} onClick={e => e.stopPropagation()}
+                    style={{
+                      width: 28, height: 28, borderRadius: "50%",
+                      background: "linear-gradient(135deg, var(--surf-hi), var(--surf-lo))",
+                      boxShadow: "var(--edge-lit), var(--edge-dark)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      textDecoration: "none", flexShrink: 0,
+                    }}>
+                    <Phone size={13} stroke="var(--green)" strokeWidth={2} />
+                  </a>
+                )}
+              </div>
+            ))}
+          </KatlanirBolum>
+        );
+
+      case "hizli":
+        return (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div className="section-title" style={{ margin: 0 }}>Hızlı Erişim</div>
+              <button onClick={() => !titriyor && setHizliDuzenleAcik(true)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, padding: "4px 6px" }}>
+                <SlidersHorizontal size={12} strokeWidth={2} /> Düzenle
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+              {gosterilenModuller.map(q => {
+                const Icon = q.icon;
+                return (
+                  <div key={q.path} onClick={() => !titriyor && navigate(q.path)}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, cursor: "pointer" }}>
+                    <div style={{ position: "relative", width: 52, height: 52 }}>
+                      <div style={{
+                        position: "absolute", inset: 0, borderRadius: 14,
+                        background: q.color, filter: "blur(13px)", opacity: 0.32,
+                        transform: "translateY(5px) scale(1.06)",
+                      }} />
+                      <div style={{
+                        position: "relative", width: 52, height: 52, borderRadius: 14,
+                        background: "linear-gradient(135deg, var(--surf-hi), var(--surf-lo))",
+                        boxShadow: "var(--edge-lit), var(--edge-dark), var(--lift)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <Icon size={21} stroke={q.color} strokeWidth={1.8} />
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--title)", textAlign: "center", lineHeight: 1.2 }}>
+                      {q.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      case "bekleyenler":
+        return (
+          <div>
+            <div className="section-title">Bekleyenler</div>
+            <div className="card">
+              <div className="card-row" style={{ padding: "10px 0", cursor: "pointer" }} onClick={() => !titriyor && setAktifTamirAcik(true)}>
+                <span style={{ fontSize: 13.5, color: "var(--text)" }}>Aktif Tamir</span>
+                <span style={{ fontWeight: 700, color: bekleyen.tamir > 0 ? "var(--orange)" : "var(--dim)" }}>{bekleyen.tamir || 0}</span>
+              </div>
+              <div className="divider" />
+              <div className="card-row" style={{ padding: "10px 0", cursor: "pointer" }} onClick={() => !titriyor && setAcikBorcAcik(true)}>
+                <span style={{ fontSize: 13.5, color: "var(--text)" }}>Açık Borç</span>
+                <span style={{ fontWeight: 700, color: bekleyen.borc > 0 ? "var(--orange)" : "var(--dim)" }}>{bekleyen.borc || 0}</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "stok":
+        if (stokListe.length === 0) return null;
+        return (
+          <div className="card" onClick={() => !titriyor && setStokAcik(true)} style={{ cursor: "pointer" }}>
+            <div className="card-row">
+              <span style={{ color: "var(--orange)", fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                <TriangleAlert size={15} strokeWidth={2} /> Azalan Stok
+              </span>
+              <span style={{ fontWeight: 700, color: "var(--orange)", fontSize: 13 }}>{stokListe.length} ürün →</span>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  }
+
   return (
     <div className="page" style={{ paddingBottom: 90 }}>
 
@@ -623,167 +934,40 @@ export default function Dashboard({ user }) {
         </button>
       </div>
 
-      {/* Tamir durum sayıları */}
-      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-        {["bekliyor", "tamirde", "parca_bekleniyor", "hazir"].map(k => (
-          <div key={k} className="stat-card raised" onClick={() => setAcikDurum(k)}
-            style={{ textAlign: "center", cursor: "pointer", padding: "12px 6px 10px" }}>
-            <div className="stat-value" style={{ fontSize: 20, color: DURUM_RENK[k] }}>
-              {durumlar[k] || 0}
-            </div>
-            <div className="stat-label" style={{ marginTop: 4 }}>{DURUM_LABEL[k]}</div>
-            <div style={{ height: 2.5, borderRadius: 2, marginTop: 8, background: DURUM_RENK[k], opacity: 0.7 }} />
-          </div>
-        ))}
-      </div>
-
-      {/* Bugün kasa */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, margin: "12px 0 14px" }}>
-        <div className="card" style={{ margin: 0, cursor: "pointer" }} onClick={() => setAcikKasaTip("gelir")}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-            <Wallet size={13} stroke="var(--hint)" strokeWidth={2} />
-            <span style={{ fontSize: 11, color: "var(--hint)" }}>Bugün Gelir</span>
-          </div>
-          <div style={{ fontWeight: 300, fontSize: 20, color: "var(--green)", letterSpacing: -0.5 }}>{fmtH(kasa.gelir)}₺</div>
-        </div>
-        <div className="card" style={{ margin: 0, cursor: "pointer" }} onClick={() => setAcikKasaTip("gider")}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-            <TrendingDown size={13} stroke="var(--hint)" strokeWidth={2} />
-            <span style={{ fontSize: 11, color: "var(--hint)" }}>Bugün Gider</span>
-          </div>
-          <div style={{ fontWeight: 300, fontSize: 20, color: "var(--red)", letterSpacing: -0.5 }}>{fmtH(kasa.gider)}₺</div>
-        </div>
-      </div>
-
-      {/* Bu ay */}
-      <div className="card" style={{ cursor: "pointer" }} onClick={() => setKazancAcik(true)}>
-        <div className="card-row">
-          <div>
-            <div style={{ fontWeight: 300, fontSize: 22, color: "var(--orange)", letterSpacing: -0.5 }}>
-              {numH(bu_ay.gelir)}₺
-            </div>
-            <div style={{ fontSize: 11.5, color: "var(--hint)", marginTop: 2, display: "flex", alignItems: "center", gap: 5 }}>
-              Bu ay kazanç <TrendingUp size={11} strokeWidth={2} />
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontWeight: 700, color: "var(--text)" }}>{bu_ay.tamir || 0} tamir</div>
-            <div style={{ fontSize: 11.5, color: "var(--hint)", marginTop: 2 }}>{bugun.tamir_sayisi || 0} bugün açıldı</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Katlanır uyarı bölümleri */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "14px 0" }}>
-        <KatlanirBolum baslik="Gecikmiş Borçlar" ikon={CreditCard} renk="var(--red)"
-          sayi={(uyarilar.borc || []).length} acik={acikBolum.borc} onToggle={() => bolumToggle("borc")}>
-          {(uyarilar.borc || []).map((u, i) => (
-            <div key={u.id} onClick={() => setSecilenBorc(u)}
-              style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>{u.musteri_adi}</span>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--red)" }}>{numH(u.kalan)}₺</span>
-            </div>
-          ))}
-        </KatlanirBolum>
-
-        <KatlanirBolum baslik="Garanti Bitiyor" ikon={ShieldCheck} renk="var(--blue)"
-          sayi={(uyarilar.garanti || []).length} acik={acikBolum.garanti} onToggle={() => bolumToggle("garanti")}>
-          {(uyarilar.garanti || []).map((u, i) => (
-            <div key={u.id} onClick={() => setSecilenGaranti(u)}
-              style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>{u.musteri_adi} · {u.cihaz}</span>
-              <span style={{ fontSize: 11.5, color: "var(--blue)", flexShrink: 0 }}>{u.bitis_tarihi}</span>
-            </div>
-          ))}
-        </KatlanirBolum>
-
-        <KatlanirBolum baslik="Aranacaklar" ikon={Phone} renk="var(--green)"
-          sayi={aranacaklar.length} acik={acikBolum.arama} onToggle={() => bolumToggle("arama")}>
-          {aranacaklar.map((a, i) => (
-            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none" }}>
-              <div style={{ flex: 1, fontSize: 12.5, cursor: "pointer", color: "var(--text)" }} onClick={() => setSecilenArama(a)}>
-                <span style={{ fontWeight: 600 }}>{a.musteri_adi || "—"}</span> — {a.device_model}
-              </div>
-              {a.telefon && (
-                <a href={`tel:${a.telefon}`} onClick={e => e.stopPropagation()}
-                  style={{
-                    width: 28, height: 28, borderRadius: "50%",
-                    background: "linear-gradient(135deg, var(--surf-hi), var(--surf-lo))",
-                    boxShadow: "var(--edge-lit), var(--edge-dark)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    textDecoration: "none", flexShrink: 0,
-                  }}>
-                  <Phone size={13} stroke="var(--green)" strokeWidth={2} />
-                </a>
-              )}
-            </div>
-          ))}
-        </KatlanirBolum>
-      </div>
-
-      {/* Hızlı Erişim */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div className="section-title" style={{ margin: 0 }}>Hızlı Erişim</div>
-        <button onClick={() => setHizliDuzenleAcik(true)}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, padding: "4px 6px" }}>
-          <SlidersHorizontal size={12} strokeWidth={2} /> Düzenle
-        </button>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
-        {gosterilenModuller.map(q => {
-          const Icon = q.icon;
-          return (
-            <div key={q.path} onClick={() => navigate(q.path)}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, cursor: "pointer" }}>
-              <div style={{ position: "relative", width: 52, height: 52 }}>
-                <div style={{
-                  position: "absolute", inset: 0, borderRadius: 14,
-                  background: q.color, filter: "blur(13px)", opacity: 0.32,
-                  transform: "translateY(5px) scale(1.06)",
-                }} />
-                <div style={{
-                  position: "relative", width: 52, height: 52, borderRadius: 14,
-                  background: "linear-gradient(135deg, var(--surf-hi), var(--surf-lo))",
-                  boxShadow: "var(--edge-lit), var(--edge-dark), var(--lift)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <Icon size={21} stroke={q.color} strokeWidth={1.8} />
-                </div>
-              </div>
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--title)", textAlign: "center", lineHeight: 1.2 }}>
-                {q.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Bekleyenler */}
-      <div className="section-title">Bekleyenler</div>
-      <div className="card">
-        <div className="card-row" style={{ padding: "10px 0", cursor: "pointer" }} onClick={() => setAktifTamirAcik(true)}>
-          <span style={{ fontSize: 13.5, color: "var(--text)" }}>Aktif Tamir</span>
-          <span style={{ fontWeight: 700, color: bekleyen.tamir > 0 ? "var(--orange)" : "var(--dim)" }}>{bekleyen.tamir || 0}</span>
-        </div>
-        <div className="divider" />
-        <div className="card-row" style={{ padding: "10px 0", cursor: "pointer" }} onClick={() => setAcikBorcAcik(true)}>
-          <span style={{ fontSize: 13.5, color: "var(--text)" }}>Açık Borç</span>
-          <span style={{ fontWeight: 700, color: bekleyen.borc > 0 ? "var(--orange)" : "var(--dim)" }}>{bekleyen.borc || 0}</span>
-        </div>
-      </div>
-
-      {stokListe.length > 0 && (
-        <div className="card" onClick={() => setStokAcik(true)} style={{ marginTop: 14, cursor: "pointer" }}>
-          <div className="card-row">
-            <span style={{ color: "var(--orange)", fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
-              <TriangleAlert size={15} strokeWidth={2} /> Azalan Stok
-            </span>
-            <span style={{ fontWeight: 700, color: "var(--orange)", fontSize: 13 }}>{stokListe.length} ürün →</span>
-          </div>
+      {titriyor && (
+        <div style={{ textAlign: "center", fontSize: 11.5, color: "var(--hint)", margin: "0 0 10px", padding: "6px 10px", background: "var(--bg2)", borderRadius: 8 }}>
+          Sırasını değiştirmek için tutup sürükleyin — bitirince başka bir yere dokunun
         </div>
       )}
 
-      <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={() => navigate("/repairs/new")}>
+      {blokSirasi.map((key, i) => {
+        const icerik = blokIcerigi(key);
+        if (icerik === null) return null;
+        const suruklenen = suruklenenBlok === key;
+        return (
+          <div key={key}
+            ref={el => (blokRefs.current[key] = el)}
+            onPointerDown={e => blokBasBasla(e, key)}
+            className={suruklenen ? "dash-blok-suruklenen" : titriyor ? "dash-blok-titriyor" : ""}
+            style={{
+              marginBottom: 14,
+              touchAction: titriyor ? "none" : "auto",
+              animationDelay: titriyor && !suruklenen ? (i % 2 === 0 ? "0s" : "-0.13s") : undefined,
+              position: "relative",
+            }}>
+            {titriyor && (
+              <div style={{ position: "absolute", top: -6, right: -4, zIndex: 5, color: "var(--hint)", pointerEvents: "none" }}>
+                <GripVertical size={16} strokeWidth={2.2} />
+              </div>
+            )}
+            <div style={{ pointerEvents: titriyor ? "none" : "auto" }}>
+              {icerik}
+            </div>
+          </div>
+        );
+      })}
+
+      <button className="btn btn-primary" style={{ marginTop: 4 }} onClick={() => navigate("/repairs/new")}>
         <Plus size={16} strokeWidth={2.4} /> Yeni Tamir Kaydı
       </button>
 

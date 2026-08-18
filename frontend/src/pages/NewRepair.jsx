@@ -57,15 +57,30 @@ const ARIZA_CHIPS = [
   "Mikrofon", "Wifi sorunu", "Bluetooth", "Sinyal yok",
 ];
 
+function telefonTamMi(v) {
+  const rakam = (v || "").replace(/\D/g, "");
+  return rakam.length === 10 || rakam.length === 11;
+}
+
 export default function NewRepair() {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [hataAlan, setHataAlan] = useState(null);
   const [form, setForm] = useState({
     customer_name: "", customer_phone: "",
     device_model: "", imei: "", fault_desc: "",
     estimated_price: "", notes: "",
   });
+
+  // Zorunlu alanlara odaklanıp kaydırmak için — kayıt, bunlar doldurulmadan
+  // atlanamaz: müşteri adı, eksiksiz telefon, cihaz modeli, arıza; ekran
+  // kilidi açıksa PIN/desen de.
+  const musteriAdiRef = useRef(null);
+  const telefonRef = useRef(null);
+  const modelRef = useRef(null);
+  const arizaRef = useRef(null);
+  const kilitRef = useRef(null);
 
   // Ekran kilidi
   const [lockEnabled, setLockEnabled] = useState(false);
@@ -167,10 +182,40 @@ export default function NewRepair() {
     set("fault_desc", form.fault_desc ? form.fault_desc + ", " + chip : chip);
   }
 
+  function dogrula() {
+    if (!form.customer_name.trim()) {
+      return { ref: musteriAdiRef, alan: "musteriAdi", mesaj: "Müşteri adını girmeden kayıt oluşturulamaz." };
+    }
+    if (!telefonTamMi(form.customer_phone)) {
+      return { ref: telefonRef, alan: "telefon", mesaj: "Telefon numarasını eksiksiz girin (ör. 0555 123 45 67)." };
+    }
+    if (!form.device_model.trim()) {
+      return { ref: modelRef, alan: "model", mesaj: "Cihaz modelini girmeden kayıt oluşturulamaz." };
+    }
+    if (!form.fault_desc.trim()) {
+      return { ref: arizaRef, alan: "ariza", mesaj: "Arıza açıklamasını girmeden kayıt oluşturulamaz." };
+    }
+    if (lockEnabled) {
+      const kilitDolu = lockType === "pin" ? lockPin.length >= 4 : lockPattern.length > 0;
+      if (!kilitDolu) {
+        return {
+          ref: kilitRef, alan: "kilit",
+          mesaj: `Ekran kilidi açık işaretlendi — ${lockType === "pin" ? "PIN kodunu" : "deseni"} girmeden kayıt oluşturulamaz.`,
+        };
+      }
+    }
+    return null;
+  }
+
   async function submit(e) {
     e.preventDefault();
-    if (!form.device_model || !form.fault_desc) {
-      setError("Cihaz modeli ve arıza açıklaması zorunlu");
+    const hata = dogrula();
+    if (hata) {
+      setError(hata.mesaj);
+      setHataAlan(hata.alan);
+      hata.ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      hata.ref.current?.focus?.();
+      setTimeout(() => setHataAlan(null), 1700);
       return;
     }
     setSaving(true);
@@ -231,8 +276,11 @@ export default function NewRepair() {
       {error && <div className="error-msg">{error}</div>}
 
       <form onSubmit={submit}>
-        <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}><Lock size={13} strokeWidth={2} /> Ekran Kilidi</div>
-        <div className="card" style={{ marginBottom: 8 }}>
+        <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Lock size={13} strokeWidth={2} /> Ekran Kilidi
+          {lockEnabled && <span style={{ color: "var(--danger)" }}>*</span>}
+        </div>
+        <div ref={kilitRef} tabIndex={-1} className={"card" + (hataAlan === "kilit" ? " alan-hata" : "")} style={{ marginBottom: 8 }}>
           {/* Açma/kapama */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: lockEnabled ? 16 : 0 }}>
             <div>
@@ -296,7 +344,7 @@ export default function NewRepair() {
           <div className="form-group" style={{ position: "relative" }}>
             <label className="form-label">Müşteri Adı *</label>
             <div style={{ display: "flex", gap: 8 }}>
-              <input className="form-input" style={{ flex: 1 }} placeholder="Ad Soyad"
+              <input ref={musteriAdiRef} className={"form-input" + (hataAlan === "musteriAdi" ? " alan-hata" : "")} style={{ flex: 1 }} placeholder="Ad Soyad"
                 value={form.customer_name}
                 onChange={e => musteriAdiDegisti(e.target.value)}
                 onBlur={() => setTimeout(() => setShowMusteriOner(false), 150)}
@@ -320,8 +368,8 @@ export default function NewRepair() {
             )}
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Telefon</label>
-            <input className="form-input" placeholder="05xx xxx xx xx" type="tel"
+            <label className="form-label">Telefon *</label>
+            <input ref={telefonRef} className={"form-input" + (hataAlan === "telefon" ? " alan-hata" : "")} placeholder="05xx xxx xx xx" type="tel"
               value={form.customer_phone}
               onChange={e => set("customer_phone", e.target.value)} />
             {karaUyari.length > 0 && (
@@ -343,7 +391,7 @@ export default function NewRepair() {
             <label className="form-label">Cihaz Modeli *</label>
             <div style={{ display: "flex", gap: 8 }}>
               <div style={{ flex: 1, position: "relative" }}>
-                <input className="form-input" placeholder="iPhone 14, Samsung A54..."
+                <input ref={modelRef} className={"form-input" + (hataAlan === "model" ? " alan-hata" : "")} placeholder="iPhone 14, Samsung A54..."
                   value={form.device_model}
                   onChange={e => modelDegisti(e.target.value)}
                   onFocus={() => setModelFocus(true)}
@@ -372,7 +420,7 @@ export default function NewRepair() {
           <div className="form-group">
             <label className="form-label">Arıza *</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-              <input className="form-input" style={{ flex: 1 }} placeholder="Ekran kırık, batarya..."
+              <input ref={arizaRef} className={"form-input" + (hataAlan === "ariza" ? " alan-hata" : "")} style={{ flex: 1 }} placeholder="Ekran kırık, batarya..."
                 value={form.fault_desc}
                 onChange={e => set("fault_desc", e.target.value)} />
               <VoiceInput onResult={v => set("fault_desc", form.fault_desc ? form.fault_desc + " " + v : v)} />

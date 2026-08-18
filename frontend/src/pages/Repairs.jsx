@@ -10,16 +10,17 @@ const TABS = [
   { key: "parca_bekleniyor", label: "Parça" },
   { key: "hazir", label: "Hazır" },
   { key: "teslim", label: "Teslim" },
+  { key: "iptal", label: "İptal" },
 ];
 
 const STATUS_LABEL = {
   bekliyor: "Bekliyor", tamirde: "Tamirde",
-  parca_bekleniyor: "Parça", hazir: "Hazır", teslim: "Teslim",
+  parca_bekleniyor: "Parça", hazir: "Hazır", teslim: "Teslim", iptal: "İptal",
 };
 
 const STATUS_RENK = {
   bekliyor: "var(--orange)", tamirde: "var(--blue)",
-  parca_bekleniyor: "var(--purple)", hazir: "var(--green)", teslim: "var(--gray)",
+  parca_bekleniyor: "var(--purple)", hazir: "var(--green)", teslim: "var(--gray)", iptal: "var(--red)",
 };
 
 function servisSuresi(created_at, status) {

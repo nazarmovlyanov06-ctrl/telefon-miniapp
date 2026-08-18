@@ -26,8 +26,8 @@ async def list_repairs(
     params = [dukkan_id]
     if status == "aktif":
         # Ana Sayfa'daki "Aktif Tamir" önizlemesi için — teslim edilmemiş
-        # tüm durumları (bekliyor/tamirde/parça bekleniyor/hazır) kapsar.
-        where.append("r.status != 'teslim'")
+        # ve iptal edilmemiş tüm durumları (bekliyor/tamirde/parça bekleniyor/hazır) kapsar.
+        where.append("r.status NOT IN ('teslim', 'iptal')")
     elif status:
         params.append(status)
         where.append(f"r.status = ${len(params)}")

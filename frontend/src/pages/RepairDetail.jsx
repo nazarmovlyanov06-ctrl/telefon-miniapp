@@ -14,7 +14,22 @@ const STATUSES = [
   { key: "parca_bekleniyor", label: "Parça Bekleniyor" },
   { key: "hazir", label: "Hazır" },
   { key: "teslim", label: "Teslim Edildi" },
+  { key: "iptal", label: "İptal" },
 ];
+
+// Formdaki fiyat/garanti alanları <input> onChange'de string olarak
+// tutuluyor ("" dahil); bunlar backend'e olduğu gibi (string) gidince
+// PostgreSQL REAL/INTEGER kolonlarına yazılamayıp istek sessizce başarısız
+// oluyordu (durum butonları ve "Kaydet" hiçbir şey yapmıyormuş gibi
+// görünüyordu). Göndermeden önce sayıya çevriliyor.
+function sayisalTemizle(form) {
+  return {
+    ...form,
+    estimated_price: form.estimated_price === "" || form.estimated_price == null ? null : parseFloat(form.estimated_price),
+    final_price: form.final_price === "" || form.final_price == null ? null : parseFloat(form.final_price),
+    warranty_days: form.warranty_days === "" || form.warranty_days == null ? 0 : parseInt(form.warranty_days),
+  };
+}
 
 const DATE_ICONS = {
   acildi: FileClock,
@@ -103,9 +118,11 @@ export default function RepairDetail({ user }) {
     }
     setSaving(true);
     try {
-      await api.updateRepair(id, { ...form, status });
+      await api.updateRepair(id, sayisalTemizle({ ...form, status }));
       setRepair((r) => ({ ...r, status }));
       setForm((f) => ({ ...f, status }));
+    } catch (e) {
+      alert(e.message || "Durum değiştirilemedi");
     } finally { setSaving(false); }
   }
 
@@ -113,23 +130,28 @@ export default function RepairDetail({ user }) {
     setSaving(true);
     try {
       const final = parseFloat(teslimForm.final_price) || 0;
-      await api.updateRepair(id, {
+      await api.updateRepair(id, sayisalTemizle({
         ...form, status: "teslim", final_price: final,
         payment_type: teslimForm.payment_type,
         kasa_yazilsin: teslimForm.kasa_yazilsin && final > 0,
-      });
+      }));
       setRepair(r => ({ ...r, status: "teslim", final_price: final, payment_type: teslimForm.payment_type }));
       setForm(f => ({ ...f, status: "teslim", final_price: final, payment_type: teslimForm.payment_type }));
       setTeslimModal(false);
+    } catch (e) {
+      alert(e.message || "Teslim işlemi başarısız");
     } finally { setSaving(false); }
   }
 
   async function save() {
     setSaving(true);
     try {
-      await api.updateRepair(id, form);
-      setRepair((r) => ({ ...r, ...form }));
+      const payload = sayisalTemizle(form);
+      await api.updateRepair(id, payload);
+      setRepair((r) => ({ ...r, ...payload }));
       setEdit(false);
+    } catch (e) {
+      alert(e.message || "Kaydedilemedi");
     } finally { setSaving(false); }
   }
 
@@ -569,8 +591,10 @@ export default function RepairDetail({ user }) {
                 <div
                   onClick={async () => {
                     const yeni = repair[item.key] ? 0 : 1;
-                    await api.updateRepair(id, { ...form, [item.key]: yeni });
-                    setRepair(r => ({ ...r, [item.key]: yeni }));
+                    try {
+                      await api.updateRepair(id, sayisalTemizle({ ...form, [item.key]: yeni }));
+                      setRepair(r => ({ ...r, [item.key]: yeni }));
+                    } catch (e) { alert(e.message || "Güncellenemedi"); }
                   }}
                   style={{
                     width: 22, height: 22, borderRadius: 6, flexShrink: 0, cursor: "pointer",
