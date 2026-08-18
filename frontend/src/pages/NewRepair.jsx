@@ -4,7 +4,7 @@ import { api } from "../api";
 import VoiceInput from "../components/VoiceInput";
 import ImeiInput from "../components/ImeiInput";
 import PatternLock from "../components/PatternLock";
-import { Star, Lock, Hash, Shapes, CheckCircle2, Ban } from "lucide-react";
+import { Star, Lock, Hash, Shapes, CheckCircle2, Ban, Mic, Loader2, Sparkles, TriangleAlert } from "lucide-react";
 
 // PIN pad bileşeni
 function PinPad({ value, onChange }) {
@@ -104,6 +104,12 @@ export default function NewRepair() {
   const [karaUyari, setKaraUyari] = useState([]);
   const karaTimer = useRef(null);
 
+  // Tek mikrofonla karışık anlatıp AI'ın alanları ayırması
+  const [sesDinleniyor, setSesDinleniyor] = useState(false);
+  const [sesIsleniyor, setSesIsleniyor] = useState(false);
+  const [sesHata, setSesHata] = useState("");
+  const [aiDoldurdu, setAiDoldurdu] = useState(false);
+
   // Müşteri autocomplete
   const [musteriler, setMusteriler] = useState([]);
   const [musteriOner, setMusteriOner] = useState([]);
@@ -154,6 +160,58 @@ export default function NewRepair() {
         setKaraUyari([]);
       }
     }
+  }
+
+  // Tek mikrofona basıp karışık anlatınca (isim, telefon, model, arıza vb.)
+  // AI metni ayrıştırıp forma dolduruyor — kaydı KENDİSİ oluşturmuyor,
+  // kullanıcı kontrol edip "Kaydet"e basmalı.
+  function sesleDoldur() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setSesHata("Tarayıcınız ses girişini desteklemiyor"); return; }
+    const recognition = new SR();
+    recognition.lang = "tr-TR";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    setSesHata("");
+    setAiDoldurdu(false);
+    setSesDinleniyor(true);
+    recognition.onresult = async (e) => {
+      const transcript = e.results[0][0].transcript;
+      setSesDinleniyor(false);
+      setSesIsleniyor(true);
+      try {
+        const r = await api.aiTamirAyikla(transcript);
+        const a = r.alanlar || {};
+        if (Object.keys(a).length === 0) {
+          setSesHata(r.hata || "Alan bulunamadı, lütfen elle girin");
+        } else {
+          setForm(f => ({
+            ...f,
+            customer_name: a.customer_name != null ? String(a.customer_name) : f.customer_name,
+            customer_phone: a.customer_phone != null ? String(a.customer_phone) : f.customer_phone,
+            device_model: a.device_model != null ? String(a.device_model) : f.device_model,
+            fault_desc: a.fault_desc != null ? String(a.fault_desc) : f.fault_desc,
+            estimated_price: a.estimated_price != null ? String(a.estimated_price) : f.estimated_price,
+            notes: a.notes != null ? String(a.notes) : f.notes,
+          }));
+          if (a.screen_lock_type === "pin" || a.screen_lock_type === "pattern") {
+            setLockEnabled(true);
+            setLockType(a.screen_lock_type);
+            if (a.screen_lock_type === "pin" && a.screen_lock_value) {
+              setLockPin(String(a.screen_lock_value).replace(/\D/g, ""));
+            }
+          }
+          setAiDoldurdu(true);
+        }
+      } catch (err) {
+        setSesHata(err.message || "AI hatası, lütfen elle girin");
+      } finally {
+        setSesIsleniyor(false);
+      }
+    };
+    recognition.onerror = () => { setSesDinleniyor(false); setSesHata("Ses algılanamadı, tekrar deneyin"); };
+    recognition.onend = () => setSesDinleniyor(false);
+    recognition.start();
   }
 
   function modelDegisti(v) {
@@ -274,6 +332,43 @@ export default function NewRepair() {
       )}
 
       {error && <div className="error-msg">{error}</div>}
+
+      {/* Tek mikrofonla karışık anlatıp AI'ın alanları ayırması */}
+      <div className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button type="button" onClick={sesleDoldur} disabled={sesDinleniyor || sesIsleniyor}
+          style={{
+            width: 46, height: 46, borderRadius: "50%", border: "none", cursor: "pointer", flexShrink: 0,
+            background: sesDinleniyor ? "var(--danger)" : "var(--accent)",
+            color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "background 0.2s",
+          }}>
+          {sesIsleniyor ? <Loader2 size={20} strokeWidth={2} className="spin" /> : <Mic size={20} strokeWidth={2} />}
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
+            <Sparkles size={13} strokeWidth={2} /> Sesle Doldur
+          </div>
+          <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 2 }}>
+            {sesDinleniyor ? "Dinliyorum, konuşun..." : sesIsleniyor ? "AI alanları dolduruyor..." :
+              "Basın, müşteri adı / telefon / cihaz / arızayı karışık anlatın"}
+          </div>
+        </div>
+      </div>
+      {sesHata && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--danger)", fontSize: 12.5, margin: "-6px 0 12px", padding: "0 4px" }}>
+          <TriangleAlert size={13} strokeWidth={2} /> {sesHata}
+        </div>
+      )}
+      {aiDoldurdu && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600,
+          color: "var(--orange)", background: "rgba(246,162,74,0.10)", borderRadius: 10,
+          padding: "9px 12px", margin: "-6px 0 12px",
+        }}>
+          <TriangleAlert size={14} strokeWidth={2} style={{ flexShrink: 0 }} />
+          AI alanları doldurdu — lütfen kontrol edip "Kaydet"e basın, otomatik kaydetmedi.
+        </div>
+      )}
 
       <form onSubmit={submit}>
         <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>

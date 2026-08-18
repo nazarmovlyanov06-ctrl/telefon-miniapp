@@ -1,3 +1,4 @@
+import json
 import logging
 import asyncpg
 import httpx
@@ -310,6 +311,73 @@ async def _servis_verisi(db: asyncpg.Connection, dukkan_id: int) -> str:
             satirlar.append(f"  {k['ad'] or '-'} | {_mask_phone(k['telefon'])} | {k['sebep']}")
 
     return "\n".join(satirlar)
+
+
+@router.post("/tamir-ayikla")
+async def tamir_ayikla(
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+):
+    """Yeni tamir kaydı formundaki tek mikrofon butonu için — kullanıcının
+    karışık söylediği metni (müşteri adı, telefon, cihaz, arıza vb.) Gemini
+    ile ayrıştırıp forma doldurulacak alanları JSON olarak döner. Kaydı
+    KENDİSİ oluşturmaz — sadece alanları doldurur, kullanıcı kontrol edip
+    Kaydet'e basar."""
+    metin = (body.get("text") or "").strip()
+    if not metin:
+        return {"alanlar": {}}
+    if not GEMINI_API_KEY:
+        return {"alanlar": {}, "hata": "AI özelliği aktif değil"}
+
+    prompt = f"""Aşağıda bir telefon tamircisinin müşteriden aldığı bilgileri sesli olarak
+karışık sırayla anlattığı bir metin var. Bu metinden şu alanları çıkar ve SADECE
+geçerli JSON döndür, başka hiçbir açıklama ekleme, markdown kod bloğu kullanma:
+
+{{
+  "customer_name": "müşterinin adı soyadı, yoksa null",
+  "customer_phone": "telefon numarası, sadece rakamlar, yoksa null",
+  "device_model": "cihaz marka ve modeli (ör. iPhone 13, Samsung A54), yoksa null",
+  "fault_desc": "arıza / şikayet açıklaması, yoksa null",
+  "estimated_price": "tahmini ücret sayı olarak (₺ işareti olmadan), yoksa null",
+  "notes": "ekstra not varsa (yukarıdakilere uymayan bilgi), yoksa null",
+  "screen_lock_type": "ekran kilidi PIN/şifre ise 'pin', desen ise 'pattern', belirtilmemişse null",
+  "screen_lock_value": "PIN/şifre söylenmişse sadece rakamlar, yoksa null"
+}}
+
+Metin: "{metin}"
+
+JSON:"""
+
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": 400, "temperature": 0},
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            for model in ["gemini-flash-lite-latest", "gemini-3-flash-preview", "gemini-3.1-flash-lite"]:
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}",
+                    json=payload,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+                    try:
+                        alanlar = json.loads(text)
+                    except ValueError:
+                        log.warning("tamir-ayikla: Gemini JSON parse edilemedi: %r", text)
+                        return {"alanlar": {}, "hata": "Ayrıştırılamadı, lütfen elle girin"}
+                    alanlar = {k: v for k, v in alanlar.items() if v not in (None, "", "null")}
+                    return {"alanlar": alanlar}
+                elif resp.status_code == 429:
+                    continue
+        return {"alanlar": {}, "hata": "AI şu an meşgul, tekrar deneyin"}
+    except Exception:
+        log.warning("tamir-ayikla isteği başarısız", exc_info=True)
+        return {"alanlar": {}, "hata": "AI hatası, lütfen elle girin"}
 
 
 @router.post("/stt")

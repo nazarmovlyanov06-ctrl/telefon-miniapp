@@ -438,6 +438,9 @@ body {
   overflow: hidden;
 }
 
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.9s linear infinite; }
+
 /* ── Zorunlu alan uyarısı (NewRepair.jsx) ─────────────────────────────── */
 @keyframes alanShake {
   0%, 100% { transform: translateX(0); }
