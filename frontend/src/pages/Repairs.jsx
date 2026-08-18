@@ -82,8 +82,12 @@ export default function Repairs() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const s = params.get("status");
-    if (s) setTab(s);
-  }, []);
+    setTab(s || "");
+    // location.search'e bağlı: sayfa zaten açıkken (ör. Ana Sayfa'daki durum
+    // kartlarından) farklı bir status ile tekrar gelindiğinde bileşen yeniden
+    // mount olmaz — [] bağımlılığıyla bu efekt bir daha çalışmaz ve filtre
+    // eski değerde takılı kalırdı ("yanlış gösteriyor, elle değiştirince düzeliyor").
+  }, [location.search]);
 
   useEffect(() => {
     setLoading(true);

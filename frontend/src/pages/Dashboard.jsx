@@ -5,7 +5,7 @@ import {
   Search, Eye, EyeOff, Wallet, TrendingDown, Phone,
   Smartphone, Package, ShieldCheck, ClipboardList,
   Headphones, CreditCard, BarChart3, Sparkles,
-  CircleAlert, TriangleAlert, Plus, Wrench,
+  CircleAlert, TriangleAlert, Plus, Wrench, X, ArrowRight,
 } from "lucide-react";
 
 const QUICK = [
@@ -39,10 +39,69 @@ function fmt(n) {
   return Math.round(n).toString();
 }
 
+function DurumOnizlemeModal({ durum, onClose }) {
+  const [liste, setListe] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    api.repairs({ status: durum }).then(r => setListe(r.slice(0, 8))).catch(() => setListe([]));
+  }, [durum]);
+
+  function tumunuGor() {
+    navigate(`/repairs?status=${durum}`);
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      onClick={onClose}>
+      <div className="card" style={{ width: "100%", maxWidth: 480, margin: "0 auto", borderRadius: "20px 20px 0 0", maxHeight: "78vh", overflowY: "auto" }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: DURUM_RENK[durum] }} />
+            <span style={{ fontWeight: 700, fontSize: 16 }}>{DURUM_LABEL[durum]}</span>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex" }}>
+            <X size={18} strokeWidth={2} />
+          </button>
+        </div>
+
+        <button className="btn btn-primary btn-sm" onClick={tumunuGor}
+          style={{ width: "100%", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          Tümünü Gör <ArrowRight size={13} strokeWidth={2.4} />
+        </button>
+
+        {liste === null ? (
+          <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Yükleniyor...</div>
+        ) : liste.length === 0 ? (
+          <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Bu durumda tamir yok</div>
+        ) : (
+          <>
+            {liste.map(r => (
+              <div key={r.id} className="list-item" onClick={() => navigate(`/repairs/${r.id}`)}
+                style={{ cursor: "pointer" }}>
+                <div style={{
+                  width: 4, borderRadius: 4, alignSelf: "stretch", flexShrink: 0,
+                  background: DURUM_RENK[durum], marginRight: 4,
+                }} />
+                <div className="list-item-body">
+                  <div className="list-item-title">{r.customer_name || "—"} · {r.device_model}</div>
+                  <div className="list-item-sub">#{r.repair_no} · {r.fault_desc || "—"}</div>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard({ user }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [priceHidden, setPriceHidden] = useState(() => localStorage.getItem("priceHidden") === "1");
+  const [acikDurum, setAcikDurum] = useState(null);
   const navigate = useNavigate();
 
   function togglePriceHide() {
@@ -107,7 +166,7 @@ export default function Dashboard({ user }) {
       {/* Tamir durum sayıları */}
       <div className="stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
         {["bekliyor", "tamirde", "parca_bekleniyor", "hazir"].map(k => (
-          <div key={k} className="stat-card raised" onClick={() => navigate(`/repairs?status=${k}`)}
+          <div key={k} className="stat-card raised" onClick={() => setAcikDurum(k)}
             style={{ textAlign: "center", cursor: "pointer", padding: "12px 6px 10px" }}>
             <div className="stat-value" style={{ fontSize: 20, color: DURUM_RENK[k] }}>
               {durumlar[k] || 0}
@@ -273,6 +332,8 @@ export default function Dashboard({ user }) {
       <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={() => navigate("/repairs/new")}>
         <Plus size={16} strokeWidth={2.4} /> Yeni Tamir Kaydı
       </button>
+
+      {acikDurum && <DurumOnizlemeModal durum={acikDurum} onClose={() => setAcikDurum(null)} />}
     </div>
   );
 }
