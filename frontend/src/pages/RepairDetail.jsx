@@ -85,6 +85,12 @@ export default function RepairDetail({ user }) {
   // Ekran kilidi göster/gizle
   const [showLock, setShowLock] = useState(false);
 
+  // Durum değişikliği "geri al" bildirimi — yanlışlıkla tıklanan durum
+  // butonu anında kaydedildiği için kullanıcı geri çıkınca fark edip
+  // düzeltmesi zor oluyordu; birkaç saniye geri alma şansı veriyoruz.
+  const [geriAlToast, setGeriAlToast] = useState(null);
+  const geriAlTimerRef = useRef(null);
+
   useEffect(() => {
     Promise.all([
       api.repair(id),
@@ -116,13 +122,35 @@ export default function RepairDetail({ user }) {
       setTeslimModal(true);
       return;
     }
+    const onceki = repair?.status;
+    if (onceki === status) return;
     setSaving(true);
     try {
-      await api.updateRepair(id, sayisalTemizle({ ...form, status }));
+      await api.updateRepairStatus(id, status);
       setRepair((r) => ({ ...r, status }));
       setForm((f) => ({ ...f, status }));
+      if (onceki) {
+        clearTimeout(geriAlTimerRef.current);
+        setGeriAlToast({ onceki, yeni: status });
+        geriAlTimerRef.current = setTimeout(() => setGeriAlToast(null), 5000);
+      }
     } catch (e) {
       alert(e.message || "Durum değiştirilemedi");
+    } finally { setSaving(false); }
+  }
+
+  async function durumGeriAl() {
+    if (!geriAlToast) return;
+    const { onceki } = geriAlToast;
+    clearTimeout(geriAlTimerRef.current);
+    setGeriAlToast(null);
+    setSaving(true);
+    try {
+      await api.updateRepairStatus(id, onceki);
+      setRepair((r) => ({ ...r, status: onceki }));
+      setForm((f) => ({ ...f, status: onceki }));
+    } catch (e) {
+      alert(e.message || "Geri alınamadı");
     } finally { setSaving(false); }
   }
 
@@ -324,6 +352,30 @@ export default function RepairDetail({ user }) {
           </button>
         ))}
       </div>
+
+      {/* Durum değişikliği geri alma bildirimi */}
+      {geriAlToast && (
+        <div style={{
+          position: "fixed", left: 16, right: 16, bottom: 84, zIndex: 250,
+          maxWidth: 448, margin: "0 auto",
+          background: "linear-gradient(135deg, var(--surf-hi), var(--surf-lo))",
+          boxShadow: "var(--edge-lit), var(--edge-dark), var(--lift)",
+          borderRadius: 12, padding: "10px 12px",
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <span style={{ fontSize: 12.5, flex: 1, color: "var(--text)" }}>
+            Durum <b>{STATUSES.find(s => s.key === geriAlToast.yeni)?.label}</b> yapıldı
+          </span>
+          <button onClick={durumGeriAl} disabled={saving}
+            style={{ background: "none", border: "none", color: "var(--blue)", fontWeight: 700, fontSize: 12.5, cursor: "pointer", flexShrink: 0 }}>
+            Geri Al
+          </button>
+          <button onClick={() => { clearTimeout(geriAlTimerRef.current); setGeriAlToast(null); }}
+            style={{ background: "none", border: "none", color: "var(--hint)", cursor: "pointer", display: "flex", flexShrink: 0 }}>
+            <X size={14} strokeWidth={2} />
+          </button>
+        </div>
+      )}
 
       {/* Teslim modalı */}
       {teslimModal && (

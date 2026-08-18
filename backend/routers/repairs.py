@@ -238,6 +238,37 @@ async def update_repair(
     return {"ok": True}
 
 
+@router.patch("/{repair_id}/status")
+async def update_repair_status(
+    repair_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    # Sadece durumu değiştirir — tam PUT /repairs/{id} tüm alanları (fiyat,
+    # arıza vb.) body.get(...) ile üzerine yazdığı için, listeden veya
+    # detaydan tek tuşla hızlı durum değişikliğinde diğer alanları
+    # boşaltmaması için ayrı ve dar kapsamlı bir endpoint.
+    status = body.get("status")
+    if not status:
+        raise HTTPException(400, "status gerekli")
+    now = datetime.datetime.now()
+    tamirde_at = now if status == "tamirde" else None
+    completed_at = now if status == "hazir" else None
+    await db.execute(
+        """UPDATE repairs SET
+           status=$1,
+           tamirde_at=COALESCE(tamirde_at, $2),
+           completed_at=COALESCE(completed_at, $3),
+           son_guncelleyen_id=$4,
+           updated_at=now()
+           WHERE id=$5 AND dukkan_id=$6""",
+        status, tamirde_at, completed_at, user["id"], repair_id, dukkan_id,
+    )
+    return {"ok": True}
+
+
 @router.delete("/{repair_id}")
 async def delete_repair(
     repair_id: int,

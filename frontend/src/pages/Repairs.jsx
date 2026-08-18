@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../api";
-import { Wrench, Search, MessageCircle, Plus, ChevronUp, ChevronDown } from "lucide-react";
+import { Wrench, Search, MessageCircle, Plus, ChevronUp, ChevronDown, Check } from "lucide-react";
 
 const TABS = [
   { key: "", label: "Tümü" },
@@ -63,6 +63,51 @@ function SortTh({ label, col, sort, setSort }) {
   );
 }
 
+// Listeden, tamirin içine girmeden hızlı durum değiştirme — durum etiketine
+// dokununca açılır. Tam PUT yerine dar kapsamlı PATCH /repairs/{id}/status
+// kullanır, böylece kaydın diğer alanları (fiyat, arıza vb.) etkilenmez.
+function DurumSecPencere({ repair, onClose, onDegisti }) {
+  const [saving, setSaving] = useState(false);
+  async function sec(status) {
+    if (status === repair.status || saving) { onClose(); return; }
+    setSaving(true);
+    try {
+      await api.updateRepairStatus(repair.id, status);
+      onDegisti(repair.id, status);
+      onClose();
+    } catch (e) {
+      alert(e.message || "Durum değiştirilemedi");
+      setSaving(false);
+    }
+  }
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      onClick={onClose}>
+      <div className="card" style={{ width: "100%", maxWidth: 480, margin: "0 auto", borderRadius: "20px 20px 0 0" }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
+          {repair.customer_name || "—"} · {repair.device_model}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {TABS.filter(t => t.key).map(s => (
+            <button key={s.key} disabled={saving} onClick={() => sec(s.key)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "12px 14px", borderRadius: 10, fontFamily: "inherit",
+                border: repair.status === s.key ? `1.5px solid ${STATUS_RENK[s.key]}` : "1px solid var(--divider)",
+                background: repair.status === s.key ? "rgba(255,255,255,0.05)" : "transparent",
+                color: "var(--text)", fontSize: 14, fontWeight: 600, cursor: "pointer",
+              }}>
+              {STATUS_LABEL[s.key]}
+              {repair.status === s.key && <Check size={16} stroke={STATUS_RENK[s.key]} strokeWidth={2.4} />}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function openWA(phone, model) {
   const raw = (phone || "").replace(/\D/g, "");
   if (!raw) { alert("Müşteri telefon numarası kayıtlı değil"); return; }
@@ -77,8 +122,13 @@ export default function Repairs() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState({ col: "created_at", dir: "desc" });
+  const [durumSecim, setDurumSecim] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  function durumDegisti(repairId, status) {
+    setRepairs(list => list.map(r => r.id === repairId ? { ...r, status } : r));
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -182,7 +232,8 @@ export default function Repairs() {
                     </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0, position: "relative", zIndex: 1 }}>
-                    <span className={`badge badge-${r.status}`}>{STATUS_LABEL[r.status]}</span>
+                    <span className={`badge badge-${r.status}`} onClick={e => { e.stopPropagation(); setDurumSecim(r); }}
+                      style={{ cursor: "pointer" }}>{STATUS_LABEL[r.status]}</span>
                     <ServisGun gun={gun} status={r.status} />
                     {r.status === "hazir" && (
                       <button
@@ -225,7 +276,8 @@ export default function Repairs() {
                       <td>{r.device_model}</td>
                       <td>{r.fault_desc || "—"}</td>
                       <td>
-                        <span className={`badge badge-${r.status}`}>{STATUS_LABEL[r.status]}</span>
+                        <span className={`badge badge-${r.status}`} onClick={e => { e.stopPropagation(); setDurumSecim(r); }}
+                          style={{ cursor: "pointer" }}>{STATUS_LABEL[r.status]}</span>
                         {" "}<ServisGun gun={gun} status={r.status} />
                       </td>
                       <td>{r.created_at ? new Date(r.created_at).toLocaleDateString("tr-TR") : "—"}</td>
@@ -250,6 +302,10 @@ export default function Repairs() {
             </table>
           </div>
         </>
+      )}
+
+      {durumSecim && (
+        <DurumSecPencere repair={durumSecim} onClose={() => setDurumSecim(null)} onDegisti={durumDegisti} />
       )}
     </div>
   );
