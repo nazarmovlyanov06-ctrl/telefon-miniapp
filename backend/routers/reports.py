@@ -53,8 +53,12 @@ async def dashboard(
         dukkan_id,
     )]
 
+    # Dashboard'daki satırlara tıklayınca ayrı bir istek atmadan detay penceresi
+    # açılabilsin diye buradaki sorgular sadece uyarı satırı için değil, o
+    # kaydın tam detayını göstermeye yetecek kolonları da döndürüyor.
     garanti_uyari = [dict(r) for r in await db.fetch(
-        """SELECT id, musteri_adi, cihaz, bitis_tarihi FROM garantiler
+        """SELECT id, musteri_adi, telefon, cihaz, tamir_aciklama,
+                  baslangic_tarihi, sure_gun, bitis_tarihi FROM garantiler
            WHERE dukkan_id=$1 AND aktif=true AND bitis_tarihi >= $2 AND bitis_tarihi <= $3
            ORDER BY bitis_tarihi ASC LIMIT 5""",
         dukkan_id, today, yedi_gun_sonra,
@@ -62,7 +66,8 @@ async def dashboard(
 
     borc_uyari = [dict(r) for r in await db.fetch(
         """SELECT d.id, COALESCE(c.name, d.alacakli_adi) as musteri_adi,
-                  d.total_amount - d.paid_amount as kalan, d.due_date
+                  d.total_amount, d.paid_amount, d.total_amount - d.paid_amount as kalan,
+                  d.payment_type, d.installment_count, d.due_date, d.notes
            FROM debts d LEFT JOIN customers c ON d.customer_id = c.id
            WHERE d.dukkan_id=$1 AND d.due_date < $2 AND d.total_amount > d.paid_amount
            ORDER BY d.due_date ASC LIMIT 5""",
@@ -71,7 +76,8 @@ async def dashboard(
 
     aranacaklar = [dict(r) for r in await db.fetch(
         """SELECT r.id, r.repair_no, c.name as musteri_adi, c.phone as telefon,
-                  r.device_model, r.completed_at
+                  r.device_model, r.fault_desc, r.diagnosis, r.final_price,
+                  r.estimated_price, r.completed_at
            FROM repairs r LEFT JOIN customers c ON r.customer_id = c.id
            WHERE r.dukkan_id=$1 AND r.status='hazir' AND (r.completed_at <= $2 OR r.completed_at IS NULL)
            ORDER BY r.completed_at ASC LIMIT 10""",
