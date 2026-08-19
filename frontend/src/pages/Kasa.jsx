@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import {
   Wrench, Smartphone, Package, Headphones, Undo2, Briefcase,
-  Banknote, CreditCard, Wallet,
+  Banknote, CreditCard, Wallet, X,
 } from "lucide-react";
 
 const PERIYOT = [
@@ -36,8 +36,18 @@ export default function Kasa() {
   const [showDuzelt, setShowDuzelt] = useState(false);
   const [duzeltForm, setDuzeltForm] = useState({ tur: "giris", tutar: "", aciklama: "Manuel düzeltme", odeme_yontemi: "nakit" });
   const [err, setErr] = useState("");
+  const [detay, setDetay] = useState(null); // "gelir" | "gider" | "net" | null
   const tapRef = useRef(0);
   const tapTimer = useRef(null);
+
+  function detayHareketleri(tur) {
+    if (!ozet?.hareketler) return [];
+    if (tur === "net") return ozet.hareketler;
+    return ozet.hareketler.filter(h => {
+      const isGelir = h.tur === "giris" || h.tur === "gelir";
+      return tur === "gelir" ? isGelir : !isGelir;
+    });
+  }
 
   useEffect(() => { load(); }, [periyot]);
 
@@ -111,14 +121,14 @@ export default function Kasa() {
         <>
           {/* Gelir / Gider kartları */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <div className="card" style={{ margin: 0 }}>
+            <div className="card" style={{ margin: 0, cursor: "pointer" }} onClick={() => setDetay("gelir")}>
               <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 4 }}>Toplam Gelir</div>
               <div style={{ fontWeight: 700, fontSize: 20, color: "var(--success)" }}>{fmt(ozet.gelir)} ₺</div>
               <div style={{ fontSize: 10, color: "var(--hint)", marginTop: 3 }}>
                 Nakit {fmt(ozet.gelir_nakit)} · Kart {fmt(ozet.gelir_kart)}
               </div>
             </div>
-            <div className="card" style={{ margin: 0 }}>
+            <div className="card" style={{ margin: 0, cursor: "pointer" }} onClick={() => setDetay("gider")}>
               <div style={{ fontSize: 11, color: "var(--hint)", marginBottom: 4 }}>Toplam Gider</div>
               <div style={{ fontWeight: 700, fontSize: 20, color: "var(--danger)" }}>{fmt(ozet.gider)} ₺</div>
               <div style={{ fontSize: 10, color: "var(--hint)", marginTop: 3 }}>
@@ -133,8 +143,8 @@ export default function Kasa() {
             border: `1px solid ${(ozet.net || 0) >= 0 ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
             borderRadius: 12, padding: "14px 16px",
             display: "flex", justifyContent: "space-between", alignItems: "center",
-            marginBottom: 8,
-          }}>
+            marginBottom: 8, cursor: "pointer",
+          }} onClick={() => setDetay("net")}>
             <div>
               <div style={{ fontSize: 12, color: "var(--hint)", fontWeight: 600 }}>Net Kasa</div>
               <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>{periyotLabel[periyot]}</div>
@@ -247,6 +257,56 @@ export default function Kasa() {
             </>
           )}
         </>
+      )}
+
+      {/* Kart Detay Penceresi */}
+      {detay && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }} onClick={() => setDetay(null)}>
+          <div className="card" style={{ maxWidth: 420, width: "100%", maxHeight: "78vh", overflowY: "auto", margin: 0 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>
+                {detay === "gelir" ? "Gelir Detayı" : detay === "gider" ? "Gider Detayı" : "Kasa Hareketleri"}
+                <span style={{ fontWeight: 500, fontSize: 12, color: "var(--hint)", marginLeft: 6 }}>({periyotLabel[periyot]})</span>
+              </div>
+              <button onClick={() => setDetay(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex" }}>
+                <X size={18} strokeWidth={2} />
+              </button>
+            </div>
+            {detay !== "net" && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 10, fontSize: 12, color: "var(--hint)" }}>
+                <span>Nakit {fmt(detay === "gelir" ? ozet.gelir_nakit : ozet.gider_nakit)} ₺</span>
+                <span>·</span>
+                <span>Kart {fmt(detay === "gelir" ? ozet.gelir_kart : ozet.gider_kart)} ₺</span>
+              </div>
+            )}
+            {detayHareketleri(detay).length === 0 ? (
+              <div style={{ textAlign: "center", color: "var(--hint)", padding: 24, fontSize: 13 }}>Hareket yok</div>
+            ) : detayHareketleri(detay).map(h => {
+              const isGelir = h.tur === "giris" || h.tur === "gelir";
+              return (
+                <div key={h.id} className="card-row" style={{ padding: "8px 0", borderBottom: "1px solid var(--bg2)" }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{h.aciklama || h.kaynak || (isGelir ? "Gelir" : "Gider")}</div>
+                    <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>{h.odeme_yontemi} · {h.tarih}</div>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: isGelir ? "var(--success)" : "var(--danger)" }}>
+                    {isGelir ? "+" : "−"}{fmt(h.tutar)} ₺
+                  </div>
+                </div>
+              );
+            })}
+            {ozet.hareketler?.length >= 30 && (
+              <div style={{ textAlign: "center", color: "var(--hint)", fontSize: 11, marginTop: 8 }}>
+                Sadece en son 30 hareket gösteriliyor
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Gider Ekle Formu */}
