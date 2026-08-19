@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from database import get_db
 from auth import get_current_user, get_dukkan_id
 from photo_storage import save_upload
+from odeme_yardimci import kaydet_odeme
 from datetime import date
 
 router = APIRouter(prefix="/sifir-cihaz", tags=["sifir-cihaz"])
@@ -135,9 +136,7 @@ async def sat_cihaz(
     satis_tarihi = body.get("satis_tarihi", date.today().isoformat())
     musteri_adi = body.get("musteri_adi") or ""
     musteri_telefon = body.get("musteri_telefon") or ""
-    odeme = body.get("odeme_yontemi", "nakit")
-    taksit_sayi = int(body.get("taksit_sayi") or 1)
-    pesinat = float(body.get("pesinat") or 0)
+    odeme = body.get("odeme_yontemi", "nakit")  # sadece kayıtta gösterim etiketi
 
     async with db.transaction():
         customer_id = None
@@ -169,29 +168,10 @@ async def sat_cihaz(
         )
 
         aciklama = f"Sıfır Satış: {cihaz.get('model', '')} → {musteri_adi}".strip(" →")
-
-        if odeme == "taksit":
-            if pesinat > 0:
-                await db.execute(
-                    """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-                       VALUES ($1, $2, 'gelir', 'nakit', $3, $4, 'sifir_satis')""",
-                    dukkan_id, satis_tarihi, pesinat, aciklama + " (peşinat)",
-                )
-            kalan = satis_fiyati - pesinat
-            if kalan > 0 and customer_id:
-                await db.execute(
-                    """INSERT INTO debts
-                       (dukkan_id, customer_id, borc_turu, source_type, amount, total_amount,
-                        payment_type, installment_count, notes, created_by)
-                       VALUES ($1, $2, 'alacak', 'sifir_taksit', $3, $4, 'taksit', $5, $6, $7)""",
-                    dukkan_id, customer_id, kalan, kalan, taksit_sayi, aciklama, user["id"],
-                )
-        else:
-            await db.execute(
-                """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-                   VALUES ($1, $2, 'gelir', $3, $4, $5, 'sifir_satis')""",
-                dukkan_id, satis_tarihi, odeme, satis_fiyati, aciklama,
-            )
+        await kaydet_odeme(
+            db, dukkan_id, body.get("odemeler"), satis_fiyati, "gelir", "sifir_satis", aciklama, user["id"],
+            customer_id=customer_id, taksit_sayi=body.get("taksit_sayi") or 1, tarih=satis_tarihi,
+        )
     return {"ok": True}
 
 

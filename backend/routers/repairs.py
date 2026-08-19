@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from database import get_db
 from auth import get_current_user, get_dukkan_id
 from photo_storage import save_photo, delete_photo
+from odeme_yardimci import kaydet_odeme
 import datetime
 
 router = APIRouter(prefix="/repairs", tags=["repairs"])
@@ -278,53 +279,16 @@ async def update_repair(
 
     if yeni_durum == "teslim":
         final = float(body.get("final_price") or 0)
-        odeme = body.get("payment_type", "nakit")
-        kasa_yazilsin = bool(body.get("kasa_yazilsin"))
         if final > 0:
             cihaz = body.get("device_model", "")
             aciklama = f"Tamir #{repair_no} {cihaz}".strip()
-            tarih = datetime.date.today().isoformat()
-            # Borç/taksit'in "alacak" kısmı gerçek kasa hareketi değil, bu
-            # yüzden "Kasaya yaz" kutusundan BAĞIMSIZ her zaman oluşturulur —
-            # o kutu sadece gerçekten kasaya para girip girmediğini kontrol
-            # eder, müşterinin borcunu takip etmeyi değil.
-            if odeme == "borc":
-                # Müşteri hiç ödeme yapmadan teslim aldı — tamamı alacak
-                # olarak yazılır, kasaya HİÇ para girmiş gibi yazılmaz.
-                # Önceden bu durumda bile tüm tutar kasaya 'gelir' yazılıyordu,
-                # yani hiç alınmayan para alınmış gibi görünüyordu.
-                if mevcut["customer_id"]:
-                    await db.execute(
-                        """INSERT INTO debts
-                           (dukkan_id, customer_id, borc_turu, source_type, amount, total_amount,
-                            payment_type, notes, created_by)
-                           VALUES ($1, $2, 'alacak', 'tamir_borc', $3, $3, 'borc', $4, $5)""",
-                        dukkan_id, mevcut["customer_id"], final, aciklama, user["id"],
-                    )
-            elif odeme == "taksit":
-                pesinat = float(body.get("pesinat") or 0)
-                if pesinat > 0 and kasa_yazilsin:
-                    await db.execute(
-                        """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-                           VALUES ($1, $2, 'gelir', 'nakit', $3, $4, 'tamir')""",
-                        dukkan_id, tarih, pesinat, aciklama + " (peşinat)",
-                    )
-                kalan = final - pesinat
-                if kalan > 0 and mevcut["customer_id"]:
-                    taksit_sayi = int(body.get("taksit_sayi") or 1)
-                    await db.execute(
-                        """INSERT INTO debts
-                           (dukkan_id, customer_id, borc_turu, source_type, amount, total_amount,
-                            payment_type, installment_count, notes, created_by)
-                           VALUES ($1, $2, 'alacak', 'tamir_taksit', $3, $3, 'taksit', $4, $5, $6)""",
-                        dukkan_id, mevcut["customer_id"], kalan, taksit_sayi, aciklama, user["id"],
-                    )
-            elif kasa_yazilsin:
-                await db.execute(
-                    """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-                       VALUES ($1, $2, 'gelir', $3, $4, $5, 'tamir')""",
-                    dukkan_id, tarih, odeme, final, aciklama,
-                )
+            # Karma ödeme: "bir kısmı nakit, bir kısmı kart, kalanı borç"
+            # gibi ihtiyaçlar için tek satırlık payment_type yerine ödeme
+            # satırları listesi kullanılıyor — kalan otomatik borca gider.
+            await kaydet_odeme(
+                db, dukkan_id, body.get("odemeler"), final, "gelir", "tamir", aciklama, user["id"],
+                customer_id=mevcut["customer_id"], taksit_sayi=body.get("taksit_sayi") or 1,
+            )
 
     if durum_degisiyor and yeni_durum == "teslim":
         kime = body.get("teslim_alan_ad") or "size"

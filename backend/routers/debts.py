@@ -4,16 +4,14 @@ from database import get_db
 from auth import get_current_user, get_dukkan_id
 from typing import Optional
 from datetime import date
+from odeme_yardimci import BILINEN_GELIR_KAYNAK
 
-# debts.source_type -> kasa_hareketleri.kaynak (gelir tahsilatı için).
-# Taksitli 2.el/sıfır satışta peşinat satış anında zaten kasaya yazılıyor,
-# kalan tutar burada 'alacak' olarak bekliyor — bu yüzden ileride tahsil
-# edilince aynı gelir kaynağına (2el_satis/sifir_satis) sayılmalı, "manuel"
-# oluşturulan alacaklar ise kaynak dökümünde "Diğer"e düşer.
-_ALACAK_KAYNAK = {
-    "2el_taksit": "2el_satis", "sifir_taksit": "sifir_satis",
-    "tamir_taksit": "tamir", "tamir_borc": "tamir",
-}
+# alacak tipi borçlarda source_type artık doğrudan kasa 'kaynak' değeriyle
+# aynı isimle yazılıyor (bkz. odeme_yardimci.kaydet_odeme) — satışın kısmen
+# ödenmiş kısmı satış anında zaten kasaya yazılıyor, kalan tutar burada
+# 'alacak' olarak bekliyor; ileride tahsil edilince aynı gelir kaynağına
+# sayılmalı ki kasa dökümü satış anında seçilen kaynaktan sapmasın.
+# "manuel" oluşturulan alacaklar tanınmayan kaynak olduğu için "Diğer"e düşer.
 
 router = APIRouter(prefix="/debts", tags=["debts"])
 
@@ -150,7 +148,7 @@ async def pay_debt(
         if amount and float(amount) > 0:
             borc_turu = debt["borc_turu"] or "alacak"
             if borc_turu == "alacak":
-                kaynak = _ALACAK_KAYNAK.get(debt["source_type"], "diger")
+                kaynak = debt["source_type"] if debt["source_type"] in BILINEN_GELIR_KAYNAK else "diger"
                 await db.execute(
                     """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
                        VALUES ($1, $2, 'gelir', $3, $4, $5, $6)""",

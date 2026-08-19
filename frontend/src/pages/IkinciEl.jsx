@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import ImeiInput from "../components/ImeiInput";
 import UrunGorsel from "../components/UrunGorsel";
+import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 import {
   Store, Package, CheckCircle2, Search, CircleX, User, Smartphone,
   HardDrive, Cpu, Wrench, Trash2, Banknote, Phone, Radio, History,
@@ -27,7 +28,7 @@ export default function IkinciEl({ user }) {
   const [deleteId, setDeleteId] = useState(null);
   const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {} });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
-  const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit", pesinat: "", taksit_sayi: "3" });
+  const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
   const [err, setErr] = useState("");
   const [musteriler, setMusteriler] = useState([]);
   const [kimdenOner, setKimdenOner] = useState([]);
@@ -121,14 +122,15 @@ export default function IkinciEl({ user }) {
   async function submitSat(e) {
     e.preventDefault(); setErr("");
     try {
+      const satisFiyati = parseFloat(satForm.satis_fiyati) || 0;
       await api.ikinciElSat(selected.id, {
         ...satForm,
-        satis_fiyati: parseFloat(satForm.satis_fiyati),
-        pesinat: satForm.pesinat ? parseFloat(satForm.pesinat) : 0,
+        satis_fiyati: satisFiyati,
+        odemeler: (satForm.odemeler || varsayilanOdemeSatirlari(satisFiyati)).filter(o => parseFloat(o.tutar) > 0),
         taksit_sayi: satForm.taksit_sayi ? parseInt(satForm.taksit_sayi) : 1,
       });
       setShowSat(false); setSelected(null);
-      setSatForm({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odeme_yontemi: "nakit", pesinat: "", taksit_sayi: "3" });
+      setSatForm({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -478,40 +480,11 @@ export default function IkinciEl({ user }) {
                             {["Dükkan", "Getmobil", "Instagram", "Sahibinden", "Diğer"].map(k => <option key={k}>{k}</option>)}
                           </select>
                         </div>
-                        <div className="form-group">
-                          <label className="form-label">Ödeme</label>
-                          <select className="form-select" value={satForm.odeme_yontemi} onChange={e => setSatForm({ ...satForm, odeme_yontemi: e.target.value })}>
-                            <option value="nakit">Nakit</option>
-                            <option value="kart">Kart</option>
-                            <option value="taksit">Taksit</option>
-                          </select>
                         </div>
-                        </div>
-                        {satForm.odeme_yontemi === "taksit" && (
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                            <div className="form-group">
-                              <label className="form-label">Peşinat (₺)</label>
-                              <input className="form-input" type="number" value={satForm.pesinat}
-                                onChange={e => setSatForm(f => ({ ...f, pesinat: e.target.value }))}
-                                placeholder="0" />
-                            </div>
-                            <div className="form-group">
-                              <label className="form-label">Taksit Sayısı</label>
-                              <select className="form-select" value={satForm.taksit_sayi}
-                                onChange={e => setSatForm(f => ({ ...f, taksit_sayi: e.target.value }))}>
-                                {[2,3,4,6,9,12].map(n => <option key={n} value={n}>{n} taksit</option>)}
-                              </select>
-                            </div>
-                          </div>
-                        )}
-                        {satForm.odeme_yontemi === "taksit" && satForm.satis_fiyati && (
-                          <div style={{ fontSize: 13, background: "var(--bg2)", borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>
-                            <div style={{ color: "var(--hint)" }}>Kalan borç: <b style={{ color: "var(--red)" }}>
-                              {(parseFloat(satForm.satis_fiyati) - (parseFloat(satForm.pesinat) || 0)).toLocaleString("tr-TR")} ₺
-                            </b> → müşteri borcuna kaydedilecek</div>
-                          </div>
-                        )}
-                        {satForm.satis_fiyati && satForm.odeme_yontemi !== "taksit" && (
+                        <OdemeBolustur toplam={parseFloat(satForm.satis_fiyati) || 0} yon="gelir"
+                          value={satForm.odemeler} onChange={v => setSatForm(f => ({ ...f, odemeler: v }))}
+                          taksitSayi={satForm.taksit_sayi} onTaksitSayiChange={v => setSatForm(f => ({ ...f, taksit_sayi: v }))} />
+                        {satForm.satis_fiyati && (
                           <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8, fontWeight: 600 }}>
                             Kâr: {(parseFloat(satForm.satis_fiyati) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺
                           </div>

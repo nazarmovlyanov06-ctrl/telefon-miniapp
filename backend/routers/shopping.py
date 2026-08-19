@@ -3,6 +3,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 from database import get_db
 from auth import get_current_user, get_dukkan_id
+from odeme_yardimci import kaydet_odeme
 from datetime import date
 
 log = logging.getLogger("shopping")
@@ -148,22 +149,11 @@ async def mark_bought(
             stok_mesaj = f"hata:{str(e)}"
 
     if body.get("bought_price") and float(body["bought_price"]) > 0:
-        tutar = float(body["bought_price"])
         aciklama = f"Sipariş alındı: {item.get('part_name', 'Parça')}" + (f" ({body['bought_from']})" if body.get("bought_from") else "")
-        odeme = body.get("odeme_yontemi") or "nakit"
-        if odeme == "borc":
-            await db.execute(
-                """INSERT INTO debts (dukkan_id, alacakli_adi, borc_turu, source_type, amount, total_amount,
-                   payment_type, notes, created_by)
-                   VALUES ($1, $2, 'dukkan_borcu', 'parca_alim', $3, $3, 'borc', $4, $5)""",
-                dukkan_id, body.get("bought_from") or "Toptancı", tutar, aciklama, user["id"],
-            )
-        else:
-            await db.execute(
-                """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-                   VALUES ($1, $2, 'cikis', $3, $4, $5, 'parca_alim')""",
-                dukkan_id, date.today().isoformat(), odeme, tutar, aciklama,
-            )
+        await kaydet_odeme(
+            db, dukkan_id, body.get("odemeler"), float(body["bought_price"]), "gider", "parca_alim",
+            aciklama, user["id"], alacakli_adi=body.get("bought_from"), taksit_sayi=body.get("taksit_sayi") or 1,
+        )
 
     if toptanci_id_log and item:
         try:

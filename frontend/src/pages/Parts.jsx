@@ -8,6 +8,7 @@ import {
 import BrandModelPicker from "../components/BrandModelPicker";
 import PartTypePicker from "../components/PartTypePicker";
 import PartsBrowser from "../components/PartsBrowser";
+import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 import { partTypeIcon } from "../partTypeIcons";
 
 const TABS = [
@@ -37,37 +38,6 @@ function loadParcaTurleri() {
 
 function saveParcaTurleri(list) {
   try { localStorage.setItem("parca_turleri", JSON.stringify(list)); } catch (_) {}
-}
-
-const ODEME_SECENEKLERI = [
-  { v: "nakit", l: "Nakit" },
-  { v: "kart", l: "Kart" },
-  { v: "borc", l: "Borç" },
-];
-
-function OdemeSecici({ value, onChange }) {
-  return (
-    <div className="form-group" style={{ margin: 0 }}>
-      <label className="form-label">Ödeme</label>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
-        {ODEME_SECENEKLERI.map(o => (
-          <button key={o.v} type="button" onClick={() => onChange(o.v)}
-            style={{
-              padding: "7px 0", borderRadius: 8, border: "1.5px solid",
-              borderColor: value === o.v ? "var(--accent)" : "var(--border)",
-              background: value === o.v ? "rgba(99,102,241,0.12)" : "var(--bg2)",
-              color: value === o.v ? "var(--accent)" : "var(--text)",
-              fontWeight: 700, fontSize: 12.5, cursor: "pointer",
-            }}>{o.l}</button>
-        ))}
-      </div>
-      {value === "borc" && (
-        <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>
-          Kasaya yazılmaz, toptancıya olan borç Borçlar sayfasına eklenir
-        </div>
-      )}
-    </div>
-  );
 }
 
 function relativeGun(dateStr) {
@@ -102,7 +72,7 @@ export default function Parts({ user }) {
 
   // Aldım modal
   const [boughtItem, setBoughtItem] = useState(null);
-  const [boughtData, setBoughtData] = useState({ toptanci: "", fiyat: "", salePrice: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "", odeme_yontemi: "nakit" });
+  const [boughtData, setBoughtData] = useState({ toptanci: "", fiyat: "", salePrice: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "", odemeler: null, taksit_sayi: "1" });
   const [toptancilar, setToptancilar] = useState([]);
   const [toptanciOner, setToptanciOner] = useState([]);
   const [showToptanciOner, setShowToptanciOner] = useState(false);
@@ -124,7 +94,7 @@ export default function Parts({ user }) {
 
   // Stok ekle formu
   const [showAddForm, setShowAddForm] = useState(false);
-  const [addForm, setAddForm] = useState({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null, odeme_yontemi: "nakit" });
+  const [addForm, setAddForm] = useState({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null, odemeler: null, taksit_sayi: "1" });
   const [addErr, setAddErr] = useState("");
   const [addDolarMode, setAddDolarMode] = useState(false);
   const [addDolarMiktar, setAddDolarMiktar] = useState("");
@@ -138,7 +108,7 @@ export default function Parts({ user }) {
   const [hareketLoading, setHareketLoading] = useState(false);
   const [kullanForm, setKullanForm] = useState({ sebep: "tamir", aciklama: "", miktar: "1" });
   const [kullanErr, setKullanErr] = useState("");
-  const [ekleForm, setEkleForm] = useState({ miktar: "1", fiyat: "", aciklama: "", toptanci: "", odeme_yontemi: "nakit" });
+  const [ekleForm, setEkleForm] = useState({ miktar: "1", fiyat: "", aciklama: "", toptanci: "", odemeler: null, taksit_sayi: "1" });
   const [ekleErr, setEkleErr] = useState("");
   const [ekleTopOner, setEkleTopOner] = useState([]);
   const [showEkleTopOner, setShowEkleTopOner] = useState(false);
@@ -240,12 +210,13 @@ export default function Parts({ user }) {
         stok_miktar: parseInt(boughtData.stokMiktar) || 1,
         part_type: boughtData.partType || null,
         existing_part_id: boughtData.stokEkle ? boughtExistingId : null,
-        odeme_yontemi: boughtData.odeme_yontemi,
+        odemeler: (boughtData.odemeler || varsayilanOdemeSatirlari(boughtData.fiyat)).filter(o => parseFloat(o.tutar) > 0),
+        taksit_sayi: parseInt(boughtData.taksit_sayi) || 1,
       });
       const willAddStock = boughtData.stokEkle;
       const partName = boughtItem.part_name;
       setBoughtItem(null);
-      setBoughtData({ toptanci: "", fiyat: "", salePrice: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "", odeme_yontemi: "nakit" });
+      setBoughtData({ toptanci: "", fiyat: "", salePrice: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "", odemeler: null, taksit_sayi: "1" });
       api.shopping().then(setShopping);
       if (willAddStock) {
         setQ(partName);
@@ -355,15 +326,17 @@ export default function Parts({ user }) {
     try {
       const toptanciId = await resolveToptanciIdFor(ekleForm.toptanci, null);
       const aciklama = [ekleForm.toptanci, ekleForm.aciklama].filter(Boolean).join(" - ") || null;
+      const ekleToplam = (parseFloat(ekleForm.fiyat) || 0) * (parseInt(ekleForm.miktar) || 1);
       await api.stokEkle(selectedPart.id, {
         miktar: parseInt(ekleForm.miktar) || 1,
         fiyat: ekleForm.fiyat ? parseFloat(ekleForm.fiyat) : null,
         aciklama,
         toptanci_id: toptanciId,
-        odeme_yontemi: ekleForm.odeme_yontemi,
+        odemeler: (ekleForm.odemeler || varsayilanOdemeSatirlari(ekleToplam)).filter(o => parseFloat(o.tutar) > 0),
+        taksit_sayi: parseInt(ekleForm.taksit_sayi) || 1,
       });
       setSelectedPart(null);
-      setEkleForm({ miktar: "1", fiyat: "", aciklama: "", toptanci: "" });
+      setEkleForm({ miktar: "1", fiyat: "", aciklama: "", toptanci: "", odemeler: null, taksit_sayi: "1" });
       setEkleDolarMode(false);
       setEkleDolarMiktar("");
       api.parts(q ? { q } : {}).then(setParts);
@@ -424,13 +397,17 @@ export default function Parts({ user }) {
     try {
       const combinedModel = [addBrand, addForm.device_model].filter(Boolean).join(" ").trim();
       const toptanciId = await resolveToptanciId();
+      const addToplam = (parseFloat(addForm.purchase_price) || 0) * (parseInt(addForm.quantity) || 1);
+      const addOdemeler = (addForm.odemeler || varsayilanOdemeSatirlari(addToplam)).filter(o => parseFloat(o.tutar) > 0);
+      const addTaksitSayi = parseInt(addForm.taksit_sayi) || 1;
       if (addEklePart) {
         await api.stokEkle(addEklePart.id, {
           miktar: parseInt(addForm.quantity) || 1,
           fiyat: addForm.purchase_price ? parseFloat(addForm.purchase_price) : null,
           aciklama: null,
           toptanci_id: toptanciId,
-          odeme_yontemi: addForm.odeme_yontemi,
+          odemeler: addOdemeler,
+          taksit_sayi: addTaksitSayi,
         });
       } else {
         await api.createPart({
@@ -442,11 +419,12 @@ export default function Parts({ user }) {
           purchase_price: addForm.purchase_price ? parseFloat(addForm.purchase_price) : 0,
           sale_price: addForm.sale_price ? parseFloat(addForm.sale_price) : 0,
           toptanci_id: toptanciId,
-          odeme_yontemi: addForm.odeme_yontemi,
+          odemeler: addOdemeler,
+          taksit_sayi: addTaksitSayi,
         });
       }
       setShowAddForm(false);
-      setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null, odeme_yontemi: "nakit" });
+      setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null, odemeler: null, taksit_sayi: "1" });
       setAddDolarMode(false);
       setAddDolarMiktar("");
       setAddEklePart(null);
@@ -587,12 +565,14 @@ export default function Parts({ user }) {
                         )}
                       </div>
                       <div style={{ marginTop: 10 }}>
-                        <OdemeSecici value={addForm.odeme_yontemi} onChange={v => setAddForm(f => ({ ...f, odeme_yontemi: v }))} />
+                        <OdemeBolustur toplam={(parseFloat(addForm.purchase_price) || 0) * (parseInt(addForm.quantity) || 1)} yon="gider"
+                          value={addForm.odemeler} onChange={v => setAddForm(f => ({ ...f, odemeler: v }))}
+                          taksitSayi={addForm.taksit_sayi} onTaksitSayiChange={v => setAddForm(f => ({ ...f, taksit_sayi: v }))} />
                       </div>
                       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                         <button type="submit" className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}><Plus size={13} strokeWidth={2.4} /> Stok Ekle</button>
                         <button type="button" className="btn btn-ghost btn-sm"
-                          onClick={() => { setShowAddForm(false); setAddEklePart(null); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null, odeme_yontemi: "nakit" }); setAddDolarMode(false); setAddDolarMiktar(""); }}>
+                          onClick={() => { setShowAddForm(false); setAddEklePart(null); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null, odemeler: null, taksit_sayi: "1" }); setAddDolarMode(false); setAddDolarMiktar(""); }}>
                           İptal
                         </button>
                       </div>
@@ -728,12 +708,14 @@ export default function Parts({ user }) {
                         </div>
                       </div>
                       <div style={{ marginTop: 10 }}>
-                        <OdemeSecici value={addForm.odeme_yontemi} onChange={v => setAddForm(f => ({ ...f, odeme_yontemi: v }))} />
+                        <OdemeBolustur toplam={(parseFloat(addForm.purchase_price) || 0) * (parseInt(addForm.quantity) || 1)} yon="gider"
+                          value={addForm.odemeler} onChange={v => setAddForm(f => ({ ...f, odemeler: v }))}
+                          taksitSayi={addForm.taksit_sayi} onTaksitSayiChange={v => setAddForm(f => ({ ...f, taksit_sayi: v }))} />
                       </div>
                       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                         <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
                         <button type="button" className="btn btn-ghost btn-sm"
-                          onClick={() => { setShowAddForm(false); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null, odeme_yontemi: "nakit" }); setAddDolarMode(false); setAddDolarMiktar(""); }}>
+                          onClick={() => { setShowAddForm(false); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null, odemeler: null, taksit_sayi: "1" }); setAddDolarMode(false); setAddDolarMiktar(""); }}>
                           İptal
                         </button>
                       </div>
@@ -937,7 +919,9 @@ export default function Parts({ user }) {
                               </div>
                             )}
                           </div>
-                          <OdemeSecici value={ekleForm.odeme_yontemi} onChange={v => setEkleForm(f => ({ ...f, odeme_yontemi: v }))} />
+                          <OdemeBolustur toplam={(parseFloat(ekleForm.fiyat) || 0) * (parseInt(ekleForm.miktar) || 1)} yon="gider"
+                            value={ekleForm.odemeler} onChange={v => setEkleForm(f => ({ ...f, odemeler: v }))}
+                            taksitSayi={ekleForm.taksit_sayi} onTaksitSayiChange={v => setEkleForm(f => ({ ...f, taksit_sayi: v }))} />
                           <div className="form-group" style={{ margin: 0 }}>
                             <label className="form-label">Not / Açıklama</label>
                             <input className="form-input" value={ekleForm.aciklama}
@@ -1273,7 +1257,9 @@ export default function Parts({ user }) {
                   )}
 
                   <div style={{ marginBottom: 12 }}>
-                    <OdemeSecici value={boughtData.odeme_yontemi} onChange={v => setBoughtData(d => ({ ...d, odeme_yontemi: v }))} />
+                    <OdemeBolustur toplam={parseFloat(boughtData.fiyat) || 0} yon="gider"
+                      value={boughtData.odemeler} onChange={v => setBoughtData(d => ({ ...d, odemeler: v }))}
+                      taksitSayi={boughtData.taksit_sayi} onTaksitSayiChange={v => setBoughtData(d => ({ ...d, taksit_sayi: v }))} />
                   </div>
 
                   {/* Stoğa Ekle */}

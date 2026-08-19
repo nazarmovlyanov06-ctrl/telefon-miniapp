@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { Tag, CircleX, TriangleAlert, Trash2 } from "lucide-react";
 import UrunGorsel from "../components/UrunGorsel";
+import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 
 const DEFAULT_CATS = ["Şarj Aleti", "Kılıf", "Kırılmaz Cam", "Kulaklık", "Powerbank", "Diğer"];
 
@@ -22,7 +23,7 @@ export default function Aksesuar({ user }) {
   const [showForm, setShowForm] = useState(false);
   const [satForm, setSatForm] = useState(null);
   const [form, setForm] = useState({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer" });
-  const [satData, setSatData] = useState({ miktar: "1", musteri_adi: "", musteri_telefon: "" });
+  const [satData, setSatData] = useState({ miktar: "1", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
   const [err, setErr] = useState("");
   const [deleteId, setDeleteId] = useState(null);
 
@@ -68,10 +69,20 @@ export default function Aksesuar({ user }) {
 
   async function submitSat(e) {
     e.preventDefault(); setErr("");
+    const toplam = parseInt(satData.miktar || 1) * (satForm.satis_fiyati || 0);
+    const odemeler = (satData.odemeler || varsayilanOdemeSatirlari(toplam)).filter(o => parseFloat(o.tutar) > 0);
+    const alinan = odemeler.reduce((s, o) => s + (parseFloat(o.tutar) || 0), 0);
+    if (toplam - alinan > 0.009 && !satData.musteri_adi.trim()) {
+      setErr("Kalan tutar borç olarak yazılacaksa müşteri adı girilmeli");
+      return;
+    }
     try {
-      await api.satAksesuar(satForm.id, { miktar: parseInt(satData.miktar), musteri_adi: satData.musteri_adi, musteri_telefon: satData.musteri_telefon, tarih: today() });
+      await api.satAksesuar(satForm.id, {
+        miktar: parseInt(satData.miktar), musteri_adi: satData.musteri_adi, musteri_telefon: satData.musteri_telefon,
+        tarih: today(), odemeler, taksit_sayi: parseInt(satData.taksit_sayi) || 1,
+      });
       setSatForm(null);
-      setSatData({ miktar: "1", musteri_adi: "", musteri_telefon: "" });
+      setSatData({ miktar: "1", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -194,6 +205,9 @@ export default function Aksesuar({ user }) {
             <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8 }}>
               Toplam: {(parseInt(satData.miktar || 1) * (satForm.satis_fiyati || 0)).toLocaleString("tr-TR")} ₺
             </div>
+            <OdemeBolustur toplam={parseInt(satData.miktar || 1) * (satForm.satis_fiyati || 0)} yon="gelir"
+              value={satData.odemeler} onChange={v => setSatData(f => ({ ...f, odemeler: v }))}
+              taksitSayi={satData.taksit_sayi} onTaksitSayiChange={v => setSatData(f => ({ ...f, taksit_sayi: v }))} />
             <div style={{ display: "flex", gap: 8 }}>
               <button type="submit" className="btn btn-primary">Sat</button>
               <button type="button" className="btn btn-ghost" onClick={() => setSatForm(null)}>İptal</button>

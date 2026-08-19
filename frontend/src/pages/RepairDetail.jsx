@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, fotoUrl } from "../api";
 import { PatternPreview } from "../components/PatternLock";
+import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 import {
   Pencil, Home, CheckCircle2, Receipt, Copy, Check, MessageCircle,
   Trash2, Lock, Eye, EyeOff, Calendar, ClipboardList,
@@ -130,8 +131,7 @@ export default function RepairDetail({ user }) {
   const [form, setForm] = useState({});
   const [teslimModal, setTeslimModal] = useState(false);
   const [teslimForm, setTeslimForm] = useState({
-    final_price: "", payment_type: "nakit", kasa_yazilsin: true,
-    pesinat: "", taksit_sayi: "1",
+    final_price: "", odemeler: null, taksit_sayi: "1",
     teslim_alan_ad: "", teslim_alan_tel: "",
   });
 
@@ -209,7 +209,7 @@ export default function RepairDetail({ user }) {
         notes: r.notes || "",
         warranty_days: r.warranty_days || "",
       });
-      if (r.final_price) setTeslimForm(f => ({ ...f, final_price: r.final_price, payment_type: r.payment_type || "nakit" }));
+      if (r.final_price) setTeslimForm(f => ({ ...f, final_price: r.final_price }));
       // asyncpg jsonb kolonlarını ham JSON metni olarak döndürür, parse gerekiyor.
       let fonksiyonlar = {}, aksesuarlar = {};
       try { fonksiyonlar = r.intake_fonksiyonlar ? JSON.parse(r.intake_fonksiyonlar) : {}; } catch { /* eski/boş veri */ }
@@ -225,6 +225,8 @@ export default function RepairDetail({ user }) {
     if (!DURUM_SIRASI[onceki]?.includes(status)) return; // buton zaten disabled ama garanti olsun
 
     if (status === "teslim") {
+      const guncelFiyat = teslimForm.final_price || repair?.estimated_price || "";
+      setTeslimForm(f => ({ ...f, odemeler: varsayilanOdemeSatirlari(guncelFiyat), taksit_sayi: "1" }));
       setTeslimModal(true);
       return;
     }
@@ -370,17 +372,22 @@ export default function RepairDetail({ user }) {
     setSaving(true);
     try {
       const final = parseFloat(teslimForm.final_price) || 0;
+      const satirlar = (teslimForm.odemeler || []).filter(o => parseFloat(o.tutar) > 0);
+      const alinan = satirlar.reduce((s, o) => s + (parseFloat(o.tutar) || 0), 0);
+      const kalanVar = Math.round((final - alinan) * 100) / 100 > 0.009;
+      const yontemler = [...new Set(satirlar.map(o => o.yontem))];
+      const paymentTypeEtiket = satirlar.length === 0 ? "borc"
+        : (yontemler.length > 1 ? "karma" : yontemler[0]) + (kalanVar ? "+borc" : "");
       await api.updateRepair(id, sayisalTemizle({
         ...form, status: "teslim", final_price: final,
-        payment_type: teslimForm.payment_type,
-        kasa_yazilsin: teslimForm.kasa_yazilsin && final > 0,
-        pesinat: teslimForm.payment_type === "taksit" ? (parseFloat(teslimForm.pesinat) || 0) : undefined,
-        taksit_sayi: teslimForm.payment_type === "taksit" ? (parseInt(teslimForm.taksit_sayi) || 1) : undefined,
+        payment_type: paymentTypeEtiket,
+        odemeler: satirlar,
+        taksit_sayi: parseInt(teslimForm.taksit_sayi) || 1,
         teslim_alan_ad: teslimForm.teslim_alan_ad || repair.customer_name || null,
         teslim_alan_tel: teslimForm.teslim_alan_tel || repair.customer_phone || null,
       }));
-      setRepair(r => ({ ...r, status: "teslim", final_price: final, payment_type: teslimForm.payment_type }));
-      setForm(f => ({ ...f, status: "teslim", final_price: final, payment_type: teslimForm.payment_type }));
+      setRepair(r => ({ ...r, status: "teslim", final_price: final, payment_type: paymentTypeEtiket }));
+      setForm(f => ({ ...f, status: "teslim", final_price: final, payment_type: paymentTypeEtiket }));
       setTeslimModal(false);
     } catch (e) {
       alert(e.message || "Teslim işlemi başarısız");
@@ -615,44 +622,20 @@ export default function RepairDetail({ user }) {
             <div className="form-group">
               <label className="form-label">Son Ücret (₺)</label>
               <input className="form-input" type="number" value={teslimForm.final_price}
-                onChange={e => setTeslimForm(f => ({ ...f, final_price: e.target.value }))}
+                onChange={e => {
+                  const yeniFiyat = e.target.value;
+                  setTeslimForm(f => ({
+                    ...f, final_price: yeniFiyat,
+                    odemeler: (f.odemeler && f.odemeler.length === 1)
+                      ? [{ ...f.odemeler[0], tutar: yeniFiyat }]
+                      : f.odemeler,
+                  }));
+                }}
                 placeholder={repair.estimated_price || "0"} />
             </div>
-            <div className="form-group">
-              <label className="form-label">Ödeme Tipi</label>
-              <select className="form-select" value={teslimForm.payment_type}
-                onChange={e => setTeslimForm(f => ({ ...f, payment_type: e.target.value }))}>
-                <option value="nakit">Nakit</option>
-                <option value="kart">Kart</option>
-                <option value="taksit">Taksit</option>
-                <option value="borc">Borç</option>
-              </select>
-            </div>
-            {teslimForm.payment_type === "taksit" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <div className="form-group">
-                  <label className="form-label">Şimdi Alınan (₺)</label>
-                  <input className="form-input" type="number" value={teslimForm.pesinat}
-                    onChange={e => setTeslimForm(f => ({ ...f, pesinat: e.target.value }))} placeholder="0" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Taksit Sayısı</label>
-                  <input className="form-input" type="number" min="1" value={teslimForm.taksit_sayi}
-                    onChange={e => setTeslimForm(f => ({ ...f, taksit_sayi: e.target.value }))} />
-                </div>
-              </div>
-            )}
-            {teslimForm.payment_type === "borc" && (
-              <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, color: "var(--danger)", marginBottom: 4 }}>
-                Ödeme alınmadı — tüm tutar Borçlar sayfasına "alacak" olarak eklenecek, kasaya hiçbir şey yazılmayacak.
-              </div>
-            )}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, marginTop: teslimForm.payment_type === "taksit" ? 4 : 8 }}>
-              <input type="checkbox" id="kasaYazilsin"
-                checked={teslimForm.kasa_yazilsin}
-                onChange={e => setTeslimForm(f => ({ ...f, kasa_yazilsin: e.target.checked }))} />
-              <label htmlFor="kasaYazilsin" style={{ fontSize: 14 }}>Kasaya yaz</label>
-            </div>
+            <OdemeBolustur toplam={parseFloat(teslimForm.final_price) || 0} yon="gelir"
+              value={teslimForm.odemeler} onChange={v => setTeslimForm(f => ({ ...f, odemeler: v }))}
+              taksitSayi={teslimForm.taksit_sayi} onTaksitSayiChange={v => setTeslimForm(f => ({ ...f, taksit_sayi: v }))} />
 
             <div className="form-group">
               <label className="form-label">Kime Teslim Edildi</label>
@@ -675,13 +658,7 @@ export default function RepairDetail({ user }) {
                 onChange={e => setTeslimForm(f => ({ ...f, teslim_alan_tel: e.target.value }))} />
             </div>
 
-            {teslimForm.final_price && (
-              <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>
-                {parseFloat(teslimForm.final_price).toLocaleString("tr-TR")}₺ · {teslimForm.payment_type}
-                {teslimForm.kasa_yazilsin && " · kasaya yazılacak"}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <button className="btn btn-primary" onClick={teslimEt} disabled={saving} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 {saving ? "..." : <><CheckCircle2 size={15} strokeWidth={2} /> Teslim Et</>}
               </button>

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from database import get_db
 from auth import get_current_user, get_dukkan_id
 from photo_storage import save_upload
+from odeme_yardimci import kaydet_odeme
 from datetime import date
 
 router = APIRouter(prefix="/aksesuarlar", tags=["aksesuar"])
@@ -111,10 +112,10 @@ async def sat_aksesuar(
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id""",
             dukkan_id, aksesuar_id, miktar, toplam, musteri_adi or None, musteri_telefon or None, tarih, customer_id,
         )
-        await db.execute(
-            """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-               VALUES ($1, $2, 'giris', $3, $4, $5, 'aksesuar')""",
-            dukkan_id, tarih, body.get("odeme_yontemi", "nakit"), toplam, f"Aksesuar: {aks['ad']} x{miktar}",
+        await kaydet_odeme(
+            db, dukkan_id, body.get("odemeler"), toplam, "gelir", "aksesuar",
+            f"Aksesuar: {aks['ad']} x{miktar}", user["id"],
+            customer_id=customer_id, taksit_sayi=body.get("taksit_sayi") or 1, tarih=tarih,
         )
     return {"id": row["id"], "toplam": toplam}
 
