@@ -56,7 +56,11 @@ async def get_current_user(
     payload = coz_token(token)
 
     row = await db.fetchrow(
-        "SELECT id, dukkan_id, email, ad, rol, durum, aktif FROM kullanicilar WHERE id = $1",
+        """SELECT k.id, k.dukkan_id, k.email, k.ad, k.rol, k.durum, k.aktif,
+                  d.ad AS dukkan_adi
+           FROM kullanicilar k
+           LEFT JOIN dukkanlar d ON d.id = k.dukkan_id
+           WHERE k.id = $1""",
         int(payload["sub"]),
     )
     if not row:

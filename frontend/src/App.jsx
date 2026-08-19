@@ -134,7 +134,7 @@ function AppRoutes({ user }) {
     <NavShell user={user}>
       <Routes>
         <Route path="/" element={<Dashboard user={user} />} />
-        <Route path="/repairs" element={<Repairs />} />
+        <Route path="/repairs" element={<Repairs user={user} />} />
         <Route path="/repairs/new" element={<NewRepair />} />
         <Route path="/repairs/:id" element={<RepairDetail user={user} />} />
         <Route path="/customers" element={<Customers />} />

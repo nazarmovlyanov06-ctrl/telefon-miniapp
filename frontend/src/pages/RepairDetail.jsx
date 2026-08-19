@@ -79,6 +79,17 @@ const DATE_ICONS = {
 
 function fmt(n) { return (n || 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 }); }
 
+function hazirMesaji(customerName, model, dukkanAdi) {
+  const selam = customerName ? `Merhaba ${customerName},` : "Merhaba,";
+  const satirlar = [
+    selam, "",
+    `${model || "Cihazınız"} tamiri tamamlandı, teslime hazır! ✅`, "",
+    "Bizi tercih ettiğiniz için teşekkür ederiz. 🙏",
+  ];
+  if (dukkanAdi) { satirlar.push(""); satirlar.push(dukkanAdi); }
+  return satirlar.join("\n");
+}
+
 function fmtDate(d) {
   if (!d) return null;
   const dt = new Date(d);
@@ -1077,7 +1088,7 @@ export default function RepairDetail({ user }) {
                 style={{ background: "#25D366", color: "#fff", border: "none", display: "flex", alignItems: "center", gap: 6 }}
                 onClick={() => openWhatsApp(
                   isHazir
-                    ? `Merhaba ${repair.customer_name || ""},\n\n${repair.device_model} cihazınızın tamiri tamamlandı. Servisimizden teslim alabilirsiniz. ✅`
+                    ? hazirMesaji(repair.customer_name, repair.device_model, user?.dukkan_adi)
                     : `Merhaba ${repair.customer_name || ""},\n\nTamiriniz (#${repair.repair_no}) ile ilgili bilgi almak ister misiniz?`
                 )}>
                 <MessageCircle size={13} strokeWidth={2} /> WhatsApp{isHazir ? " - Hazır" : ""}

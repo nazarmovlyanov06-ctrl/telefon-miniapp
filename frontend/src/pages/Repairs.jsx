@@ -146,15 +146,26 @@ function DurumSecPencere({ repair, onClose, onDegisti }) {
   );
 }
 
-function openWA(phone, model) {
+function hazirMesaji(customerName, model, dukkanAdi) {
+  const selam = customerName ? `Merhaba ${customerName},` : "Merhaba,";
+  const satirlar = [
+    selam, "",
+    `${model || "Cihazınız"} tamiri tamamlandı, teslime hazır! ✅`, "",
+    "Bizi tercih ettiğiniz için teşekkür ederiz. 🙏",
+  ];
+  if (dukkanAdi) { satirlar.push(""); satirlar.push(dukkanAdi); }
+  return satirlar.join("\n");
+}
+
+function openWA(phone, model, customerName, dukkanAdi) {
   const raw = (phone || "").replace(/\D/g, "");
   if (!raw) { alert("Müşteri telefon numarası kayıtlı değil"); return; }
   const num = raw.startsWith("90") ? raw : raw.startsWith("0") ? "9" + raw : "90" + raw;
-  const text = encodeURIComponent(`Merhaba, ${model || "cihazınız"} tamiri tamamlandı, teslim alabilirsiniz. ✅`);
+  const text = encodeURIComponent(hazirMesaji(customerName, model, dukkanAdi));
   window.open(`https://wa.me/${num}?text=${text}`, "_blank");
 }
 
-export default function Repairs() {
+export default function Repairs({ user }) {
   const [repairs, setRepairs] = useState([]);
   const [tab, setTab] = useState("");
   const [q, setQ] = useState("");
@@ -275,7 +286,7 @@ export default function Repairs() {
                     <ServisGun gun={gun} status={r.status} />
                     {r.status === "hazir" && (
                       <button
-                        onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model); }}
+                        onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model, r.customer_name, user?.dukkan_adi); }}
                         style={{
                           background: "#25D366", color: "#fff", border: "none",
                           borderRadius: 8, padding: "4px 8px", fontSize: 12,
@@ -322,7 +333,7 @@ export default function Repairs() {
                       <td>
                         {r.status === "hazir" && (
                           <button
-                            onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model); }}
+                            onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model, r.customer_name, user?.dukkan_adi); }}
                             style={{
                               background: "#25D366", color: "#fff", border: "none",
                               borderRadius: 8, padding: "4px 8px", fontSize: 12,
