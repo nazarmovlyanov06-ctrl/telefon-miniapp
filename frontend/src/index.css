@@ -447,6 +447,14 @@ body {
   box-shadow: var(--edge-lit), var(--edge-dark), var(--lift);
   overflow: hidden;
 }
+/* .card > * kuralı TÜM kart içi elemanları aynı z-index'e (1) eşitliyor —
+   grain dokusunun (::after) içeriği kapatmamasını sağlamak için. Ama bu
+   yüzden bir öneri kutusunu (.ac-dropdown) içeren alan, ondan SONRA gelen
+   kardeş form alanlarıyla eşit seviyede kalıyor ve DOM sırasına göre
+   sonrakiler üstte basılıyor — öneri kutusu form alanlarının "altına"
+   gömülmüş gibi görünüyordu. Öneri kutusunu içeren kutuyu, açıkken kardeş
+   alanların üstüne çıkar. */
+.form-group:has(> .ac-dropdown) { z-index: 20; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 0.9s linear infinite; }
