@@ -3,15 +3,18 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import {
   Clock, Truck, CheckCircle2, CircleX, TriangleAlert, Banknote, Package,
+  Ban, Pencil, Trash2, User,
 } from "lucide-react";
 
 const DURUM_META = {
   bekliyor: { label: "Bekliyor", icon: Clock, bg: "rgba(246,162,74,0.15)", color: "var(--orange)" },
   gönderildi: { label: "Gönderildi", icon: Truck, bg: "rgba(94,168,255,0.15)", color: "var(--blue)" },
   para_iade_alindi: { label: "Para Alındı", icon: CheckCircle2, bg: "rgba(74,222,128,0.15)", color: "var(--green)" },
+  reddedildi: { label: "Reddedildi", icon: Ban, bg: "rgba(239,68,68,0.15)", color: "var(--red)" },
 };
+const SONUCLANAN_DURUMLAR = ["para_iade_alindi", "reddedildi"];
 
-export default function ParcaIade() {
+export default function ParcaIade({ user }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [list, setList] = useState([]);
@@ -21,6 +24,8 @@ export default function ParcaIade() {
   const [showForm, setShowForm] = useState(false);
   const [err, setErr] = useState("");
   const [form, setForm] = useState({ toptanci_id: "", parca: "", part_id: null, miktar: "1", sebep: "", beklenen_tutar: "" });
+  const [editId, setEditId] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
   const [parcaArama, setParcaArama] = useState("");
   const [parcaOneriler, setParcaOneriler] = useState([]);
   const [showParcaOner, setShowParcaOner] = useState(false);
@@ -80,24 +85,52 @@ export default function ParcaIade() {
 
   const selectedParca = form.part_id ? parcalar.find(p => p.id === form.part_id) : null;
 
+  function duzenle(item) {
+    setEditId(item.id);
+    setForm({
+      toptanci_id: item.toptanci_id || "", parca: item.parca, part_id: item.part_id,
+      miktar: String(item.miktar), sebep: item.sebep || "", beklenen_tutar: item.beklenen_tutar ? String(item.beklenen_tutar) : "",
+    });
+    setParcaArama(item.parca);
+    setShowForm(true);
+    setErr("");
+  }
+
+  function formuKapat() {
+    setShowForm(false);
+    setEditId(null);
+    setForm({ toptanci_id: "", parca: "", part_id: null, miktar: "1", sebep: "", beklenen_tutar: "" });
+    setParcaArama("");
+    setShowParcaOner(false);
+  }
+
   async function submit(e) {
     e.preventDefault();
     setErr("");
+    const payload = {
+      ...form,
+      toptanci_id: form.toptanci_id ? parseInt(form.toptanci_id) : null,
+      miktar: parseInt(form.miktar),
+      part_id: form.part_id || null,
+      beklenen_tutar: form.beklenen_tutar ? parseFloat(form.beklenen_tutar) : 0,
+    };
     try {
-      await api.createParcaIade({
-        ...form,
-        toptanci_id: form.toptanci_id ? parseInt(form.toptanci_id) : null,
-        miktar: parseInt(form.miktar),
-        part_id: form.part_id || null,
-        beklenen_tutar: form.beklenen_tutar ? parseFloat(form.beklenen_tutar) : 0,
-      });
-      setShowForm(false);
-      setForm({ toptanci_id: "", parca: "", part_id: null, miktar: "1", sebep: "", beklenen_tutar: "" });
-      setParcaArama("");
-      setShowParcaOner(false);
+      if (editId) await api.updateParcaIade(editId, payload);
+      else await api.createParcaIade(payload);
+      formuKapat();
       load();
     } catch (e) {
       setErr(e.message);
+    }
+  }
+
+  async function sil(id) {
+    try {
+      await api.deleteParcaIade(id);
+      setDeleteId(null);
+      load();
+    } catch (e) {
+      alert(e.message);
     }
   }
 
@@ -120,12 +153,13 @@ export default function ParcaIade() {
       const item = list.find(i => i.id === id);
       if (item) { openParaModal(item); return; }
     }
+    if (durum === "reddedildi" && !confirm("Toptancı iadeyi reddetti mi? Bu paraya bağlıysa açılmış borç kaydı silinecek.")) return;
     await api.updateParcaIadeDurum(id, durum, 0);
     load();
   }
 
-  const bekleyen = list.filter(i => i.durum !== "para_iade_alindi");
-  const tamamlanan = list.filter(i => i.durum === "para_iade_alindi");
+  const bekleyen = list.filter(i => !SONUCLANAN_DURUMLAR.includes(i.durum));
+  const tamamlanan = list.filter(i => SONUCLANAN_DURUMLAR.includes(i.durum));
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
 
@@ -159,10 +193,15 @@ export default function ParcaIade() {
           <form onSubmit={submit}>
             {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
 
+            {editId && (
+              <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                <Pencil size={12} strokeWidth={2} /> Düzenleniyor — parça/adet değiştirilemez (stok hareketiyle bağlı)
+              </div>
+            )}
             <div className="form-group" style={{ position: "relative" }}>
               <label className="form-label">Parça (Stoktan Seç) *</label>
               <input
-                className="form-input" required
+                className="form-input" required disabled={!!editId}
                 value={parcaArama}
                 onChange={e => handleParcaArama(e.target.value)}
                 onBlur={() => setTimeout(() => setShowParcaOner(false), 150)}
@@ -208,7 +247,7 @@ export default function ParcaIade() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div className="form-group">
                 <label className="form-label">Adet</label>
-                <input className="form-input" type="number" min="1"
+                <input className="form-input" type="number" min="1" disabled={!!editId}
                   max={selectedParca ? selectedParca.quantity : 999}
                   value={form.miktar}
                   onChange={e => setForm({ ...form, miktar: e.target.value })} />
@@ -234,10 +273,10 @@ export default function ParcaIade() {
 
             <div style={{ display: "flex", gap: 8 }}>
               <button type="submit" className="btn btn-primary"
-                disabled={form.part_id && parseInt(form.miktar) > (selectedParca?.quantity || 0)}>
-                Kaydet
+                disabled={!editId && form.part_id && parseInt(form.miktar) > (selectedParca?.quantity || 0)}>
+                {editId ? "Güncelle" : "Kaydet"}
               </button>
-              <button type="button" className="btn btn-ghost" onClick={() => { setShowForm(false); setParcaArama(""); }}>İptal</button>
+              <button type="button" className="btn btn-ghost" onClick={formuKapat}>İptal</button>
             </div>
           </form>
         </div>
@@ -305,6 +344,14 @@ export default function ParcaIade() {
                       {i.beklenen_tutar > 0 ? ` · ₺${i.beklenen_tutar.toLocaleString("tr-TR")} bekleniyor` : ""}
                     </div>
                     {i.sebep && <div style={{ fontSize: 12, color: "var(--hint)" }}>{i.sebep}</div>}
+                    {(i.olusturan_adi || i.son_degistiren_adi) && (
+                      <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                        <User size={10} strokeWidth={2} />
+                        {i.durum === "bekliyor"
+                          ? (i.olusturan_adi ? `Ekleyen: ${i.olusturan_adi}` : null)
+                          : (i.son_degistiren_adi ? `Son işlem: ${i.son_degistiren_adi}` : (i.olusturan_adi ? `Ekleyen: ${i.olusturan_adi}` : null))}
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{
@@ -316,15 +363,32 @@ export default function ParcaIade() {
                     </div>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                   {i.durum === "bekliyor" && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "gönderildi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Truck size={13} strokeWidth={2} /> Gönderildi
-                    </button>
+                    <>
+                      <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "gönderildi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Truck size={13} strokeWidth={2} /> Gönderildi
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => duzenle(i)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Pencil size={13} strokeWidth={2} /> Düzenle
+                      </button>
+                    </>
                   )}
                   {i.durum === "gönderildi" && (
-                    <button className="btn btn-primary btn-sm" onClick={() => updateDurum(i.id, "para_iade_alindi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Banknote size={13} strokeWidth={2} /> Para Alındı
+                    <>
+                      <button className="btn btn-primary btn-sm" onClick={() => updateDurum(i.id, "para_iade_alindi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Banknote size={13} strokeWidth={2} /> Para Alındı
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "reddedildi")}
+                        style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--red)" }}>
+                        <Ban size={13} strokeWidth={2} /> Reddedildi
+                      </button>
+                    </>
+                  )}
+                  {user?.rol === "patron" && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => setDeleteId(i.id)}
+                      style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--hint)", marginLeft: "auto" }}>
+                      <Trash2 size={13} strokeWidth={2} />
                     </button>
                   )}
                 </div>
@@ -333,33 +397,56 @@ export default function ParcaIade() {
           })}
           {tamamlanan.length > 0 && (
             <>
-              <div className="section-title" style={{ marginTop: 16 }}>Tamamlananlar ({tamamlanan.length})</div>
-              {tamamlanan.map(i => (
-                <div key={i.id} className="card" style={{ opacity: 0.75 }}>
-                  <div className="card-row">
-                    <div>
-                      <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
-                        <CheckCircle2 size={13} stroke="var(--green)" strokeWidth={2} /> {i.parca}
+              <div className="section-title" style={{ marginTop: 16 }}>Sonuçlananlar ({tamamlanan.length})</div>
+              {tamamlanan.map(i => {
+                const meta = DURUM_META[i.durum] || DURUM_META.para_iade_alindi;
+                const MetaIcon = meta.icon;
+                return (
+                  <div key={i.id} className="card" style={{ opacity: 0.75 }}>
+                    <div className="card-row">
+                      <div>
+                        <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                          <MetaIcon size={13} stroke={meta.color} strokeWidth={2} /> {i.parca}
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--hint)" }}>
+                          {i.toptanci_adi ? `${i.toptanci_adi} · ` : ""}{i.miktar} adet
+                          {i.beklenen_tutar > 0 ? ` · ₺${i.beklenen_tutar.toLocaleString("tr-TR")}` : ""}
+                        </div>
+                        {i.son_degistiren_adi && (
+                          <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                            <User size={10} strokeWidth={2} /> {i.son_degistiren_adi}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: 12, color: "var(--hint)" }}>
-                        {i.toptanci_adi ? `${i.toptanci_adi} · ` : ""}{i.miktar} adet
-                        {i.beklenen_tutar > 0 ? ` · ₺${i.beklenen_tutar.toLocaleString("tr-TR")}` : ""}
+                      <div style={{
+                        display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20,
+                        fontSize: 12, fontWeight: 600,
+                        background: meta.bg, color: meta.color,
+                      }}>
+                        <MetaIcon size={12} strokeWidth={2} /> {meta.label}
                       </div>
-                    </div>
-                    <div style={{
-                      display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20,
-                      fontSize: 12, fontWeight: 600,
-                      background: DURUM_META.para_iade_alindi.bg,
-                      color: DURUM_META.para_iade_alindi.color,
-                    }}>
-                      <CheckCircle2 size={12} strokeWidth={2} /> {DURUM_META.para_iade_alindi.label}
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </>
           )}
         </>
+      )}
+
+      {deleteId && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div className="card" style={{ width: "100%", maxWidth: 340 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>İade kaydını sil</div>
+            <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 16 }}>
+              Bu kayıt silinecek, stoktan düşülen miktar varsa geri eklenecek. Emin misin?
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" style={{ background: "var(--danger)" }} onClick={() => sil(deleteId)}>Sil</button>
+              <button className="btn btn-ghost" onClick={() => setDeleteId(null)}>İptal</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -6,6 +6,12 @@ from datetime import date
 
 router = APIRouter(prefix="/parca-iade", tags=["parca-iade"])
 
+# Önceden bu liste hiç zorlanmıyordu — demo seed verisi "kabul"/"red" gibi
+# gerçek akışta hiç var olmayan durum değerleri yazmıştı. Bu değerler
+# frontend'in bildiği hiçbir duruma denk gelmediği için o kayıtların üzerinde
+# HİÇ buton çıkmıyordu, sonsuza dek "bekleyen" sayılıp ilerletilemiyordu.
+GECERLI_DURUMLAR = {"bekliyor", "gönderildi", "para_iade_alindi", "reddedildi"}
+
 
 @router.get("/")
 async def list_iade(
@@ -14,9 +20,11 @@ async def list_iade(
     db: asyncpg.Connection = Depends(get_db),
 ):
     rows = await db.fetch(
-        """SELECT p.*, t.ad as toptanci_adi
+        """SELECT p.*, t.ad as toptanci_adi, u1.ad as olusturan_adi, u2.ad as son_degistiren_adi
            FROM parca_iadeler p
            LEFT JOIN toptancilar t ON p.toptanci_id = t.id
+           LEFT JOIN kullanicilar u1 ON p.created_by = u1.id
+           LEFT JOIN kullanicilar u2 ON p.son_durum_degistiren_id = u2.id
            WHERE p.dukkan_id = $1
            ORDER BY p.created_at DESC""",
         dukkan_id,
@@ -57,10 +65,10 @@ async def add_iade(
         beklenen_tutar = float(body.get("beklenen_tutar") or 0)
 
         row = await db.fetchrow(
-            """INSERT INTO parca_iadeler (dukkan_id, toptanci_id, part_id, parca, miktar, sebep, durum, beklenen_tutar)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id""",
+            """INSERT INTO parca_iadeler (dukkan_id, toptanci_id, part_id, parca, miktar, sebep, durum, beklenen_tutar, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6, 'bekliyor', $7, $8) RETURNING id""",
             dukkan_id, body.get("toptanci_id"), part_id, body["parca"], miktar,
-            body.get("sebep"), body.get("durum", "bekliyor"), beklenen_tutar,
+            body.get("sebep"), beklenen_tutar, user["id"],
         )
         iade_id = row["id"]
 
@@ -82,6 +90,92 @@ async def add_iade(
     return {"id": iade_id}
 
 
+@router.put("/{iade_id}")
+async def edit_iade(
+    iade_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    iade = await db.fetchrow("SELECT * FROM parca_iadeler WHERE id=$1 AND dukkan_id=$2", iade_id, dukkan_id)
+    if not iade:
+        raise HTTPException(404, "İade bulunamadı")
+    if iade["durum"] != "bekliyor":
+        raise HTTPException(400, "Toptancıya gönderilmiş/sonuçlanmış bir iade düzenlenemez")
+
+    yeni_tutar = float(body.get("beklenen_tutar") or 0)
+    async with db.transaction():
+        await db.execute(
+            """UPDATE parca_iadeler SET toptanci_id=$1, parca=$2, miktar=$3, sebep=$4, beklenen_tutar=$5
+               WHERE id=$6 AND dukkan_id=$7""",
+            body.get("toptanci_id"), body.get("parca", iade["parca"]), int(body.get("miktar") or iade["miktar"]),
+            body.get("sebep"), yeni_tutar, iade_id, dukkan_id,
+        )
+        # Beklenen tutar değiştiyse, henüz ödenmemiş bağlı borcu da güncelle.
+        await db.execute(
+            """UPDATE debts SET amount=$1, total_amount=$1
+               WHERE dukkan_id=$2 AND source_type='parca_iade' AND source_id=$3 AND paid_amount=0""",
+            yeni_tutar, dukkan_id, iade_id,
+        )
+        if yeni_tutar <= 0:
+            await db.execute(
+                "DELETE FROM debts WHERE dukkan_id=$1 AND source_type='parca_iade' AND source_id=$2 AND paid_amount=0",
+                dukkan_id, iade_id,
+            )
+        elif yeni_tutar > 0:
+            var_mi = await db.fetchval(
+                "SELECT id FROM debts WHERE dukkan_id=$1 AND source_type='parca_iade' AND source_id=$2",
+                dukkan_id, iade_id,
+            )
+            if not var_mi:
+                await db.execute(
+                    """INSERT INTO debts (dukkan_id, alacakli_adi, borc_turu, source_type, source_id,
+                       amount, total_amount, payment_type, notes, created_by)
+                       VALUES ($1, $2, 'alacak', 'parca_iade', $3, $4, $4, 'borc', $5, $6)""",
+                    dukkan_id, body.get("parca", iade["parca"]), iade_id, yeni_tutar,
+                    f"Parça iade: {body.get('parca', iade['parca'])}", user["id"],
+                )
+    return {"ok": True}
+
+
+@router.delete("/{iade_id}")
+async def delete_iade(
+    iade_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    if user["rol"] != "patron":
+        raise HTTPException(403, "Sadece patron silebilir")
+    iade = await db.fetchrow("SELECT * FROM parca_iadeler WHERE id=$1 AND dukkan_id=$2", iade_id, dukkan_id)
+    if not iade:
+        raise HTTPException(404, "İade bulunamadı")
+    if iade["durum"] == "para_iade_alindi":
+        raise HTTPException(400, "Para iadesi tamamlanmış bir kayıt silinemez")
+
+    async with db.transaction():
+        if iade["part_id"]:
+            # Yanlış girilen kayıt siliniyor — stoktan düşülen miktar geri eklenir,
+            # yoksa stok kalıcı olarak eksik görünmeye devam ederdi.
+            await db.execute(
+                "UPDATE parts SET quantity = quantity + $1 WHERE id = $2 AND dukkan_id = $3",
+                iade["miktar"], iade["part_id"], dukkan_id,
+            )
+            await db.execute(
+                """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
+                   VALUES ($1, $2, 'giris', $3, 'iade_iptal', $4, $5, $6)""",
+                dukkan_id, iade["part_id"], iade["miktar"], "Hatalı iade kaydı silindi",
+                date.today().isoformat(), user["id"],
+            )
+        await db.execute(
+            "DELETE FROM debts WHERE dukkan_id=$1 AND source_type='parca_iade' AND source_id=$2 AND paid_amount=0",
+            dukkan_id, iade_id,
+        )
+        await db.execute("DELETE FROM parca_iadeler WHERE id=$1 AND dukkan_id=$2", iade_id, dukkan_id)
+    return {"ok": True}
+
+
 @router.put("/{iade_id}/durum")
 async def update_durum(
     iade_id: int,
@@ -91,6 +185,8 @@ async def update_durum(
     db: asyncpg.Connection = Depends(get_db),
 ):
     yeni_durum = body["durum"]
+    if yeni_durum not in GECERLI_DURUMLAR:
+        raise HTTPException(400, f"Geçersiz durum: {yeni_durum}")
 
     iade_row = await db.fetchrow("SELECT * FROM parca_iadeler WHERE id = $1 AND dukkan_id = $2", iade_id, dukkan_id)
     if not iade_row:
@@ -99,8 +195,9 @@ async def update_durum(
 
     async with db.transaction():
         await db.execute(
-            "UPDATE parca_iadeler SET durum = $1 WHERE id = $2 AND dukkan_id = $3",
-            yeni_durum, iade_id, dukkan_id,
+            """UPDATE parca_iadeler SET durum = $1, son_durum_degistiren_id = $2, son_durum_degisiklik_at = now()
+               WHERE id = $3 AND dukkan_id = $4""",
+            yeni_durum, user["id"], iade_id, dukkan_id,
         )
 
         if yeni_durum == "para_iade_alindi":
@@ -122,5 +219,13 @@ async def update_durum(
                     "UPDATE debts SET paid_amount = total_amount WHERE dukkan_id=$1 AND source_type='parca_iade' AND source_id=$2",
                     dukkan_id, iade_id,
                 )
+        elif yeni_durum == "reddedildi":
+            # Toptancı iadeyi kabul etmedi — bu para hiç gelmeyecek, açılmış
+            # 'alacak' borcunu (henüz tahsil edilmemişse) siliyoruz. Önceden bu
+            # durum hiç yoktu, reddedilen iadeler "bekliyor" gibi asılı kalıyordu.
+            await db.execute(
+                "DELETE FROM debts WHERE dukkan_id=$1 AND source_type='parca_iade' AND source_id=$2 AND paid_amount=0",
+                dukkan_id, iade_id,
+            )
 
     return {"ok": True}

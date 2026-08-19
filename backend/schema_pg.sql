@@ -492,6 +492,9 @@ CREATE TABLE IF NOT EXISTS parca_iadeler (
     sebep TEXT,
     durum TEXT DEFAULT 'bekliyor',
     beklenen_tutar REAL DEFAULT 0,
+    created_by INTEGER REFERENCES kullanicilar(id),
+    son_durum_degistiren_id INTEGER REFERENCES kullanicilar(id),
+    son_durum_degisiklik_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT now()
 );
 

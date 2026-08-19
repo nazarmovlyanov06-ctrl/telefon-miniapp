@@ -153,7 +153,7 @@ function AppRoutes({ user }) {
         <Route path="/hedef" element={<Hedef />} />
         <Route path="/maas" element={<Maas />} />
         <Route path="/karalist" element={<KaraListe />} />
-        <Route path="/parca-iade" element={<ParcaIade />} />
+        <Route path="/parca-iade" element={<ParcaIade user={user} />} />
         <Route path="/ai" element={<AiChat />} />
         <Route path="/customers/:id" element={<CustomerDetail />} />
         <Route path="/sifir-cihaz" element={<SifirCihaz user={user} />} />
