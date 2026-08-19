@@ -122,14 +122,24 @@ async def dashboard(
         "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND created_at >= $2", dukkan_id, month_start_date
     )
 
+    # Kasa artık sadece patron'a açık (bkz. routers/kasa.py) — bu özet uç
+    # noktası da aynı kısıtlamayı uygulamazsa, dashboard'daki "Bugün Gelir/
+    # Gider" ve "Bu Ay Kazanç" kartları kapatılsa bile veri ağ isteğinde
+    # (network sekmesi) hâlâ görünür kalırdı. Patron değilse bu alanlar sıfır.
+    patron_mu = user["rol"] == "patron"
+
     return {
         "tamir_durumlar": tamir_durumlar,
         "kasa_bugun": {
-            "gelir": kasa_gelir_bugun,
-            "gider": kasa_gider_bugun,
-            "net": kasa_gelir_bugun - kasa_gider_bugun,
+            "gelir": kasa_gelir_bugun if patron_mu else 0,
+            "gider": kasa_gider_bugun if patron_mu else 0,
+            "net": (kasa_gelir_bugun - kasa_gider_bugun) if patron_mu else 0,
         },
-        "bu_ay": {"gelir": bu_ay_gelir, "tamir": bu_ay_tamir, "kaynaklar": bu_ay_kaynaklar},
+        "bu_ay": {
+            "gelir": bu_ay_gelir if patron_mu else 0,
+            "tamir": bu_ay_tamir,
+            "kaynaklar": bu_ay_kaynaklar if patron_mu else [],
+        },
         "uyarilar": {"stok": stok_uyari, "garanti": garanti_uyari, "borc": borc_uyari},
         "aranacaklar": aranacaklar,
         "son_tamirler": son_tamirler,
@@ -140,7 +150,7 @@ async def dashboard(
             "teslim_sayisi": await scalar(
                 "SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1 AND DATE(delivered_at)=$2", dukkan_id, today_date
             ),
-            "gelir": kasa_gelir_bugun,
+            "gelir": kasa_gelir_bugun if patron_mu else 0,
         },
         "bekleyen": {
             "tamir": sum(tamir_durumlar.get(s, 0) for s in ["bekliyor", "tamirde", "parca_bekleniyor"]),

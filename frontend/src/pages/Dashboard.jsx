@@ -764,6 +764,7 @@ export default function Dashboard({ user }) {
         );
 
       case "kasa":
+        if (user?.rol !== "patron") return null;
         return (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div className="card" style={{ margin: 0, cursor: "pointer" }} onClick={() => !titriyor && setAcikKasaTip("gelir")}>
@@ -784,6 +785,7 @@ export default function Dashboard({ user }) {
         );
 
       case "kazanc":
+        if (user?.rol !== "patron") return null;
         return (
           <div className="card" style={{ cursor: "pointer" }} onClick={() => !titriyor && setKazancAcik(true)}>
             <div className="card-row">
