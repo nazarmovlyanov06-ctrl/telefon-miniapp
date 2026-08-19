@@ -15,6 +15,8 @@ export default function useSurukleSirala(baslangicSira, onSiraDegisti) {
   const basiliAnahtarRef = useRef(null);
   const suruklemeBasladiRef = useRef(false);
   const justEnteredRef = useRef(null);
+  const sonSwapZamaniRef = useRef(0);
+  const SWAP_BEKLEME_MS = 220;
 
   useEffect(() => { siraRef.current = sira; }, [sira]);
 
@@ -67,18 +69,25 @@ export default function useSurukleSirala(baslangicSira, onSiraDegisti) {
         }
         return;
       }
+      const simdi = Date.now();
+      if (simdi - sonSwapZamaniRef.current < SWAP_BEKLEME_MS) return;
       const dizi = siraRef.current;
       for (const digerKey of dizi) {
         if (digerKey === key) continue;
         const el = refs.current[digerKey];
         if (!el) continue;
         const r = el.getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        // Kenara yakın küçük hareketlerde sürekli takas olmasın diye kutunun
+        // ortasına yakın %60'lık bölgeye girmesi gerekiyor.
+        const mx = r.width * 0.2, my = r.height * 0.2;
+        if (e.clientX >= r.left + mx && e.clientX <= r.right - mx &&
+            e.clientY >= r.top + my && e.clientY <= r.bottom - my) {
           const i1 = dizi.indexOf(key), i2 = dizi.indexOf(digerKey);
           const yeni = [...dizi];
           yeni.splice(i1, 1);
           yeni.splice(i2, 0, key);
           siraAyarla(yeni);
+          sonSwapZamaniRef.current = simdi;
           break;
         }
       }
