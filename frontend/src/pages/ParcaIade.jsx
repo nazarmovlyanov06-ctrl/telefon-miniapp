@@ -36,7 +36,13 @@ export default function ParcaIade({ user }) {
   const [alinanTutar, setAlinanTutar] = useState("");
   const [odemeYontemi, setOdemeYontemi] = useState("nakit");
   const [degisimModal, setDegisimModal] = useState(null);
-  const [degisimForm, setDegisimForm] = useState({ alinan_part_id: "", alinan_miktar: "1", fark_tutari: "", fark_yonu: "yok", odemeler: null, taksit_sayi: "1" });
+  const [degisimForm, setDegisimForm] = useState({
+    alinan_part_id: null, alinan_parca_adi: "", alinan_device_model: "", alinan_part_type: "",
+    alinan_miktar: "1", alinan_fiyat: "", odemeler: null, taksit_sayi: "1",
+  });
+  const [degisimArama, setDegisimArama] = useState("");
+  const [degisimOneriler, setDegisimOneriler] = useState([]);
+  const [showDegisimOner, setShowDegisimOner] = useState(false);
   const dolarKuru = parseFloat(localStorage.getItem("son_dolar_kuru") || "0");
 
   useEffect(() => {
@@ -158,19 +164,55 @@ export default function ParcaIade({ user }) {
 
   function openDegisimModal(item) {
     setDegisimModal(item);
-    setDegisimForm({ alinan_part_id: "", alinan_miktar: String(item.miktar || 1), fark_tutari: "", fark_yonu: "yok", odemeler: null, taksit_sayi: "1" });
+    setDegisimForm({
+      alinan_part_id: null, alinan_parca_adi: "", alinan_device_model: "", alinan_part_type: "",
+      alinan_miktar: String(item.miktar || 1), alinan_fiyat: "", odemeler: null, taksit_sayi: "1",
+    });
+    setDegisimArama("");
+    setShowDegisimOner(false);
   }
+
+  function handleDegisimArama(val) {
+    setDegisimArama(val);
+    setDegisimForm(f => ({ ...f, alinan_parca_adi: val, alinan_part_id: null }));
+    if (val.length >= 1) {
+      const q = val.toLowerCase();
+      const found = tumParcalar.filter(p =>
+        p.name.toLowerCase().includes(q) || (p.device_model || "").toLowerCase().includes(q)
+      ).slice(0, 8);
+      setDegisimOneriler(found);
+      setShowDegisimOner(found.length > 0);
+    } else {
+      setShowDegisimOner(false);
+    }
+  }
+
+  function secDegisimParca(p) {
+    setDegisimArama(p.name + (p.device_model ? ` (${p.device_model})` : ""));
+    setDegisimForm(f => ({
+      ...f, alinan_parca_adi: p.name, alinan_part_id: p.id,
+      alinan_fiyat: p.purchase_price > 0 ? String(p.purchase_price) : f.alinan_fiyat,
+    }));
+    setShowDegisimOner(false);
+  }
+
+  // Fark: gönderdiğimiz parçanın değeri (beklenen_tutar) ile aldığımızın
+  // değeri (birim fiyat × miktar) karşılaştırılır — yön elle seçilmiyor.
+  const degisimAlinanDeger = (parseFloat(degisimForm.alinan_fiyat) || 0) * (parseInt(degisimForm.alinan_miktar) || 0);
+  const degisimGonderilenDeger = degisimModal?.beklenen_tutar || 0;
+  const degisimFark = Math.round((degisimAlinanDeger - degisimGonderilenDeger) * 100) / 100;
 
   async function submitDegisim() {
     if (!degisimModal) return;
-    const fark = parseFloat(degisimForm.fark_tutari) || 0;
-    const farkVar = fark > 0 && degisimForm.fark_yonu !== "yok";
+    const farkVar = Math.abs(degisimFark) > 0.009;
     await api.updateParcaIadeDurum(degisimModal.id, "parca_degisimi", {
-      alinan_part_id: degisimForm.alinan_part_id ? parseInt(degisimForm.alinan_part_id) : null,
+      alinan_part_id: degisimForm.alinan_part_id,
+      alinan_parca_adi: degisimForm.alinan_part_id ? null : degisimForm.alinan_parca_adi,
+      alinan_device_model: degisimForm.alinan_device_model || null,
+      alinan_part_type: degisimForm.alinan_part_type || null,
       alinan_miktar: parseInt(degisimForm.alinan_miktar) || 1,
-      fark_tutari: fark,
-      fark_yonu: farkVar ? degisimForm.fark_yonu : null,
-      odemeler: farkVar ? (degisimForm.odemeler || varsayilanOdemeSatirlari(fark)).filter(o => parseFloat(o.tutar) > 0) : [],
+      alinan_fiyat: parseFloat(degisimForm.alinan_fiyat) || 0,
+      odemeler: farkVar ? (degisimForm.odemeler || varsayilanOdemeSatirlari(Math.abs(degisimFark))).filter(o => parseFloat(o.tutar) > 0) : [],
       taksit_sayi: parseInt(degisimForm.taksit_sayi) || 1,
     });
     setDegisimModal(null);
@@ -364,65 +406,87 @@ export default function ParcaIade({ user }) {
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
               <Repeat size={16} strokeWidth={2} /> Parça Değişimi
             </div>
-            <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 12 }}>
+            <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 4 }}>
               {degisimModal.parca} — {degisimModal.toptanci_adi || "Toptancı belirtilmedi"}
             </div>
+            {degisimModal.beklenen_tutar > 0 && (
+              <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 12 }}>
+                Gönderdiğimiz parçanın değeri: <strong>₺{degisimModal.beklenen_tutar.toLocaleString("tr-TR")}</strong>
+              </div>
+            )}
 
-            <div className="form-group">
-              <label className="form-label">Yerine Gelen Parça (opsiyonel)</label>
-              <select className="form-select" value={degisimForm.alinan_part_id}
-                onChange={e => setDegisimForm(f => ({ ...f, alinan_part_id: e.target.value }))}>
-                <option value="">Stok bağlanmasın</option>
-                {tumParcalar.map(p => <option key={p.id} value={p.id}>{p.name}{p.device_model ? ` (${p.device_model})` : ""} — {p.quantity} adet</option>)}
-              </select>
-              {degisimForm.alinan_part_id && (
-                <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>Seçilen parçanın stoğuna miktar eklenecek</div>
+            <div className="form-group" style={{ position: "relative" }}>
+              <label className="form-label">Yerine Gelen Parça</label>
+              <input className="form-input"
+                value={degisimArama}
+                onChange={e => handleDegisimArama(e.target.value)}
+                onBlur={() => setTimeout(() => setShowDegisimOner(false), 150)}
+                placeholder="Parça adı yaz veya ara..."
+                autoComplete="off"
+              />
+              {showDegisimOner && (
+                <div className="ac-dropdown" style={{ maxHeight: 200, overflowY: "auto" }}>
+                  {degisimOneriler.map(p => (
+                    <div key={p.id} onMouseDown={() => secDegisimParca(p)}
+                      style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
+                        borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div>{p.name}</div>
+                        {p.device_model && <div style={{ fontSize: 11, color: "var(--hint)" }}>{p.device_model}</div>}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--hint)" }}>{p.quantity} adet</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {degisimForm.alinan_part_id ? (
+                <div style={{ fontSize: 11, color: "var(--success)", marginTop: 4 }}>Stoktaki parça — miktar eklenecek</div>
+              ) : degisimArama && (
+                <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 4 }}>Stokta yok — yeni parça olarak eklenecek</div>
               )}
             </div>
-            {degisimForm.alinan_part_id && (
+
+            {!degisimForm.alinan_part_id && degisimArama && (
+              <div className="form-group">
+                <label className="form-label">Cihaz Modeli (opsiyonel)</label>
+                <input className="form-input" value={degisimForm.alinan_device_model}
+                  onChange={e => setDegisimForm(f => ({ ...f, alinan_device_model: e.target.value }))} placeholder="Ör: iPhone 13" />
+              </div>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div className="form-group">
                 <label className="form-label">Gelen Miktar</label>
                 <input className="form-input" type="number" min="1" value={degisimForm.alinan_miktar}
                   onChange={e => setDegisimForm(f => ({ ...f, alinan_miktar: e.target.value }))} />
               </div>
-            )}
-
-            <div className="form-group">
-              <label className="form-label">Fiyat Farkı Var mı?</label>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
-                {[
-                  { v: "yok", l: "Fark Yok" },
-                  { v: "biz_oderiz", l: "Biz Öderiz" },
-                  { v: "toptanci_oder", l: "Toptancı Öder" },
-                ].map(o => (
-                  <button key={o.v} type="button" onClick={() => setDegisimForm(f => ({ ...f, fark_yonu: o.v }))}
-                    style={{
-                      padding: "7px 4px", borderRadius: 8, border: "1.5px solid",
-                      borderColor: degisimForm.fark_yonu === o.v ? "var(--accent)" : "var(--border)",
-                      background: degisimForm.fark_yonu === o.v ? "rgba(99,102,241,0.12)" : "var(--bg2)",
-                      color: degisimForm.fark_yonu === o.v ? "var(--accent)" : "var(--text)",
-                      fontWeight: 700, fontSize: 11.5, cursor: "pointer",
-                    }}>{o.l}</button>
-                ))}
+              <div className="form-group">
+                <label className="form-label">Gelen Parça Fiyatı (₺)</label>
+                <input className="form-input" type="number" min="0" step="0.01" value={degisimForm.alinan_fiyat}
+                  onChange={e => setDegisimForm(f => ({ ...f, alinan_fiyat: e.target.value }))} placeholder="0" />
               </div>
             </div>
 
-            {degisimForm.fark_yonu !== "yok" && (
-              <>
-                <div className="form-group">
-                  <label className="form-label">Fark Tutarı (₺)</label>
-                  <input className="form-input" type="number" min="0" step="0.01"
-                    value={degisimForm.fark_tutari}
-                    onChange={e => setDegisimForm(f => ({ ...f, fark_tutari: e.target.value }))}
-                    placeholder="0" />
-                </div>
-                {parseFloat(degisimForm.fark_tutari) > 0 && (
-                  <OdemeBolustur toplam={parseFloat(degisimForm.fark_tutari) || 0}
-                    yon={degisimForm.fark_yonu === "biz_oderiz" ? "gider" : "gelir"}
-                    value={degisimForm.odemeler} onChange={v => setDegisimForm(f => ({ ...f, odemeler: v }))}
-                    taksitSayi={degisimForm.taksit_sayi} onTaksitSayiChange={v => setDegisimForm(f => ({ ...f, taksit_sayi: v }))} />
+            {degisimForm.alinan_fiyat && (
+              <div style={{
+                background: Math.abs(degisimFark) <= 0.009 ? "var(--bg2)" : "rgba(94,168,255,0.08)",
+                border: Math.abs(degisimFark) <= 0.009 ? "none" : "1px solid rgba(94,168,255,0.25)",
+                borderRadius: 8, padding: "8px 12px", fontSize: 12.5, marginBottom: 10,
+              }}>
+                {Math.abs(degisimFark) <= 0.009 ? (
+                  <span style={{ color: "var(--hint)" }}>Fark yok — değerler eşit</span>
+                ) : degisimFark > 0 ? (
+                  <span><strong style={{ color: "var(--danger)" }}>₺{degisimFark.toLocaleString("tr-TR")}</strong> fazlasını biz öderiz (gelen parça daha değerli)</span>
+                ) : (
+                  <span><strong style={{ color: "var(--success)" }}>₺{Math.abs(degisimFark).toLocaleString("tr-TR")}</strong> toptancı bize öder/borçlu kalır (gönderdiğimiz daha değerliydi)</span>
                 )}
-              </>
+              </div>
+            )}
+
+            {Math.abs(degisimFark) > 0.009 && (
+              <OdemeBolustur toplam={Math.abs(degisimFark)} yon={degisimFark > 0 ? "gider" : "gelir"}
+                value={degisimForm.odemeler} onChange={v => setDegisimForm(f => ({ ...f, odemeler: v }))}
+                taksitSayi={degisimForm.taksit_sayi} onTaksitSayiChange={v => setDegisimForm(f => ({ ...f, taksit_sayi: v }))} />
             )}
 
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>

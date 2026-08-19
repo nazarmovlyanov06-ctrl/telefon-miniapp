@@ -236,39 +236,72 @@ async def update_durum(
                 dukkan_id, iade_id,
             )
             alinan_part_id = body.get("alinan_part_id")
+            alinan_parca_adi = (body.get("alinan_parca_adi") or "").strip()
             alinan_miktar = int(body.get("alinan_miktar") or iade["miktar"])
+            alinan_fiyat = float(body.get("alinan_fiyat") or 0)  # birim fiyat
+
             if alinan_part_id:
-                p = await db.fetchrow("SELECT name FROM parts WHERE id=$1 AND dukkan_id=$2", alinan_part_id, dukkan_id)
+                # Stoktaki mevcut bir parça seçildi — miktarı ekle.
+                p = await db.fetchrow("SELECT name, purchase_price FROM parts WHERE id=$1 AND dukkan_id=$2", alinan_part_id, dukkan_id)
                 if p:
+                    if alinan_fiyat > 0:
+                        await db.execute(
+                            "UPDATE parts SET quantity = quantity + $1, purchase_price = $2 WHERE id=$3 AND dukkan_id=$4",
+                            alinan_miktar, alinan_fiyat, alinan_part_id, dukkan_id,
+                        )
+                    else:
+                        await db.execute(
+                            "UPDATE parts SET quantity = quantity + $1 WHERE id=$2 AND dukkan_id=$3",
+                            alinan_miktar, alinan_part_id, dukkan_id,
+                        )
                     await db.execute(
-                        "UPDATE parts SET quantity = quantity + $1 WHERE id=$2 AND dukkan_id=$3",
-                        alinan_miktar, alinan_part_id, dukkan_id,
-                    )
-                    await db.execute(
-                        """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
-                           VALUES ($1, $2, 'giris', $3, 'degisim', $4, $5, $6)""",
+                        """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by, birim_fiyat)
+                           VALUES ($1, $2, 'giris', $3, 'degisim', $4, $5, $6, $7)""",
                         dukkan_id, alinan_part_id, alinan_miktar,
                         f"Parça değişimi karşılığı — orijinal: {iade.get('parca')}",
-                        date.today().isoformat(), user["id"],
+                        date.today().isoformat(), user["id"], alinan_fiyat or None,
                     )
-            # Fiyat farkı varsa (değişim parçası daha pahalı/ucuz) o fark
-            # ayrıca ödenir/tahsil edilir — nakit/kart/borç karışık olabilir.
-            fark = float(body.get("fark_tutari") or 0)
-            fark_yonu = body.get("fark_yonu")
-            if fark > 0 and fark_yonu in ("biz_oderiz", "toptanci_oder"):
+            elif alinan_parca_adi:
+                # Stokta hiç olmayan bir parça geldi — yeni parça olarak açılır.
+                ins = await db.fetchrow(
+                    """INSERT INTO parts (dukkan_id, name, device_model, part_type, quantity, min_quantity,
+                       purchase_price, toptanci_id, created_by)
+                       VALUES ($1, $2, $3, $4, $5, 2, $6, $7, $8) RETURNING id""",
+                    dukkan_id, alinan_parca_adi, body.get("alinan_device_model"), body.get("alinan_part_type"),
+                    alinan_miktar, alinan_fiyat if alinan_fiyat > 0 else None, iade.get("toptanci_id"), user["id"],
+                )
+                alinan_part_id = ins["id"]
+                await db.execute(
+                    """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by, birim_fiyat)
+                       VALUES ($1, $2, 'giris', $3, 'yeni_parca', $4, $5, $6, $7)""",
+                    dukkan_id, alinan_part_id, alinan_miktar,
+                    f"Parça değişimi ile yeni parça — orijinal: {iade.get('parca')}",
+                    date.today().isoformat(), user["id"], alinan_fiyat or None,
+                )
+
+            # Fark otomatik hesaplanır: gönderdiğimiz parçanın değeri (beklenen_tutar)
+            # ile aldığımız parçanın değeri (alinan_fiyat×miktar) karşılaştırılır.
+            # Aldığımız daha değerliyse biz fazlasını öderiz (gider), gönderdiğimiz
+            # daha değerliyse toptancı bize borçlu kalır/öder (gelir). Yön elle
+            # seçilmiyor, fiyatlardan otomatik çıkarılıyor.
+            gonderilen_deger = float(iade.get("beklenen_tutar") or 0)
+            alinan_deger = alinan_fiyat * alinan_miktar
+            fark = round(alinan_deger - gonderilen_deger, 2)
+
+            if abs(fark) > 0.009:
                 toptanci_adi = None
                 if iade.get("toptanci_id"):
                     tr = await db.fetchrow("SELECT ad FROM toptancilar WHERE id=$1 AND dukkan_id=$2", iade["toptanci_id"], dukkan_id)
                     toptanci_adi = tr["ad"] if tr else None
-                aciklama = f"Parça değişim farkı: {iade.get('parca')}"
-                if fark_yonu == "biz_oderiz":
+                aciklama = f"Parça değişim farkı: {iade.get('parca')} ↔ {alinan_parca_adi or (alinan_part_id and 'stoktaki parça') or ''}".strip()
+                if fark > 0:
                     await kaydet_odeme(
-                        db, dukkan_id, body.get("odemeler"), fark, "gider", "parca_degisim_farki", aciklama, user["id"],
+                        db, dukkan_id, body.get("odemeler"), abs(fark), "gider", "parca_degisim_farki", aciklama, user["id"],
                         alacakli_adi=toptanci_adi, taksit_sayi=body.get("taksit_sayi") or 1,
                     )
                 else:
                     await kaydet_odeme(
-                        db, dukkan_id, body.get("odemeler"), fark, "gelir", "parca_degisim_farki", aciklama, user["id"],
+                        db, dukkan_id, body.get("odemeler"), abs(fark), "gelir", "parca_degisim_farki", aciklama, user["id"],
                         alacakli_adi=toptanci_adi or iade.get("parca"), taksit_sayi=body.get("taksit_sayi") or 1,
                     )
 
