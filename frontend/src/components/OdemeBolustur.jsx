@@ -26,10 +26,27 @@ export default function OdemeBolustur({ toplam, value, onChange, taksitSayi, onT
   function satirSil(i) {
     onChange(satirlar.filter((_, idx) => idx !== i));
   }
+  function hicOdemeAlinmadi() {
+    onChange([{ yontem: "nakit", tutar: "" }]);
+  }
+
+  const tamamenBorc = alinan <= 0.009 && (toplam || 0) > 0;
 
   return (
     <div className="form-group">
-      <label className="form-label">Ödeme</label>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <label className="form-label" style={{ margin: 0 }}>Ödeme</label>
+        <button type="button" onClick={hicOdemeAlinmadi}
+          style={{
+            fontSize: 11, padding: "2px 8px", borderRadius: 10, border: "1px solid",
+            borderColor: tamamenBorc ? "var(--danger)" : "var(--border)",
+            background: tamamenBorc ? "rgba(239,68,68,0.1)" : "transparent",
+            color: tamamenBorc ? "var(--danger)" : "var(--hint)",
+            cursor: "pointer", fontWeight: 600,
+          }}>
+          Hiç ödeme alınmadı (tamamı borç)
+        </button>
+      </div>
       {satirlar.map((s, i) => (
         <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
           <select className="form-select" style={{ width: 92, flexShrink: 0 }} value={s.yontem}
