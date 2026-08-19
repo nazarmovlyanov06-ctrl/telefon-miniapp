@@ -310,28 +310,30 @@ async def update_repair_intake(
     db: asyncpg.Connection = Depends(get_db),
 ):
     """Cihaz teslim alma muayenesi (gelen aksesuarlar + çalışan/çalışmayan
-    fonksiyonlar + cihaz açılmıyorsa 'kapalı' notu) — sadece 'bekliyor'
-    durumundayken değiştirilebilir, onaylanınca kilitlenir (bkz.
-    onayla_repair_intake / update_repair_status)."""
+    fonksiyonlar + cihaz açılmıyorsa 'kapalı' notu + ön ödeme alındı mı) —
+    onaylanmadıkça değiştirilebilir (bkz. onayla_repair_intake). Yanlışlıkla
+    onaylandıysa patron `kilit-ac` ile tekrar açabilir, bkz. o endpoint."""
     mevcut = await db.fetchrow(
-        "SELECT status, intake_onaylandi FROM repairs WHERE id=$1 AND dukkan_id=$2", repair_id, dukkan_id
+        "SELECT intake_onaylandi FROM repairs WHERE id=$1 AND dukkan_id=$2", repair_id, dukkan_id
     )
     if not mevcut:
         raise HTTPException(404, "Tamir bulunamadı")
-    if mevcut["status"] != "bekliyor" or mevcut["intake_onaylandi"]:
-        raise HTTPException(400, "Muayene sadece onaylanmadan ve 'Bekliyor' durumundayken değiştirilebilir")
+    if mevcut["intake_onaylandi"]:
+        raise HTTPException(400, "Muayene onaylandı, değiştirmek için önce kilidi açın")
 
     fonksiyonlar = json.dumps(body["fonksiyonlar"], ensure_ascii=False) if "fonksiyonlar" in body else None
     aksesuarlar = json.dumps(body["aksesuarlar"], ensure_ascii=False) if "aksesuarlar" in body else None
+    on_odeme = (1 if body.get("on_odeme") else 0) if "on_odeme" in body else None
     await db.execute(
         """UPDATE repairs SET
            intake_kapali = COALESCE($1, intake_kapali),
            intake_notu = COALESCE($2, intake_notu),
            intake_fonksiyonlar = COALESCE($3::jsonb, intake_fonksiyonlar),
            intake_aksesuarlar = COALESCE($4::jsonb, intake_aksesuarlar),
+           on_odeme = COALESCE($5, on_odeme),
            updated_at = now()
-           WHERE id=$5 AND dukkan_id=$6""",
-        body.get("kapali"), body.get("notu"), fonksiyonlar, aksesuarlar, repair_id, dukkan_id,
+           WHERE id=$6 AND dukkan_id=$7""",
+        body.get("kapali"), body.get("notu"), fonksiyonlar, aksesuarlar, on_odeme, repair_id, dukkan_id,
     )
     return {"ok": True}
 
@@ -343,15 +345,33 @@ async def onayla_repair_intake(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    mevcut = await db.fetchrow(
-        "SELECT status FROM repairs WHERE id=$1 AND dukkan_id=$2", repair_id, dukkan_id
-    )
-    if not mevcut:
+    row = await db.fetchrow("SELECT 1 FROM repairs WHERE id=$1 AND dukkan_id=$2", repair_id, dukkan_id)
+    if not row:
         raise HTTPException(404, "Tamir bulunamadı")
-    if mevcut["status"] != "bekliyor":
-        raise HTTPException(400, "Muayene sadece 'Bekliyor' durumundayken onaylanabilir")
     await db.execute(
         "UPDATE repairs SET intake_onaylandi = true, updated_at = now() WHERE id=$1 AND dukkan_id=$2",
+        repair_id, dukkan_id,
+    )
+    return {"ok": True}
+
+
+@router.post("/{repair_id}/intake/kilit-ac")
+async def kilit_ac_repair_intake(
+    repair_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Yanlışlıkla onaylanan muayeneyi tekrar düzenlenebilir yapar —
+    sadece patron açabilir, personel yanlışlıkla kendi onayını iptal edip
+    değiştirmesin diye."""
+    if user["rol"] != "patron":
+        raise HTTPException(403, "Sadece patron muayene kilidini açabilir")
+    row = await db.fetchrow("SELECT 1 FROM repairs WHERE id=$1 AND dukkan_id=$2", repair_id, dukkan_id)
+    if not row:
+        raise HTTPException(404, "Tamir bulunamadı")
+    await db.execute(
+        "UPDATE repairs SET intake_onaylandi = false, updated_at = now() WHERE id=$1 AND dukkan_id=$2",
         repair_id, dukkan_id,
     )
     return {"ok": True}

@@ -109,7 +109,7 @@ export default function RepairDetail({ user }) {
   const [kontrolUyari, setKontrolUyari] = useState(false);
   const kontrolRef = useRef(null);
   // Cihaz teslim alma muayenesi
-  const [intake, setIntake] = useState({ kapali: false, notu: "", fonksiyonlar: {}, aksesuarlar: {} });
+  const [intake, setIntake] = useState({ kapali: false, notu: "", fonksiyonlar: {}, aksesuarlar: {}, on_odeme: false });
   const [intakeSaving, setIntakeSaving] = useState(false);
 
   // Parçalar
@@ -172,7 +172,7 @@ export default function RepairDetail({ user }) {
       let fonksiyonlar = {}, aksesuarlar = {};
       try { fonksiyonlar = r.intake_fonksiyonlar ? JSON.parse(r.intake_fonksiyonlar) : {}; } catch { /* eski/boş veri */ }
       try { aksesuarlar = r.intake_aksesuarlar ? JSON.parse(r.intake_aksesuarlar) : {}; } catch { /* eski/boş veri */ }
-      setIntake({ kapali: !!r.intake_kapali, notu: r.intake_notu || "", fonksiyonlar, aksesuarlar });
+      setIntake({ kapali: !!r.intake_kapali, notu: r.intake_notu || "", fonksiyonlar, aksesuarlar, on_odeme: !!r.on_odeme });
     }).finally(() => setLoading(false));
     api.vitrinAyarlarim().then(r => setDukkanSlug(r.slug)).catch(() => {});
   }, [id]);
@@ -277,6 +277,17 @@ export default function RepairDetail({ user }) {
       setRepair(r => ({ ...r, intake_onaylandi: true }));
     } catch (e) {
       alert(e.message || "Onaylanamadı");
+    } finally { setIntakeSaving(false); }
+  }
+
+  async function intakeKilitAc() {
+    if (!confirm("Muayene kilidini açmak istediğinize emin misiniz? Tekrar düzenlenebilir olacak.")) return;
+    setIntakeSaving(true);
+    try {
+      await api.kilitAcRepairIntake(id);
+      setRepair(r => ({ ...r, intake_onaylandi: false }));
+    } catch (e) {
+      alert(e.message || "Kilit açılamadı");
     } finally { setIntakeSaving(false); }
   }
 
@@ -902,6 +913,12 @@ export default function RepairDetail({ user }) {
               {repair.intake_onaylandi && (
                 <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: "var(--green)", display: "flex", alignItems: "center", gap: 4 }}>
                   <Lock size={11} strokeWidth={2} /> Onaylandı
+                  {user?.rol === "patron" && (
+                    <button type="button" onClick={intakeKilitAc} disabled={intakeSaving}
+                      style={{ background: "none", border: "none", color: "var(--blue)", fontWeight: 700, cursor: "pointer", padding: "0 0 0 6px", fontSize: 11 }}>
+                      Düzenle
+                    </button>
+                  )}
                 </span>
               )}
             </div>
@@ -917,9 +934,33 @@ export default function RepairDetail({ user }) {
             )}
 
             {(() => {
-              const kilitli = repair.intake_onaylandi || repair.status !== "bekliyor";
+              const kilitli = repair.intake_onaylandi;
               return (
                 <div style={{ opacity: kilitli ? 0.8 : 1 }}>
+                  <div onClick={() => !kilitli && intakeGuncelle({ on_odeme: !intake.on_odeme })}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "9px 11px", borderRadius: 10, marginBottom: 8,
+                      border: `1.5px solid ${intake.on_odeme ? "var(--green)" : "var(--divider)"}`,
+                      background: intake.on_odeme ? "rgba(74,222,128,0.08)" : "transparent",
+                      cursor: kilitli ? "default" : "pointer",
+                    }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: intake.on_odeme ? "var(--green)" : "var(--text)" }}>
+                      Ön ödeme alındı
+                    </span>
+                    <div style={{
+                      width: 40, height: 23, borderRadius: 12, flexShrink: 0,
+                      background: intake.on_odeme ? "var(--green)" : "var(--border)",
+                      position: "relative", transition: "background 0.2s",
+                    }}>
+                      <div style={{
+                        position: "absolute", top: 2.5, left: intake.on_odeme ? 19 : 2.5,
+                        width: 18, height: 18, borderRadius: "50%", background: "#fff",
+                        transition: "left 0.2s",
+                      }} />
+                    </div>
+                  </div>
+
                   <div onClick={() => !kilitli && intakeGuncelle({ kapali: !intake.kapali })}
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
