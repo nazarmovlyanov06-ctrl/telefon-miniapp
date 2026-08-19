@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import {
   Clock, Truck, CheckCircle2, CircleX, TriangleAlert, Banknote, Package,
-  Ban, Pencil, Trash2, User, Repeat, RefreshCw,
+  Ban, Pencil, Trash2, User, Repeat, RefreshCw, ChevronRight, Calendar,
 } from "lucide-react";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 
@@ -20,10 +20,20 @@ const DURUM_SIRASI = ["bekliyor", "gönderildi", "para_iade_alindi", "parca_degi
 // sayılır — toptancıya hiç gönderilmemiş ya da haftalarca cevap gelmemiş
 // iadeler için hatırlatma yoktu, listenin dibinde sessizce kaybolabiliyorlardı.
 const ESKI_ESIK_GUN = { bekliyor: 7, gönderildi: 14 };
+// Bir durumun kaydedildiği tarihi göstermek için — parça ne zaman gönderildi,
+// ne zaman para alındı, ne zaman değişti hiç görünmüyordu.
+const DURUM_TARIH_LABEL = {
+  gönderildi: "Gönderildi", para_iade_alindi: "Para Alındı",
+  parca_degisimi: "Değişti", reddedildi: "Reddedildi",
+};
 
 function gunSayisiHesapla(tarihStr) {
   if (!tarihStr) return 0;
   return Math.floor((Date.now() - new Date(tarihStr).getTime()) / 86400000);
+}
+
+function tarihFormat(tarihStr) {
+  return tarihStr ? new Date(tarihStr).toLocaleDateString("tr-TR") : null;
 }
 
 export default function ParcaIade({ user }) {
@@ -353,6 +363,10 @@ export default function ParcaIade({ user }) {
             </button>
           );
         })}
+      </div>
+      {/* Çip barı yatayda kaydırmalı — çalışan bunu fark etmeyebilir diye altına not */}
+      <div style={{ fontSize: 11, color: "var(--dim)", marginTop: -8, marginBottom: 12, display: "flex", alignItems: "center", gap: 2 }}>
+        Kaydırarak diğer durumları da görebilirsiniz <ChevronRight size={12} strokeWidth={2} />
       </div>
 
       {bekleyen.length > 0 && (
@@ -693,6 +707,18 @@ export default function ParcaIade({ user }) {
                             : (i.son_degistiren_adi ? `Son işlem: ${i.son_degistiren_adi}` : (i.olusturan_adi ? `Ekleyen: ${i.olusturan_adi}` : null))}
                         </div>
                       )}
+                      {(() => {
+                        const talep = tarihFormat(i.created_at);
+                        const durumTarih = i.durum !== "bekliyor" ? tarihFormat(i.son_durum_degisiklik_at) : null;
+                        const durumLabel = DURUM_TARIH_LABEL[i.durum];
+                        if (!talep) return null;
+                        return (
+                          <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+                            <Calendar size={10} strokeWidth={2} />
+                            Talep: {talep}{durumLabel && durumTarih ? ` · ${durumLabel}: ${durumTarih}` : ""}
+                          </div>
+                        );
+                      })()}
                     </div>
                     {(() => {
                       const referansTarih = i.durum === "gönderildi" ? (i.son_durum_degisiklik_at || i.created_at) : i.created_at;
@@ -756,6 +782,18 @@ export default function ParcaIade({ user }) {
                           <User size={10} strokeWidth={2} /> {i.son_degistiren_adi}
                         </div>
                       )}
+                      {(() => {
+                        const talep = tarihFormat(i.created_at);
+                        const durumTarih = tarihFormat(i.son_durum_degisiklik_at);
+                        const durumLabel = DURUM_TARIH_LABEL[i.durum];
+                        if (!talep && !durumTarih) return null;
+                        return (
+                          <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+                            <Calendar size={10} strokeWidth={2} />
+                            {durumLabel && durumTarih ? `${durumLabel}: ${durumTarih}` : `Talep: ${talep}`}
+                          </div>
+                        );
+                      })()}
                     </div>
                     {user?.rol === "patron" && i.durum !== "para_iade_alindi" && (
                       <button className="btn btn-ghost btn-sm" onClick={() => setDeleteId(i.id)}
