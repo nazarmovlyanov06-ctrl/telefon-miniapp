@@ -8,7 +8,7 @@ BILINEN_GELIR_KAYNAK = {"tamir", "2el_satis", "sifir_satis", "aksesuar", "parca_
 
 async def kaydet_odeme(
     db, dukkan_id, odemeler, toplam, yon, kaynak, aciklama, user_id,
-    customer_id=None, alacakli_adi=None, taksit_sayi=1, tarih=None,
+    customer_id=None, alacakli_adi=None, taksit_sayi=1, tarih=None, gider_id=None,
 ):
     """Bir satış/alımın tutarını istenilen sayıda ödeme satırına (nakit/kart,
     karışık) ve varsa kalan borca böler. "Bir kısmı nakit, bir kısmı kart,
@@ -35,9 +35,9 @@ async def kaydet_odeme(
         yontem = o.get("yontem") or "nakit"
         alinan_toplam += tutar
         await db.execute(
-            """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)""",
-            dukkan_id, tarih, kasa_tur, yontem, tutar, aciklama, kaynak,
+            """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak, gider_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+            dukkan_id, tarih, kasa_tur, yontem, tutar, aciklama, kaynak, gider_id,
         )
     kalan = round(toplam - alinan_toplam, 2)
     if kalan <= 0.009:
@@ -49,17 +49,17 @@ async def kaydet_odeme(
         await db.execute(
             """INSERT INTO debts
                (dukkan_id, customer_id, borc_turu, source_type, amount, total_amount,
-                payment_type, installment_count, notes, created_by)
-               VALUES ($1, $2, 'alacak', $3, $4, $4, $5, $6, $7, $8)""",
+                payment_type, installment_count, notes, created_by, gider_id)
+               VALUES ($1, $2, 'alacak', $3, $4, $4, $5, $6, $7, $8, $9)""",
             dukkan_id, customer_id, kaynak if kaynak in BILINEN_GELIR_KAYNAK else "manuel",
-            kalan, "taksit" if taksit_sayi > 1 else "borc", taksit_sayi, aciklama, user_id,
+            kalan, "taksit" if taksit_sayi > 1 else "borc", taksit_sayi, aciklama, user_id, gider_id,
         )
     else:
         await db.execute(
             """INSERT INTO debts
                (dukkan_id, alacakli_adi, borc_turu, source_type, amount, total_amount,
-                payment_type, installment_count, notes, created_by)
-               VALUES ($1, $2, 'dukkan_borcu', $3, $4, $4, $5, $6, $7, $8)""",
-            dukkan_id, alacakli_adi or "Toptancı", kaynak,
-            kalan, "taksit" if taksit_sayi > 1 else "borc", taksit_sayi, aciklama, user_id,
+                payment_type, installment_count, notes, created_by, gider_id)
+               VALUES ($1, $2, 'dukkan_borcu', $3, $4, $4, $5, $6, $7, $8, $9)""",
+            dukkan_id, alacakli_adi or "Alacaklı", kaynak,
+            kalan, "taksit" if taksit_sayi > 1 else "borc", taksit_sayi, aciklama, user_id, gider_id,
         )

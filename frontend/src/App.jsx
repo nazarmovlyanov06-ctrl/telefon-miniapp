@@ -147,7 +147,7 @@ function AppRoutes({ user }) {
         <Route path="/ikinciel" element={<IkinciEl user={user} />} />
         <Route path="/garanti" element={<Garanti />} />
         <Route path="/kasa" element={user?.rol === "patron" ? <Kasa /> : <Navigate to="/" replace />} />
-        <Route path="/gider" element={<Gider />} />
+        <Route path="/gider" element={user?.rol === "patron" ? <Gider /> : <Navigate to="/" replace />} />
         <Route path="/loaner" element={<Loaner />} />
         <Route path="/aksesuar" element={<Aksesuar user={user} />} />
         <Route path="/hedef" element={<Hedef />} />

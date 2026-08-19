@@ -740,7 +740,8 @@ export default function Dashboard({ user }) {
 
   const gosterilenModuller = hizliErisim
     .map(p => TUM_MODULLER.find(m => m.path === p))
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter(m => user?.rol === "patron" || !m.patronOnly);
 
   // Sürüklenip taşınabilen her blok — boş olan bölümler (ör. borç/garanti/
   // aranacak listesi boşsa) null döner ve hiç render edilmez, böylece boş bir

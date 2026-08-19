@@ -237,6 +237,16 @@ CREATE TABLE IF NOT EXISTS imei_history (
     created_at TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS giderler (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    kategori TEXT NOT NULL,
+    tutar REAL NOT NULL,
+    aciklama TEXT,
+    tarih TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS debts (
     id SERIAL PRIMARY KEY,
     dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
@@ -252,6 +262,7 @@ CREATE TABLE IF NOT EXISTS debts (
     installment_count INTEGER DEFAULT 1,
     due_date TEXT,
     notes TEXT,
+    gider_id INTEGER REFERENCES giderler(id),
     created_by INTEGER REFERENCES kullanicilar(id),
     created_at TIMESTAMP DEFAULT now()
 );
@@ -338,16 +349,7 @@ CREATE TABLE IF NOT EXISTS kasa_hareketleri (
     tutar REAL NOT NULL,
     aciklama TEXT,
     kaynak TEXT,
-    created_at TIMESTAMP DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS giderler (
-    id SERIAL PRIMARY KEY,
-    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
-    kategori TEXT NOT NULL,
-    tutar REAL NOT NULL,
-    aciklama TEXT,
-    tarih TEXT NOT NULL,
+    gider_id INTEGER REFERENCES giderler(id),
     created_at TIMESTAMP DEFAULT now()
 );
 

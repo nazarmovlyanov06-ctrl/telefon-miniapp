@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { CircleX, Trash2 } from "lucide-react";
+import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 
 const KATEGORILER = ["Kira", "Elektrik", "Su", "İnternet", "Vergi", "Sigorta", "Malzeme", "Diğer"];
 
@@ -11,7 +12,7 @@ export default function Gider() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [err, setErr] = useState("");
-  const [form, setForm] = useState({ kategori: "Kira", tutar: "", aciklama: "", tarih: today() });
+  const [form, setForm] = useState({ kategori: "Kira", tutar: "", aciklama: "", tarih: today(), odemeler: null, taksit_sayi: "1", alacakli_adi: "" });
 
   useEffect(() => { load(); }, []);
 
@@ -25,10 +26,19 @@ export default function Gider() {
   async function submit(e) {
     e.preventDefault();
     setErr("");
+    const tutar = parseFloat(form.tutar) || 0;
+    const odemeler = (form.odemeler || varsayilanOdemeSatirlari(tutar)).filter(o => parseFloat(o.tutar) > 0);
+    const alinan = odemeler.reduce((s, o) => s + (parseFloat(o.tutar) || 0), 0);
+    if (tutar - alinan > 0.009 && !form.alacakli_adi.trim()) {
+      setErr("Kalan tutar borç yazılacaksa kime borçlanıldığı girilmeli");
+      return;
+    }
     try {
-      await api.createGider({ ...form, tutar: parseFloat(form.tutar) });
+      await api.createGider({
+        ...form, tutar, odemeler, taksit_sayi: parseInt(form.taksit_sayi) || 1,
+      });
       setShowForm(false);
-      setForm({ kategori: "Kira", tutar: "", aciklama: "", tarih: today() });
+      setForm({ kategori: "Kira", tutar: "", aciklama: "", tarih: today(), odemeler: null, taksit_sayi: "1", alacakli_adi: "" });
       load();
     } catch (e) {
       setErr(e.message);
@@ -42,6 +52,9 @@ export default function Gider() {
   }
 
   const toplam = Array.isArray(list) ? list.reduce((s, g) => s + (g.tutar || 0), 0) : 0;
+  const formTutar = parseFloat(form.tutar) || 0;
+  const formAlinan = (form.odemeler || varsayilanOdemeSatirlari(formTutar)).reduce((s, o) => s + (parseFloat(o.tutar) || 0), 0);
+  const kalanBorc = formTutar - formAlinan;
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
 
@@ -82,6 +95,17 @@ export default function Gider() {
               <label className="form-label">Tarih</label>
               <input className="form-input" type="date" value={form.tarih} onChange={e => setForm({ ...form, tarih: e.target.value })} />
             </div>
+            <OdemeBolustur toplam={parseFloat(form.tutar) || 0} yon="gider"
+              value={form.odemeler} onChange={v => setForm(f => ({ ...f, odemeler: v }))}
+              taksitSayi={form.taksit_sayi} onTaksitSayiChange={v => setForm(f => ({ ...f, taksit_sayi: v }))} />
+            {kalanBorc > 0.009 && (
+              <div className="form-group">
+                <label className="form-label">Kime Borçlanıldı *</label>
+                <input className="form-input" value={form.alacakli_adi}
+                  onChange={e => setForm({ ...form, alacakli_adi: e.target.value })}
+                  placeholder="Ör: Ev sahibi, Elektrik şirketi..." />
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               <button type="submit" className="btn btn-primary">Kaydet</button>
               <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>İptal</button>
