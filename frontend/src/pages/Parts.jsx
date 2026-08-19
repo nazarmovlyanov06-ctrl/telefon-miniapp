@@ -69,7 +69,13 @@ export default function Parts({ user }) {
   const [toptancilar, setToptancilar] = useState([]);
   const [toptanciOner, setToptanciOner] = useState([]);
   const [showToptanciOner, setShowToptanciOner] = useState(false);
-  const [dollarRate, setDollarRate] = useState(null);
+  // Sayfa açılışında son bilinen kuru localStorage'dan yükle — dolar modunda
+  // kur hiç çekilmeden fiyat girilince TL karşılığı sessizce boş kalıp alış
+  // fiyatı hiç kaydedilmiyordu (kullanıcı fark etmeden).
+  const [dollarRate, setDollarRate] = useState(() => {
+    const cached = parseFloat(localStorage.getItem("son_dolar_kuru") || "");
+    return cached > 0 ? cached : null;
+  });
   const [kurLoading, setKurLoading] = useState(false);
   const [matchingParts, setMatchingParts] = useState([]);
   const [boughtExistingId, setBoughtExistingId] = useState(null);
@@ -294,15 +300,23 @@ export default function Parts({ user }) {
 
   async function submitEkle(e) {
     e.preventDefault(); setEkleErr("");
+    if (ekleDolarMode && ekleDolarMiktar && !ekleForm.fiyat) {
+      setEkleErr("Kur alınmadan dolar tutarı TL'ye çevrilemedi — önce \"Kur al\"a basın");
+      return;
+    }
     try {
+      const toptanciId = await resolveToptanciIdFor(ekleForm.toptanci, null);
       const aciklama = [ekleForm.toptanci, ekleForm.aciklama].filter(Boolean).join(" - ") || null;
       await api.stokEkle(selectedPart.id, {
         miktar: parseInt(ekleForm.miktar) || 1,
         fiyat: ekleForm.fiyat ? parseFloat(ekleForm.fiyat) : null,
         aciklama,
+        toptanci_id: toptanciId,
       });
       setSelectedPart(null);
       setEkleForm({ miktar: "1", fiyat: "", aciklama: "", toptanci: "" });
+      setEkleDolarMode(false);
+      setEkleDolarMiktar("");
       api.parts(q ? { q } : {}).then(setParts);
     } catch (e) { setEkleErr(e.message); }
   }
@@ -340,19 +354,24 @@ export default function Parts({ user }) {
     } else { setShowAddTopOner(false); }
   }
 
-  async function resolveToptanciId() {
-    const ad = addForm.toptanci.trim();
+  async function resolveToptanciIdFor(adHam, mevcutId) {
+    const ad = (adHam || "").trim();
     if (!ad) return null;
-    if (addForm.toptanci_id) return addForm.toptanci_id;
+    if (mevcutId) return mevcutId;
     const mevcut = toptancilar.find(t => t.ad.toLowerCase() === ad.toLowerCase());
     if (mevcut) return mevcut.id;
     const yeni = await api.createToptanci({ ad });
     api.toptanciList().then(setToptancilar);
     return yeni.id;
   }
+  function resolveToptanciId() { return resolveToptanciIdFor(addForm.toptanci, addForm.toptanci_id); }
 
   async function submitAddPart(e) {
     e.preventDefault(); setAddErr("");
+    if (addDolarMode && addDolarMiktar && !addForm.purchase_price) {
+      setAddErr("Kur alınmadan dolar tutarı TL'ye çevrilemedi — önce \"Kur al\"a basın");
+      return;
+    }
     try {
       const combinedModel = [addBrand, addForm.device_model].filter(Boolean).join(" ").trim();
       const toptanciId = await resolveToptanciId();

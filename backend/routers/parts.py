@@ -117,6 +117,11 @@ async def delete_part(
 ):
     if user["rol"] != "patron":
         raise HTTPException(403, "Sadece patron silebilir")
+    # stok_hareketleri.part_id -> parts(id) CASCADE değil; hareket geçmişi olan
+    # bir parça (artık her yeni parçada en az bir "yeni_parca" kaydı oluyor)
+    # önce bu satırlar silinmeden FK ihlaliyle 500 dönüyordu.
+    await db.execute("DELETE FROM stok_hareketleri WHERE part_id = $1 AND dukkan_id = $2", part_id, dukkan_id)
+    await db.execute("DELETE FROM repair_parts WHERE part_id = $1 AND dukkan_id = $2", part_id, dukkan_id)
     await db.execute("DELETE FROM parts WHERE id = $1 AND dukkan_id = $2", part_id, dukkan_id)
     return {"ok": True}
 
