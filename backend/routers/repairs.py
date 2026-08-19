@@ -433,6 +433,21 @@ async def update_repair_status(
         )
         kime = iade.get("kime_ad") or "size"
         mesaj = f"Tamir talebiniz iptal edildi. Cihaz {kime} teslim edildi."
+    elif status == "parca_bekleniyor":
+        parca = body.get("parca_bilgisi") or {}
+        durum_detay = json.dumps({
+            "parca_adi": parca.get("ad") or None,
+            "tahmini_tarih": parca.get("tahmini_tarih") or None,
+            "not": parca.get("not") or None,
+        }, ensure_ascii=False) if parca else None
+        await db.execute(
+            """UPDATE repairs SET status=$1, durum_detay=COALESCE($2::jsonb, durum_detay),
+               son_guncelleyen_id=$3, updated_at=now()
+               WHERE id=$4 AND dukkan_id=$5""",
+            status, durum_detay, user["id"], repair_id, dukkan_id,
+        )
+        parca_adi = parca.get("ad")
+        mesaj = f"Cihazınız için {parca_adi} bekleniyor." if parca_adi else "Cihazınız için parça bekleniyor."
     else:
         await db.execute(
             """UPDATE repairs SET
@@ -446,13 +461,40 @@ async def update_repair_status(
         )
         mesaj = {
             "tamirde": "Cihazınız tamire alındı, çalışmalara başlandı.",
-            "parca_bekleniyor": "Cihazınız için parça bekleniyor.",
             "hazir": "Cihazınız hazır! Servisimizden teslim alabilirsiniz.",
         }.get(status)
 
     if not zorla:
         baslik = f"Durum güncellendi: {DURUM_LABEL_TR.get(status, status)}"
         await _bildirim_ekle(db, dukkan_id, mevcut["customer_id"], repair_id, baslik, mesaj)
+    return {"ok": True}
+
+
+@router.patch("/{repair_id}/parca-bilgisi")
+async def update_repair_parca_bilgisi(
+    repair_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """'Parça Bekleniyor' durumundayken hangi parçanın beklendiğini
+    düzenlemek için — bir durum değişikliği değil, bu yüzden PATCH
+    /status'un "aynı duruma geçiş" erken dönüşüne takılmaması için ayrı."""
+    mevcut = await db.fetchrow("SELECT status FROM repairs WHERE id=$1 AND dukkan_id=$2", repair_id, dukkan_id)
+    if not mevcut:
+        raise HTTPException(404, "Tamir bulunamadı")
+    if mevcut["status"] != "parca_bekleniyor":
+        raise HTTPException(400, "Bu bilgi sadece 'Parça Bekleniyor' durumundayken düzenlenebilir")
+    durum_detay = json.dumps({
+        "parca_adi": body.get("ad") or None,
+        "tahmini_tarih": body.get("tahmini_tarih") or None,
+        "not": body.get("not") or None,
+    }, ensure_ascii=False)
+    await db.execute(
+        "UPDATE repairs SET durum_detay=$1::jsonb, updated_at=now() WHERE id=$2 AND dukkan_id=$3",
+        durum_detay, repair_id, dukkan_id,
+    )
     return {"ok": True}
 
 

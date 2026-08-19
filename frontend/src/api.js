@@ -139,6 +139,7 @@ export const api = {
   updateRepairIntake: (id, data) => patch(`/repairs/${id}/intake`, data),
   onaylaRepairIntake: (id) => post(`/repairs/${id}/intake/onayla`, {}),
   kilitAcRepairIntake: (id) => post(`/repairs/${id}/intake/kilit-ac`, {}),
+  updateRepairParcaBilgisi: (id, data) => patch(`/repairs/${id}/parca-bilgisi`, data),
   deleteRepair: (id) => del(`/repairs/${id}`),
 
   // Musteriler

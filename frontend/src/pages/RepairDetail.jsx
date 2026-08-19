@@ -140,6 +140,12 @@ export default function RepairDetail({ user }) {
   const [iptalSaving, setIptalSaving] = useState(false);
   const [iptalHata, setIptalHata] = useState("");
 
+  // Parça Bekleniyor — hangi parça bekleniyor notu (durum değişikliğinde
+  // veya zaten o durumdayken düzenlemek için)
+  const [bekParcaModal, setBekParcaModal] = useState(false);
+  const [bekParcaForm, setBekParcaForm] = useState({ ad: "", tahmini_tarih: "", not: "" });
+  const [bekParcaSaving, setBekParcaSaving] = useState(false);
+
   // Muayene onaylanmadan "Tamirde"ye geçilemez — uyarı için
   const [kontrolUyari, setKontrolUyari] = useState(false);
   const kontrolRef = useRef(null);
@@ -227,6 +233,11 @@ export default function RepairDetail({ user }) {
       setIptalModal(true);
       return;
     }
+    if (status === "parca_bekleniyor") {
+      setBekParcaForm({ ad: "", tahmini_tarih: "", not: "" });
+      setBekParcaModal(true);
+      return;
+    }
     if (onceki === "bekliyor" && status === "tamirde" && !repair.intake_onaylandi) {
       setKontrolUyari(true);
       kontrolRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -265,6 +276,30 @@ export default function RepairDetail({ user }) {
     } catch (e) {
       setIptalHata(e.message || "İptal edilemedi");
     } finally { setIptalSaving(false); }
+  }
+
+  // "Parça Bekleniyor"a ilk geçişte durum + not tek çağrıda; zaten o
+  // durumdaysa (sadece notu güncellerken) ayrı, dar kapsamlı endpoint.
+  async function parcaKaydet() {
+    const zatenBuDurumda = repair.status === "parca_bekleniyor";
+    setBekParcaSaving(true);
+    try {
+      if (zatenBuDurumda) {
+        await api.updateRepairParcaBilgisi(id, bekParcaForm);
+      } else {
+        const onceki = repair.status;
+        await api.updateRepairStatus(id, "parca_bekleniyor", { parca_bilgisi: bekParcaForm });
+        setRepair(r => ({ ...r, status: "parca_bekleniyor" }));
+        setForm(f => ({ ...f, status: "parca_bekleniyor" }));
+        clearTimeout(geriAlTimerRef.current);
+        setGeriAlToast({ onceki, yeni: "parca_bekleniyor" });
+        geriAlTimerRef.current = setTimeout(() => setGeriAlToast(null), 5000);
+      }
+      setRepair(r => ({ ...r, durum_detay: JSON.stringify({ parca_adi: bekParcaForm.ad || null, tahmini_tarih: bekParcaForm.tahmini_tarih || null, not: bekParcaForm.not || null }) }));
+      setBekParcaModal(false);
+    } catch (e) {
+      alert(e.message || "Kaydedilemedi");
+    } finally { setBekParcaSaving(false); }
   }
 
   async function durumGeriAl() {
@@ -707,6 +742,45 @@ export default function RepairDetail({ user }) {
         </div>
       )}
 
+      {/* Parça Bekleniyor modalı — hangi parça bekleniyor notu */}
+      {bekParcaModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div className="card" style={{ width: "100%", maxWidth: 400 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+              <Package size={16} strokeWidth={2} /> Parça Bekleniyor
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--hint)", marginBottom: 14 }}>
+              Hangi parça bekleniyor? (İsterseniz boş bırakıp sonra düzenleyebilirsiniz.)
+            </div>
+            <div className="form-group">
+              <label className="form-label">Parça Adı</label>
+              <input className="form-input" placeholder="Ör. Ekran, batarya, kamera modülü..."
+                value={bekParcaForm.ad}
+                onChange={e => setBekParcaForm(f => ({ ...f, ad: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Tahmini Gelme Tarihi</label>
+              <input className="form-input" type="date"
+                value={bekParcaForm.tahmini_tarih}
+                onChange={e => setBekParcaForm(f => ({ ...f, tahmini_tarih: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label">Not</label>
+              <input className="form-input" placeholder="Ör. toptancıdan bekleniyor..."
+                value={bekParcaForm.not}
+                onChange={e => setBekParcaForm(f => ({ ...f, not: e.target.value }))} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" onClick={parcaKaydet} disabled={bekParcaSaving}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                {bekParcaSaving ? "..." : <><CheckCircle2 size={15} strokeWidth={2} /> Kaydet</>}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setBekParcaModal(false)}>Vazgeç</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Fiş modal */}
       {fisModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 16 }}
@@ -852,6 +926,30 @@ export default function RepairDetail({ user }) {
                 </>
               ) : (
                 <Row label="Kime Teslim Edildi" value={durumDetay.teslim_alan_ad || repair.customer_name || "—"} />
+              )}
+            </div>
+          )}
+
+          {/* Parça bekleniyor notu */}
+          {repair.status === "parca_bekleniyor" && (
+            <div className="card" style={{ borderLeft: "3px solid var(--purple)", background: "rgba(167,139,250,0.06)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--purple)", display: "flex", alignItems: "center", gap: 7 }}>
+                  <Package size={14} strokeWidth={2} /> BEKLENEN PARÇA
+                </div>
+                <button onClick={() => { setBekParcaForm({ ad: durumDetay?.parca_adi || "", tahmini_tarih: durumDetay?.tahmini_tarih || "", not: durumDetay?.not || "" }); setBekParcaModal(true); }}
+                  style={{ background: "none", border: "none", color: "var(--blue)", fontWeight: 700, fontSize: 11.5, cursor: "pointer" }}>
+                  Düzenle
+                </button>
+              </div>
+              {durumDetay?.parca_adi || durumDetay?.tahmini_tarih || durumDetay?.not ? (
+                <>
+                  <Row label="Parça" value={durumDetay.parca_adi || "—"} />
+                  {durumDetay.tahmini_tarih && <><div className="divider" /><Row label="Tahmini Tarih" value={durumDetay.tahmini_tarih} /></>}
+                  {durumDetay.not && <><div className="divider" /><Row label="Not" value={durumDetay.not} /></>}
+                </>
+              ) : (
+                <div style={{ fontSize: 12.5, color: "var(--hint)" }}>Henüz not düşülmedi.</div>
               )}
             </div>
           )}
