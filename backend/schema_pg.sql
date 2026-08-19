@@ -358,6 +358,7 @@ CREATE TABLE IF NOT EXISTS kasa_hareketleri (
     aciklama TEXT,
     kaynak TEXT,
     gider_id INTEGER REFERENCES giderler(id),
+    debt_payment_id INTEGER REFERENCES debt_payments(id),
     created_at TIMESTAMP DEFAULT now()
 );
 

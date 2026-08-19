@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import {
   Banknote, Landmark, ClipboardList, CircleX, User, Ban, Phone, Calendar,
-  CreditCard, FileText, Wallet, X,
+  CreditCard, FileText, Wallet, X, Search, Pencil, Trash2,
 } from "lucide-react";
 
-export default function Debts() {
+export default function Debts({ user }) {
   const [tab, setTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("tab") || "alacak";
@@ -16,6 +16,7 @@ export default function Debts() {
   const [gecmis, setGecmis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [musteriler, setMusteriler] = useState([]);
   const [toptancilar, setToptancilar] = useState([]);
   const [oneriler, setOneriler] = useState([]);
@@ -24,6 +25,8 @@ export default function Debts() {
   const [odemeler, setOdemeler] = useState({});
   const [payModal, setPayModal] = useState(null); // { debt, defaultAmount }
   const [payForm, setPayForm] = useState({ amount: "", payment_type: "nakit" });
+  const [payErr, setPayErr] = useState("");
+  const [arama, setArama] = useState("");
   const [form, setForm] = useState({
     customer_id: null, customer_name_display: "",
     alacakli_adi: "",
@@ -35,18 +38,31 @@ export default function Debts() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    load();
     api.customers("").then(setMusteriler).catch(() => {});
     api.toptanciList().then(setToptancilar).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Arama yazarken her tuşta değil, 300ms bekleyip sakinleşince çek.
+  const ilkYuklemeRef = useRef(true);
+  useEffect(() => {
+    if (ilkYuklemeRef.current) { ilkYuklemeRef.current = false; return; }
+    const t = setTimeout(load, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arama]);
 
   async function load() {
     setLoading(true);
     try {
       const [a, d, g] = await Promise.all([
-        api.debts("alacak"),
-        api.debts("dukkan_borcu"),
-        api.debtsGecmis(),
+        api.debts("alacak", arama),
+        api.debts("dukkan_borcu", arama),
+        api.debtsGecmis(arama),
       ]);
       setAlacaklar(a);
       setDukkanBorclari(d);
@@ -83,19 +99,24 @@ export default function Debts() {
 
   async function submitYeniBorc(e) {
     e.preventDefault(); setErr("");
-    if (tab === "alacak" && !form.customer_id) { setErr("Müşteri seçilmelidir"); return; }
+    const serbestIsim = form.customer_name_display.trim();
+    if (tab === "alacak" && !form.customer_id && !serbestIsim) { setErr("Müşteri veya kişi/kurum adı girilmelidir"); return; }
     if (tab === "dukkan_borcu" && !form.alacakli_adi.trim()) { setErr("Alacaklı adı zorunlu"); return; }
+    const payload = {
+      borc_turu: tab,
+      customer_id: tab === "alacak" ? form.customer_id : null,
+      // Kayıtlı müşteri seçilmediyse yazılan isim serbest "alacaklı" olarak
+      // kaydedilir — önceden alacak sadece kayıtlı müşteriye açılabiliyordu.
+      alacakli_adi: tab === "dukkan_borcu" ? form.alacakli_adi : (!form.customer_id ? serbestIsim : null),
+      total_amount: parseFloat(form.total_amount),
+      payment_type: form.payment_type,
+      installment_count: parseInt(form.installment_count),
+      due_date: form.due_date || null,
+      notes: form.notes,
+    };
     try {
-      await api.createDebt({
-        borc_turu: tab,
-        customer_id: tab === "alacak" ? form.customer_id : null,
-        alacakli_adi: tab === "dukkan_borcu" ? form.alacakli_adi : null,
-        total_amount: parseFloat(form.total_amount),
-        payment_type: form.payment_type,
-        installment_count: parseInt(form.installment_count),
-        due_date: form.due_date || null,
-        notes: form.notes,
-      });
+      if (editingId) await api.updateDebt(editingId, payload);
+      else await api.createDebt(payload);
       setShowForm(false);
       resetForm();
       load();
@@ -103,8 +124,39 @@ export default function Debts() {
   }
 
   function resetForm() {
+    setEditingId(null);
     setForm({ customer_id: null, customer_name_display: "", alacakli_adi: "", total_amount: "", payment_type: "borc", installment_count: "1", due_date: "", notes: "" });
     setShowOneriler(false);
+  }
+
+  function canManage(d) {
+    // Parça İade'nin beklenen tutarına bağlı alacak kendi sayfasından yönetilir.
+    return !(d.source_type === "parca_iade" && d.source_id);
+  }
+
+  function startEdit(d) {
+    setEditingId(d.id);
+    setForm({
+      customer_id: d.customer_id || null,
+      customer_name_display: d.customer_id ? d.customer_name : (d.borc_turu === "alacak" ? (d.alacakli_adi || "") : ""),
+      alacakli_adi: d.borc_turu === "dukkan_borcu" ? (d.alacakli_adi || "") : "",
+      total_amount: String(d.total_amount ?? ""),
+      payment_type: d.payment_type || "borc",
+      installment_count: String(d.installment_count || 1),
+      due_date: d.due_date || "",
+      notes: d.notes || "",
+    });
+    setErr("");
+    setShowOneriler(false);
+    setShowForm(true);
+  }
+
+  async function silBorc(d) {
+    if (!confirm("Bu kaydı silmek istiyorsun?")) return;
+    try {
+      await api.deleteDebt(d.id);
+      load();
+    } catch (e) { alert(e.message); }
   }
 
   function pay(debt) {
@@ -113,15 +165,20 @@ export default function Debts() {
       : "";
     setPayModal(debt);
     setPayForm({ amount: taksitTutari ? String(taksitTutari) : "", payment_type: "nakit" });
+    setPayErr("");
   }
 
   async function submitPay(e) {
     e.preventDefault();
     if (!payModal || !payForm.amount) return;
-    await api.payDebt(payModal.id, { amount: parseFloat(payForm.amount), payment_type: payForm.payment_type });
-    setPayModal(null);
-    load();
-    if (expandedId === payModal.id) loadOdemeler(payModal.id);
+    setPayErr("");
+    try {
+      await api.payDebt(payModal.id, { amount: parseFloat(payForm.amount), payment_type: payForm.payment_type });
+      const id = payModal.id;
+      setPayModal(null);
+      load();
+      if (expandedId === id) loadOdemeler(id);
+    } catch (e) { setPayErr(e.message); }
   }
 
   async function loadOdemeler(id) {
@@ -133,6 +190,15 @@ export default function Debts() {
     if (expandedId === id) { setExpandedId(null); return; }
     setExpandedId(id);
     if (!odemeler[id]) loadOdemeler(id);
+  }
+
+  async function silOdeme(debtId, paymentId) {
+    if (!confirm("Bu ödeme kaydını silmek istiyorsun? Borcun ödenen tutarı buna göre geri alınacak.")) return;
+    try {
+      await api.deleteDebtOdeme(debtId, paymentId);
+      loadOdemeler(debtId);
+      load();
+    } catch (e) { alert(e.message); }
   }
 
   const totalAlacak = alacaklar.reduce((s, d) => s + (d.remaining || 0), 0);
@@ -151,20 +217,27 @@ export default function Debts() {
         <div className="page-title" style={{ margin: 0, flex: 1 }}>
           {tab === "alacak" ? "Alacaklar" : tab === "dukkan_borcu" ? "Dükkan Borçları" : "Geçmiş"}
         </div>
-        {tab !== "gecmis" && <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(!showForm); setErr(""); resetForm(); }}>+ Yeni</button>}
+        {tab !== "gecmis" && <button className="btn btn-primary btn-sm" onClick={() => { if (showForm) { setShowForm(false); } else { resetForm(); setShowForm(true); } setErr(""); }}>+ Yeni</button>}
       </div>
 
       {/* Sekme */}
       <div className="tabs" style={{ marginBottom: 12 }}>
-        <button className={`tab ${tab === "alacak" ? "active" : ""}`} onClick={() => { setTab("alacak"); setShowForm(false); setExpandedId(null); }}>
+        <button className={`tab ${tab === "alacak" ? "active" : ""}`} onClick={() => { setTab("alacak"); setShowForm(false); setExpandedId(null); resetForm(); }}>
           Alacaklar {alacaklar.length > 0 && `(${alacaklar.length})`}
         </button>
-        <button className={`tab ${tab === "dukkan_borcu" ? "active" : ""}`} onClick={() => { setTab("dukkan_borcu"); setShowForm(false); setExpandedId(null); }}>
+        <button className={`tab ${tab === "dukkan_borcu" ? "active" : ""}`} onClick={() => { setTab("dukkan_borcu"); setShowForm(false); setExpandedId(null); resetForm(); }}>
           Borçlar {dukkanBorclari.length > 0 && `(${dukkanBorclari.length})`}
         </button>
-        <button className={`tab ${tab === "gecmis" ? "active" : ""}`} onClick={() => { setTab("gecmis"); setShowForm(false); setExpandedId(null); }}>
+        <button className={`tab ${tab === "gecmis" ? "active" : ""}`} onClick={() => { setTab("gecmis"); setShowForm(false); setExpandedId(null); resetForm(); }}>
           Geçmiş
         </button>
+      </div>
+
+      <div className="form-group" style={{ position: "relative", marginBottom: 10 }}>
+        <input className="form-input" style={{ paddingLeft: 36 }} value={arama}
+          onChange={e => setArama(e.target.value)} placeholder="İsim veya notta ara..." />
+        <Search size={15} strokeWidth={2} stroke="var(--hint)"
+          style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
       </div>
 
       {/* Özet kart */}
@@ -189,19 +262,26 @@ export default function Debts() {
       {showForm && (
         <div className="card" style={{ marginBottom: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 10 }}>
-            {tab === "alacak" ? "Yeni Alacak Kaydı" : "Yeni Dükkan Borcu"}
+            {editingId
+              ? (tab === "alacak" ? "Alacak Kaydını Düzenle" : "Dükkan Borcunu Düzenle")
+              : (tab === "alacak" ? "Yeni Alacak Kaydı" : "Yeni Dükkan Borcu")}
           </div>
           <form onSubmit={submitYeniBorc}>
             {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>{err}</div>}
 
             {tab === "alacak" ? (
               <div className="form-group" style={{ position: "relative" }}>
-                <label className="form-label">Müşteri *</label>
+                <label className="form-label">Müşteri veya Kişi/Kurum *</label>
                 <input className="form-input" required
                   value={form.customer_name_display}
                   onChange={e => handleMusteriChange(e.target.value)}
                   onBlur={() => setTimeout(() => setShowOneriler(false), 150)}
-                  placeholder="Müşteri adı yaz..." autoComplete="off" />
+                  placeholder="Müşteri adı yaz, ya da kayıtlı değilse serbest yaz..." autoComplete="off" />
+                {form.customer_name_display && !form.customer_id && (
+                  <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>
+                    Kayıtlı müşteri seçilmedi — "{form.customer_name_display}" serbest isim olarak kaydedilecek
+                  </div>
+                )}
                 {showOneriler && (
                   <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 99,
                     background: "var(--card)", border: "1px solid var(--border)",
@@ -284,7 +364,7 @@ export default function Debts() {
                 onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="submit" className="btn btn-primary">Kaydet</button>
+              <button type="submit" className="btn btn-primary">{editingId ? "Güncelle" : "Kaydet"}</button>
               <button type="button" className="btn btn-ghost" onClick={() => { setShowForm(false); resetForm(); }}>İptal</button>
             </div>
           </form>
@@ -296,7 +376,7 @@ export default function Debts() {
       ) : activeList.length === 0 ? (
         <div className="empty">
           <div className="empty-icon" style={{display:"flex",justifyContent:"center"}}>{tab === "alacak" ? <Banknote size={40} stroke="var(--dim)" strokeWidth={1.5}/> : tab === "gecmis" ? <ClipboardList size={40} stroke="var(--dim)" strokeWidth={1.5}/> : <Landmark size={40} stroke="var(--dim)" strokeWidth={1.5}/>}</div>
-          {tab === "alacak" ? "Açık alacak yok" : tab === "gecmis" ? "Geçmiş kayıt yok" : "Dükkan borcu yok"}
+          {arama ? "Aramayla eşleşen kayıt yok" : (tab === "alacak" ? "Açık alacak yok" : tab === "gecmis" ? "Geçmiş kayıt yok" : "Dükkan borcu yok")}
         </div>
       ) : (
         activeList.map((d) => (
@@ -342,13 +422,23 @@ export default function Debts() {
               </div>
             </div>
             {tab !== "gecmis" && (
-            <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+            <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
               <button className="btn btn-ghost btn-sm" onClick={() => pay(d)}>
                 {tab === "alacak" ? "Ödeme Al" : "Ödedik"}
               </button>
               <button className="btn btn-ghost btn-sm" onClick={() => toggleExpand(d.id)}>
                 {expandedId === d.id ? "▲ Gizle" : "▼ Taksit/Geçmiş"}
               </button>
+              {canManage(d) && (
+                <button className="btn btn-ghost btn-sm" onClick={() => startEdit(d)} title="Düzenle" style={{ padding: "4px 8px", display: "flex", marginLeft: "auto" }}>
+                  <Pencil size={13} strokeWidth={2} />
+                </button>
+              )}
+              {canManage(d) && user?.rol === "patron" && (d.paid_amount || 0) === 0 && (
+                <button className="btn btn-ghost btn-sm" onClick={() => silBorc(d)} title="Sil" style={{ padding: "4px 8px", display: "flex", marginLeft: canManage(d) ? 0 : "auto" }}>
+                  <Trash2 size={13} strokeWidth={2} />
+                </button>
+              )}
             </div>
             )}
             {expandedId === d.id && (
@@ -406,9 +496,16 @@ export default function Debts() {
                 {!(odemeler[d.id]?.length) ? (
                   <div style={{ fontSize: 12, color: "var(--hint)" }}>Henüz ödeme yok</div>
                 ) : odemeler[d.id].map(o => (
-                  <div key={o.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
+                  <div key={o.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
                     <span style={{ color: "var(--hint)" }}>{o.paid_at ? new Date(o.paid_at).toLocaleDateString("tr-TR") : "—"}</span>
-                    <span style={{ fontWeight: 600, color: "var(--success)" }}>+₺{(o.amount || 0).toLocaleString("tr-TR")}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontWeight: 600, color: "var(--success)" }}>+₺{(o.amount || 0).toLocaleString("tr-TR")}</span>
+                      {user?.rol === "patron" && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => silOdeme(d.id, o.id)} title="Bu ödemeyi sil" style={{ padding: "2px 6px", display: "flex" }}>
+                          <Trash2 size={12} strokeWidth={2} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -438,18 +535,17 @@ export default function Debts() {
               })()}
             </div>
             <form onSubmit={submitPay}>
+              {payErr && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>{payErr}</div>}
               <div className="form-group">
                 <label className="form-label">Tutar (₺)</label>
                 <input className="form-input" type="number" required autoFocus
-                  inputMode="numeric"
+                  inputMode="numeric" max={payModal.remaining || undefined}
                   value={payForm.amount}
                   onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))}
                   placeholder="0" />
-                {payModal.payment_type === "taksit" && payModal.installment_count > 1 && (
-                  <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>
-                    Aylık taksit: ₺{Math.round((payModal.total_amount || 0) / (payModal.installment_count || 1)).toLocaleString("tr-TR")}
-                  </div>
-                )}
+                <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>
+                  Kalan: ₺{(payModal.remaining || 0).toLocaleString("tr-TR")}
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Ödeme Yöntemi</label>

@@ -180,11 +180,18 @@ export const api = {
   imeiBtk: (imei) => get(`/imei/btk/${imei}`),
 
   // Borc
-  debts: (tur) => get(`/debts/${tur ? "?tur=" + tur : ""}`),
-  debtsGecmis: () => get("/debts/gecmis"),
+  debts: (tur, q) => {
+    const params = new URLSearchParams(Object.fromEntries(Object.entries({ tur, q }).filter(([, v]) => v)));
+    const s = params.toString();
+    return get(`/debts/${s ? "?" + s : ""}`);
+  },
+  debtsGecmis: (q) => get(`/debts/gecmis${q ? "?q=" + encodeURIComponent(q) : ""}`),
   createDebt: (data) => post("/debts/", data),
+  updateDebt: (id, data) => put(`/debts/${id}`, data),
+  deleteDebt: (id) => del(`/debts/${id}`),
   payDebt: (id, data) => post(`/debts/${id}/pay`, data),
   debtOdemeler: (id) => get(`/debts/${id}/odemeler`),
+  deleteDebtOdeme: (debtId, paymentId) => del(`/debts/${debtId}/odemeler/${paymentId}`),
 
   // Kullaniciler (calisanlar)
   users: () => get("/users/"),

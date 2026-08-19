@@ -16,18 +16,32 @@ from odeme_yardimci import BILINEN_GELIR_KAYNAK
 router = APIRouter(prefix="/debts", tags=["debts"])
 
 
+def _patron_kontrol(user):
+    if user["rol"] != "patron":
+        raise HTTPException(403, "Sadece patron")
+
+
 @router.get("/")
 async def list_debts(
     tur: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
     dukkan_id: int = Depends(get_dukkan_id),
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
     params = [dukkan_id]
-    tur_filter = ""
+    where = ["d.dukkan_id = $1", "d.total_amount > d.paid_amount"]
     if tur:
         params.append(tur)
-        tur_filter = f"AND COALESCE(d.borc_turu,'alacak') = ${len(params)}"
+        where.append(f"COALESCE(d.borc_turu,'alacak') = ${len(params)}")
+    if q:
+        params.append(f"%{q}%")
+        idx = len(params)
+        where.append(f"(c.name ILIKE ${idx} OR d.alacakli_adi ILIKE ${idx} OR d.notes ILIKE ${idx})")
+    where_sql = " AND ".join(where)
+    # Açık (henüz kapanmamış) borç/alacaklar her zaman dikkat gerektirir —
+    # Parça İade'deki bekleyen kayıtlar gibi limitsiz listelenir, aksi halde
+    # 100'den fazla açık kayıt varsa eskiler sessizce listeden düşerdi.
     rows = await db.fetch(
         f"""SELECT d.*,
                   COALESCE(c.name, d.alacakli_adi, 'Bilinmiyor') as customer_name,
@@ -35,9 +49,8 @@ async def list_debts(
                   (d.total_amount - d.paid_amount) as remaining
            FROM debts d
            LEFT JOIN customers c ON d.customer_id = c.id
-           WHERE d.dukkan_id = $1 AND d.total_amount > d.paid_amount {tur_filter}
-           ORDER BY d.due_date ASC NULLS LAST, d.created_at DESC
-           LIMIT 100""",
+           WHERE {where_sql}
+           ORDER BY d.due_date ASC NULLS LAST, d.created_at DESC""",
         *params,
     )
     return [dict(r) for r in rows]
@@ -45,20 +58,28 @@ async def list_debts(
 
 @router.get("/gecmis")
 async def gecmis_debts(
+    q: Optional[str] = Query(None),
     dukkan_id: int = Depends(get_dukkan_id),
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
+    params = [dukkan_id]
+    where = ["d.dukkan_id = $1", "d.paid_amount >= d.total_amount", "d.total_amount > 0"]
+    if q:
+        params.append(f"%{q}%")
+        idx = len(params)
+        where.append(f"(c.name ILIKE ${idx} OR d.alacakli_adi ILIKE ${idx} OR d.notes ILIKE ${idx})")
+    where_sql = " AND ".join(where)
     rows = await db.fetch(
-        """SELECT d.*,
+        f"""SELECT d.*,
                   COALESCE(c.name, d.alacakli_adi, 'Bilinmiyor') as customer_name,
                   c.phone as customer_phone,
                   (d.total_amount - d.paid_amount) as remaining
            FROM debts d
            LEFT JOIN customers c ON d.customer_id = c.id
-           WHERE d.dukkan_id = $1 AND d.paid_amount >= d.total_amount AND d.total_amount > 0
-           ORDER BY d.created_at DESC LIMIT 100""",
-        dukkan_id,
+           WHERE {where_sql}
+           ORDER BY d.created_at DESC LIMIT 200""",
+        *params,
     )
     return [dict(r) for r in rows]
 
@@ -72,10 +93,12 @@ async def create_debt(
 ):
     borc_turu = body.get("borc_turu", "alacak")
     customer_id = body.get("customer_id")
-    alacakli_adi = body.get("alacakli_adi")
+    alacakli_adi = (body.get("alacakli_adi") or "").strip() or None
 
-    if borc_turu == "alacak" and not customer_id:
-        raise HTTPException(400, "Alacak için müşteri seçilmelidir")
+    # Alacak kaydı öncesi sadece kayıtlı müşteri seçilebiliyordu — müşteri
+    # olmayan birine (borç verilen tanıdık, vb.) alacak açılamıyordu.
+    if borc_turu == "alacak" and not customer_id and not alacakli_adi:
+        raise HTTPException(400, "Alacak için müşteri veya kişi/kurum adı girilmelidir")
     if borc_turu == "dukkan_borcu" and not alacakli_adi:
         raise HTTPException(400, "Dükkan borcu için alacaklı adı zorunlu")
 
@@ -100,6 +123,69 @@ async def create_debt(
     return {"id": row["id"]}
 
 
+def _kaynak_kontrol(debt):
+    # Parça İade'nin kendi beklenen tutarına bağlı borç, o kaydın edit_iade'si
+    # tarafından aktif olarak senkronize ediliyor (bkz. parca_iade.py) — burada
+    # bağımsız değiştirilirse bir sonraki iade düzenlemesinde üzerine yazılır.
+    if debt["source_type"] == "parca_iade" and debt["source_id"] is not None:
+        raise HTTPException(400, "Bu kayıt Parça İade'ye bağlı, oradan düzenleyin/silin")
+
+
+@router.put("/{debt_id}")
+async def edit_debt(
+    debt_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    debt = await db.fetchrow("SELECT * FROM debts WHERE id=$1 AND dukkan_id=$2", debt_id, dukkan_id)
+    if not debt:
+        raise HTTPException(404, "Borç bulunamadı")
+    _kaynak_kontrol(debt)
+
+    total_amount = float(body.get("total_amount", debt["total_amount"]))
+    if total_amount < debt["paid_amount"] - 0.009:
+        raise HTTPException(400, "Yeni tutar, şimdiye kadar ödenen tutardan az olamaz")
+
+    customer_id = body.get("customer_id", debt["customer_id"])
+    alacakli_adi = (body["alacakli_adi"] if "alacakli_adi" in body else debt["alacakli_adi"])
+    alacakli_adi = (alacakli_adi or "").strip() or None
+    if (debt["borc_turu"] or "alacak") == "alacak" and not customer_id and not alacakli_adi:
+        raise HTTPException(400, "Alacak için müşteri veya kişi/kurum adı girilmelidir")
+
+    await db.execute(
+        """UPDATE debts SET customer_id=$1, alacakli_adi=$2, total_amount=$3, amount=$3,
+           payment_type=$4, installment_count=$5, due_date=$6, notes=$7
+           WHERE id=$8 AND dukkan_id=$9""",
+        customer_id, alacakli_adi, total_amount,
+        body.get("payment_type", debt["payment_type"]),
+        body.get("installment_count", debt["installment_count"]),
+        body.get("due_date", debt["due_date"]),
+        body.get("notes", debt["notes"]),
+        debt_id, dukkan_id,
+    )
+    return {"ok": True}
+
+
+@router.delete("/{debt_id}")
+async def delete_debt(
+    debt_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    _patron_kontrol(user)
+    debt = await db.fetchrow("SELECT * FROM debts WHERE id=$1 AND dukkan_id=$2", debt_id, dukkan_id)
+    if not debt:
+        raise HTTPException(404, "Borç bulunamadı")
+    _kaynak_kontrol(debt)
+    if debt["paid_amount"] > 0:
+        raise HTTPException(400, "Bu kayda zaten ödeme yapılmış — önce ödemeleri silin")
+    await db.execute("DELETE FROM debts WHERE id=$1 AND dukkan_id=$2", debt_id, dukkan_id)
+    return {"ok": True}
+
+
 @router.get("/{debt_id}/odemeler")
 async def debt_odemeler(
     debt_id: int,
@@ -122,13 +208,21 @@ async def pay_debt(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    amount = body.get("amount", 0)
+    amount = float(body.get("amount", 0) or 0)
+    if amount <= 0:
+        raise HTTPException(400, "Tutar sıfırdan büyük olmalı")
 
     debt = await db.fetchrow(
         "SELECT * FROM debts WHERE id = $1 AND dukkan_id = $2", debt_id, dukkan_id
     )
     if not debt:
         raise HTTPException(404, "Borc bulunamadi")
+
+    kalan = debt["total_amount"] - debt["paid_amount"]
+    # Önceden üst sınır kontrolü yoktu — fazladan bir sıfır girilse kalan
+    # tutar eksiye düşer ve bunu geri almanın yolu olmazdı.
+    if amount - kalan > 0.009:
+        raise HTTPException(400, f"Ödeme, kalan tutardan (₺{kalan:.0f}) fazla olamaz")
 
     new_paid = debt["paid_amount"] + amount
     odeme_yontemi = body.get("payment_type", "nakit")
@@ -137,29 +231,55 @@ async def pay_debt(
             "UPDATE debts SET paid_amount = $1 WHERE id = $2 AND dukkan_id = $3",
             new_paid, debt_id, dukkan_id,
         )
-        await db.execute(
+        payment = await db.fetchrow(
             """INSERT INTO debt_payments (dukkan_id, debt_id, amount, payment_type, notes, created_by)
-               VALUES ($1, $2, $3, $4, $5, $6)""",
+               VALUES ($1, $2, $3, $4, $5, $6) RETURNING id""",
             dukkan_id, debt_id, amount, odeme_yontemi, body.get("notes"), user["id"],
         )
         # Borç tahsilatı/ödemesi de kasadan gerçek para hareketi — daha önce
         # buraya hiç yazılmıyordu, bu yüzden taksitle satılan bir cihazın
         # kalan ödemesi tahsil edilse bile Kasa'da hiç gelir olarak görünmüyordu.
-        if amount and float(amount) > 0:
-            borc_turu = debt["borc_turu"] or "alacak"
-            if borc_turu == "alacak":
-                kaynak = debt["source_type"] if debt["source_type"] in BILINEN_GELIR_KAYNAK else "diger"
-                await db.execute(
-                    """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-                       VALUES ($1, $2, 'gelir', $3, $4, $5, $6)""",
-                    dukkan_id, date.today().isoformat(), odeme_yontemi, float(amount),
-                    f"Borç tahsilatı: {debt['notes'] or ''}".strip(": "), kaynak,
-                )
-            else:
-                await db.execute(
-                    """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-                       VALUES ($1, $2, 'cikis', $3, $4, $5, 'borc_odeme')""",
-                    dukkan_id, date.today().isoformat(), odeme_yontemi, float(amount),
-                    f"Dükkan borcu ödemesi: {debt['alacakli_adi'] or ''}".strip(": "),
-                )
+        borc_turu = debt["borc_turu"] or "alacak"
+        if borc_turu == "alacak":
+            kaynak = debt["source_type"] if debt["source_type"] in BILINEN_GELIR_KAYNAK else "diger"
+            await db.execute(
+                """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak, debt_payment_id)
+                   VALUES ($1, $2, 'gelir', $3, $4, $5, $6, $7)""",
+                dukkan_id, date.today().isoformat(), odeme_yontemi, amount,
+                f"Borç tahsilatı: {debt['notes'] or ''}".strip(": "), kaynak, payment["id"],
+            )
+        else:
+            await db.execute(
+                """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak, debt_payment_id)
+                   VALUES ($1, $2, 'cikis', $3, $4, $5, 'borc_odeme', $6)""",
+                dukkan_id, date.today().isoformat(), odeme_yontemi, amount,
+                f"Dükkan borcu ödemesi: {debt['alacakli_adi'] or ''}".strip(": "), payment["id"],
+            )
     return {"ok": True, "new_paid": new_paid}
+
+
+@router.delete("/{debt_id}/odemeler/{payment_id}")
+async def delete_odeme(
+    debt_id: int,
+    payment_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    # Yanlış girilen bir ödeme kaydını düzeltmenin yolu yoktu — kalıcı olarak
+    # borcu (yanlışlıkla) kapatmış olarak kalırdı. Silme; borcun ödenen
+    # tutarını geri alır ve kasaya yazılmış karşılığını da temizler.
+    _patron_kontrol(user)
+    payment = await db.fetchrow(
+        "SELECT * FROM debt_payments WHERE id=$1 AND debt_id=$2 AND dukkan_id=$3", payment_id, debt_id, dukkan_id
+    )
+    if not payment:
+        raise HTTPException(404, "Ödeme bulunamadı")
+    async with db.transaction():
+        await db.execute(
+            "UPDATE debts SET paid_amount = GREATEST(paid_amount - $1, 0) WHERE id=$2 AND dukkan_id=$3",
+            payment["amount"], debt_id, dukkan_id,
+        )
+        await db.execute("DELETE FROM kasa_hareketleri WHERE debt_payment_id=$1 AND dukkan_id=$2", payment_id, dukkan_id)
+        await db.execute("DELETE FROM debt_payments WHERE id=$1 AND dukkan_id=$2", payment_id, dukkan_id)
+    return {"ok": True}

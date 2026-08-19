@@ -141,7 +141,7 @@ function AppRoutes({ user }) {
         <Route path="/parts" element={<Parts user={user} />} />
         <Route path="/more" element={<More user={user} />} />
         <Route path="/imei" element={<IMEI />} />
-        <Route path="/debts" element={<Debts />} />
+        <Route path="/debts" element={<Debts user={user} />} />
         <Route path="/settings" element={<Settings user={user} />} />
         <Route path="/toptanci" element={<Toptanci />} />
         <Route path="/ikinciel" element={<IkinciEl user={user} />} />
