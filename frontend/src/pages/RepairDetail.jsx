@@ -6,6 +6,7 @@ import {
   Pencil, Home, CheckCircle2, Receipt, Copy, Check, MessageCircle,
   Trash2, Lock, Eye, EyeOff, SquareCheck, Calendar, ClipboardList,
   Wrench, Camera, User, X, CircleX, Search, FileClock, Package, QrCode,
+  TriangleAlert, UserCheck, RotateCcw,
 } from "lucide-react";
 
 const STATUSES = [
@@ -15,6 +16,33 @@ const STATUSES = [
   { key: "hazir", label: "Hazır" },
   { key: "teslim", label: "Teslim Edildi" },
   { key: "iptal", label: "İptal" },
+];
+
+// Durum akışı: "bekliyor"dan doğrudan "hazır"/"teslim"e atlanamaz — önce
+// "tamirde"den geçmesi gerekir. Backend de aynı kuralı zorluyor (repairs.py
+// DURUM_SIRASI), burası sadece kullanıcıya erişilemeyen durumları gri
+// göstermek için.
+const DURUM_SIRASI = {
+  bekliyor: ["tamirde", "iptal"],
+  tamirde: ["parca_bekleniyor", "hazir", "iptal"],
+  parca_bekleniyor: ["tamirde", "hazir", "iptal"],
+  hazir: ["teslim", "tamirde", "iptal"],
+  teslim: [],
+  iptal: [],
+};
+
+const KONTROL_ALANLARI = [
+  { key: "on_odeme", label: "Ön ödeme alındı" },
+  { key: "musteri_onayi", label: "Müşteri onayı alındı" },
+  { key: "eski_parca", label: "Eski parça müşteriye verildi" },
+  { key: "veri_yedegi", label: "Veri yedeği alındı" },
+];
+
+const IADE_KALEMLERI = [
+  { key: "cihaz", label: "Cihaz" },
+  { key: "sim", label: "SIM kart" },
+  { key: "hafiza_karti", label: "Hafıza kartı" },
+  { key: "aksesuar", label: "Aksesuar / kılıf" },
 ];
 
 // Formdaki fiyat/garanti alanları <input> onChange'de string olarak
@@ -55,7 +83,20 @@ export default function RepairDetail({ user }) {
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState({});
   const [teslimModal, setTeslimModal] = useState(false);
-  const [teslimForm, setTeslimForm] = useState({ final_price: "", payment_type: "nakit", kasa_yazilsin: true });
+  const [teslimForm, setTeslimForm] = useState({
+    final_price: "", payment_type: "nakit", kasa_yazilsin: true,
+    teslim_alan_ad: "", teslim_alan_tel: "",
+  });
+
+  // İptal — iade edilen kalemler + kime iade edildiği
+  const [iptalModal, setIptalModal] = useState(false);
+  const [iptalForm, setIptalForm] = useState({ kalemler: {}, kime_ad: "", kime_tel: "", aciklama: "" });
+  const [iptalSaving, setIptalSaving] = useState(false);
+  const [iptalHata, setIptalHata] = useState("");
+
+  // Kontrol listesi tamamlanmadan "Tamirde"ye geçilemez — uyarı için
+  const [kontrolUyari, setKontrolUyari] = useState(false);
+  const kontrolRef = useRef(null);
 
   // Parçalar
   const [parcalar, setParcalar] = useState([]);
@@ -118,25 +159,61 @@ export default function RepairDetail({ user }) {
   }, [id]);
 
   async function changeStatus(status) {
-    if (status === "teslim" && repair?.status !== "teslim") {
+    const onceki = repair?.status;
+    if (onceki === status) return;
+    if (!DURUM_SIRASI[onceki]?.includes(status)) return; // buton zaten disabled ama garanti olsun
+
+    if (status === "teslim") {
       setTeslimModal(true);
       return;
     }
-    const onceki = repair?.status;
-    if (onceki === status) return;
+    if (status === "iptal") {
+      setIptalForm({ kalemler: {}, kime_ad: "", kime_tel: "", aciklama: "" });
+      setIptalHata("");
+      setIptalModal(true);
+      return;
+    }
+    if (onceki === "bekliyor" && status === "tamirde") {
+      const tamamMi = KONTROL_ALANLARI.every(k => repair[k.key]);
+      if (!tamamMi) {
+        setKontrolUyari(true);
+        kontrolRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => setKontrolUyari(false), 1800);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       await api.updateRepairStatus(id, status);
       setRepair((r) => ({ ...r, status }));
       setForm((f) => ({ ...f, status }));
-      if (onceki) {
-        clearTimeout(geriAlTimerRef.current);
-        setGeriAlToast({ onceki, yeni: status });
-        geriAlTimerRef.current = setTimeout(() => setGeriAlToast(null), 5000);
-      }
+      clearTimeout(geriAlTimerRef.current);
+      setGeriAlToast({ onceki, yeni: status });
+      geriAlTimerRef.current = setTimeout(() => setGeriAlToast(null), 5000);
     } catch (e) {
       alert(e.message || "Durum değiştirilemedi");
     } finally { setSaving(false); }
+  }
+
+  async function iptalOnayla() {
+    if (!iptalForm.kime_ad.trim()) {
+      setIptalHata("Cihazın kime iade edildiğini girin");
+      return;
+    }
+    setIptalSaving(true);
+    setIptalHata("");
+    try {
+      await api.updateRepairStatus(id, "iptal", { iade: iptalForm });
+      setRepair(r => ({ ...r, status: "iptal" }));
+      setForm(f => ({ ...f, status: "iptal" }));
+      setIptalModal(false);
+      clearTimeout(geriAlTimerRef.current);
+      setGeriAlToast({ onceki: repair.status, yeni: "iptal" });
+      geriAlTimerRef.current = setTimeout(() => setGeriAlToast(null), 5000);
+    } catch (e) {
+      setIptalHata(e.message || "İptal edilemedi");
+    } finally { setIptalSaving(false); }
   }
 
   async function durumGeriAl() {
@@ -146,12 +223,24 @@ export default function RepairDetail({ user }) {
     setGeriAlToast(null);
     setSaving(true);
     try {
-      await api.updateRepairStatus(id, onceki);
+      await api.updateRepairStatus(id, onceki, { zorla: true });
       setRepair((r) => ({ ...r, status: onceki }));
       setForm((f) => ({ ...f, status: onceki }));
     } catch (e) {
       alert(e.message || "Geri alınamadı");
     } finally { setSaving(false); }
+  }
+
+  async function kontrolToggle(alan) {
+    const yeni = repair[alan] ? 0 : 1;
+    try {
+      await api.updateRepairKontrol(id, alan, yeni);
+      setRepair(r => ({ ...r, [alan]: yeni }));
+    } catch (e) { alert(e.message || "Güncellenemedi"); }
+  }
+
+  function teslimAlanAyniKisi() {
+    setTeslimForm(f => ({ ...f, teslim_alan_ad: repair.customer_name || "", teslim_alan_tel: repair.customer_phone || "" }));
   }
 
   async function teslimEt() {
@@ -162,6 +251,8 @@ export default function RepairDetail({ user }) {
         ...form, status: "teslim", final_price: final,
         payment_type: teslimForm.payment_type,
         kasa_yazilsin: teslimForm.kasa_yazilsin && final > 0,
+        teslim_alan_ad: teslimForm.teslim_alan_ad || repair.customer_name || null,
+        teslim_alan_tel: teslimForm.teslim_alan_tel || repair.customer_phone || null,
       }));
       setRepair(r => ({ ...r, status: "teslim", final_price: final, payment_type: teslimForm.payment_type }));
       setForm(f => ({ ...f, status: "teslim", final_price: final, payment_type: teslimForm.payment_type }));
@@ -328,6 +419,11 @@ export default function RepairDetail({ user }) {
 
   const isHazir = repair.status === "hazir";
   const isTeslim = repair.status === "teslim";
+  // asyncpg jsonb kolonunu ham JSON metni olarak döndürür, parse gerekiyor.
+  let durumDetay = null;
+  if (repair.durum_detay) {
+    try { durumDetay = JSON.parse(repair.durum_detay); } catch { durumDetay = null; }
+  }
 
   return (
     <div className="page">
@@ -339,18 +435,24 @@ export default function RepairDetail({ user }) {
         </button>
       </div>
 
-      {/* Durum butonları */}
+      {/* Durum butonları — mevcut durumdan doğrudan erişilemeyenler gri/pasif */}
       <div className="section-title">Durum</div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-        {STATUSES.map((s) => (
-          <button key={s.key}
-            className={`tab ${(form.status || repair.status) === s.key ? "active" : ""}`}
-            onClick={() => changeStatus(s.key)}
-            disabled={saving}
-            style={{ fontSize: 12 }}>
-            {s.label}
-          </button>
-        ))}
+        {STATUSES.map((s) => {
+          const aktifDurum = form.status || repair.status;
+          const buDurum = s.key === aktifDurum;
+          const erisilebilir = buDurum || (DURUM_SIRASI[aktifDurum] || []).includes(s.key);
+          return (
+            <button key={s.key}
+              className={`tab ${buDurum ? "active" : ""}`}
+              onClick={() => changeStatus(s.key)}
+              disabled={saving || !erisilebilir}
+              title={!erisilebilir ? `'${STATUSES.find(x => x.key === aktifDurum)?.label}' durumundan doğrudan geçilemez` : undefined}
+              style={{ fontSize: 12, opacity: erisilebilir ? 1 : 0.35, cursor: erisilebilir ? "pointer" : "not-allowed" }}>
+              {s.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Durum değişikliği geri alma bildirimi */}
@@ -380,7 +482,7 @@ export default function RepairDetail({ user }) {
       {/* Teslim modalı */}
       {teslimModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div className="card" style={{ width: "100%", maxWidth: 400 }}>
+          <div className="card" style={{ width: "100%", maxWidth: 400, maxHeight: "88vh", overflowY: "auto" }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
               <Home size={16} strokeWidth={2} /> Teslim Et
             </div>
@@ -406,6 +508,28 @@ export default function RepairDetail({ user }) {
                 onChange={e => setTeslimForm(f => ({ ...f, kasa_yazilsin: e.target.checked }))} />
               <label htmlFor="kasaYazilsin" style={{ fontSize: 14 }}>Kasaya yaz</label>
             </div>
+
+            <div className="form-group">
+              <label className="form-label">Kime Teslim Edildi</label>
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={teslimAlanAyniKisi}
+                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                  <UserCheck size={13} strokeWidth={2} /> Aynı Kişi ({repair.customer_name || "—"})
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm"
+                  onClick={() => setTeslimForm(f => ({ ...f, teslim_alan_ad: "", teslim_alan_tel: "" }))}
+                  style={{ flex: 1 }}>
+                  Farklı Kişi
+                </button>
+              </div>
+              <input className="form-input" placeholder="Teslim alan kişi — ad soyad" style={{ marginBottom: 8 }}
+                value={teslimForm.teslim_alan_ad}
+                onChange={e => setTeslimForm(f => ({ ...f, teslim_alan_ad: e.target.value }))} />
+              <input className="form-input" placeholder="Telefon (opsiyonel)" type="tel"
+                value={teslimForm.teslim_alan_tel}
+                onChange={e => setTeslimForm(f => ({ ...f, teslim_alan_tel: e.target.value }))} />
+            </div>
+
             {teslimForm.final_price && (
               <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>
                 {parseFloat(teslimForm.final_price).toLocaleString("tr-TR")}₺ · {teslimForm.payment_type}
@@ -417,6 +541,79 @@ export default function RepairDetail({ user }) {
                 {saving ? "..." : <><CheckCircle2 size={15} strokeWidth={2} /> Teslim Et</>}
               </button>
               <button className="btn btn-ghost" onClick={() => setTeslimModal(false)}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* İptal modalı — iade edilen kalemler + kime iade edildiği */}
+      {iptalModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div className="card" style={{ width: "100%", maxWidth: 420, maxHeight: "88vh", overflowY: "auto" }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, display: "flex", alignItems: "center", gap: 8, color: "var(--danger)" }}>
+              <CircleX size={16} strokeWidth={2} /> Tamiri İptal Et
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--hint)", marginBottom: 14 }}>
+              Müşteriye iade edilen eşyaları işaretleyin ve cihazın kime teslim edildiğini girin.
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">İade Edilen Eşyalar</label>
+              {IADE_KALEMLERI.map(k => {
+                const secili = !!iptalForm.kalemler[k.key];
+                return (
+                  <div key={k.key} onClick={() => setIptalForm(f => ({ ...f, kalemler: { ...f.kalemler, [k.key]: !secili } }))}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", cursor: "pointer" }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                      border: `2px solid ${secili ? "var(--danger)" : "var(--divider)"}`,
+                      background: secili ? "var(--danger)" : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center", color: "#191b20",
+                    }}>
+                      {secili ? <Check size={14} strokeWidth={3} /> : null}
+                    </div>
+                    <span style={{ fontSize: 13.5 }}>{k.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Kime İade Edildi *</label>
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                <button type="button" className="btn btn-ghost btn-sm"
+                  onClick={() => setIptalForm(f => ({ ...f, kime_ad: repair.customer_name || "", kime_tel: repair.customer_phone || "" }))}
+                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                  <UserCheck size={13} strokeWidth={2} /> Aynı Kişi ({repair.customer_name || "—"})
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm"
+                  onClick={() => setIptalForm(f => ({ ...f, kime_ad: "", kime_tel: "" }))} style={{ flex: 1 }}>
+                  Farklı Kişi
+                </button>
+              </div>
+              <input className="form-input" placeholder="Ad Soyad" style={{ marginBottom: 8 }}
+                value={iptalForm.kime_ad}
+                onChange={e => setIptalForm(f => ({ ...f, kime_ad: e.target.value }))} />
+              <input className="form-input" placeholder="Telefon (opsiyonel)" type="tel"
+                value={iptalForm.kime_tel}
+                onChange={e => setIptalForm(f => ({ ...f, kime_tel: e.target.value }))} />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label">Açıklama (opsiyonel)</label>
+              <input className="form-input" placeholder="İptal sebebi vb."
+                value={iptalForm.aciklama}
+                onChange={e => setIptalForm(f => ({ ...f, aciklama: e.target.value }))} />
+            </div>
+
+            {iptalHata && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 10 }}>{iptalHata}</div>}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-danger" onClick={iptalOnayla} disabled={iptalSaving}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                {iptalSaving ? "..." : <><CircleX size={15} strokeWidth={2} /> İptal Et</>}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setIptalModal(false)}>Vazgeç</button>
             </div>
           </div>
         </div>
@@ -545,6 +742,32 @@ export default function RepairDetail({ user }) {
         </div>
       ) : (
         <>
+          {/* İptal / teslim ek bilgisi */}
+          {durumDetay && (repair.status === "iptal" || isTeslim) && (
+            <div className="card" style={{
+              borderLeft: `3px solid ${repair.status === "iptal" ? "var(--danger)" : "var(--green)"}`,
+              background: repair.status === "iptal" ? "rgba(248,113,113,0.06)" : "rgba(74,222,128,0.06)",
+            }}>
+              {repair.status === "iptal" ? (
+                <>
+                  <Row label="Kime İade Edildi" value={durumDetay.iade_kime_ad || "—"} />
+                  {durumDetay.iade_kime_tel && <><div className="divider" /><Row label="Telefon" value={durumDetay.iade_kime_tel} /></>}
+                  {durumDetay.iade_kalemler && Object.values(durumDetay.iade_kalemler).some(Boolean) && (
+                    <>
+                      <div className="divider" />
+                      <Row label="İade Edilenler" value={
+                        IADE_KALEMLERI.filter(k => durumDetay.iade_kalemler[k.key]).map(k => k.label).join(", ") || "—"
+                      } />
+                    </>
+                  )}
+                  {durumDetay.aciklama && <><div className="divider" /><Row label="Açıklama" value={durumDetay.aciklama} /></>}
+                </>
+              ) : (
+                <Row label="Kime Teslim Edildi" value={durumDetay.teslim_alan_ad || repair.customer_name || "—"} />
+              )}
+            </div>
+          )}
+
           {/* Temel bilgiler */}
           <div className="card">
             <Row label="Müşteri" value={repair.customer_name || "—"} />
@@ -628,40 +851,51 @@ export default function RepairDetail({ user }) {
             </>}
           </div>
 
-          {/* Kontrol Listesi */}
-          <div className="card">
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: "var(--hint)", display: "flex", alignItems: "center", gap: 7 }}>
+          {/* Kontrol Listesi — sadece "Bekliyor" durumundayken değiştirilebilir;
+              "Tamirde"ye geçmeden önce tamamlanması zorunlu, geçtikten sonra
+              kilitlenir (tekrar değiştirilemez). */}
+          <div ref={kontrolRef} tabIndex={-1}
+            className={"card" + (kontrolUyari ? " alan-hata" : "")}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4, color: "var(--hint)", display: "flex", alignItems: "center", gap: 7 }}>
               <SquareCheck size={14} strokeWidth={2} /> KONTROL LİSTESİ
-            </div>
-            {[
-              { key: "on_odeme", label: "Ön ödeme alındı" },
-              { key: "musteri_onayi", label: "Müşteri onayı alındı" },
-              { key: "eski_parca", label: "Eski parça müşteriye verildi" },
-              { key: "veri_yedegi", label: "Veri yedeği alındı" },
-            ].map(item => (
-              <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
-                <div
-                  onClick={async () => {
-                    const yeni = repair[item.key] ? 0 : 1;
-                    try {
-                      await api.updateRepair(id, sayisalTemizle({ ...form, [item.key]: yeni }));
-                      setRepair(r => ({ ...r, [item.key]: yeni }));
-                    } catch (e) { alert(e.message || "Güncellenemedi"); }
-                  }}
-                  style={{
-                    width: 22, height: 22, borderRadius: 6, flexShrink: 0, cursor: "pointer",
-                    border: `2px solid ${repair[item.key] ? "var(--blue)" : "var(--divider)"}`,
-                    background: repair[item.key] ? "var(--blue)" : "transparent",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#191b20",
-                  }}>
-                  {repair[item.key] ? <Check size={14} strokeWidth={3} /> : null}
-                </div>
-                <span style={{ fontSize: 13, color: repair[item.key] ? "var(--text)" : "var(--hint)" }}>
-                  {item.label}
+              {repair.status !== "bekliyor" && (
+                <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: "var(--hint)", display: "flex", alignItems: "center", gap: 4 }}>
+                  <Lock size={11} strokeWidth={2} /> Kilitli
                 </span>
+              )}
+            </div>
+            {repair.status === "bekliyor" && (
+              <div style={{ fontSize: 11.5, color: "var(--hint)", marginBottom: 8 }}>
+                "Tamirde"ye geçmeden önce tamamlanmalı.
               </div>
-            ))}
+            )}
+            {kontrolUyari && (
+              <div style={{ fontSize: 12.5, color: "var(--danger)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <TriangleAlert size={13} strokeWidth={2} /> Tamire almadan önce kontrol listesini tamamlayın
+              </div>
+            )}
+            {KONTROL_ALANLARI.map(item => {
+              const kilitli = repair.status !== "bekliyor";
+              return (
+                <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", opacity: kilitli ? 0.75 : 1 }}>
+                  <div
+                    onClick={() => !kilitli && kontrolToggle(item.key)}
+                    style={{
+                      width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                      cursor: kilitli ? "default" : "pointer",
+                      border: `2px solid ${repair[item.key] ? "var(--blue)" : "var(--divider)"}`,
+                      background: repair[item.key] ? "var(--blue)" : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "#191b20",
+                    }}>
+                    {repair[item.key] ? <Check size={14} strokeWidth={3} /> : null}
+                  </div>
+                  <span style={{ fontSize: 13, color: repair[item.key] ? "var(--text)" : "var(--hint)" }}>
+                    {item.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           {/* Tarihler */}

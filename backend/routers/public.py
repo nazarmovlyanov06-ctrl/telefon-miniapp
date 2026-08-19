@@ -392,6 +392,23 @@ async def musteri_panelim(
            WHERE customer_id = $1 AND gonderen = 'dukkan' AND okundu = false""",
         musteri["id"],
     )
+
+    # Tamir durum değişikliği bildirimleri — son 20 tanesi gösterilir, okunmamış
+    # sayısı bu çağrıda alınıp hemen ardından okundu işaretlenir (panel açılınca
+    # "görüldü" sayılır, mesajlaşma sekmesindeki okuma mantığıyla tutarlı).
+    bildirimler = await db.fetch(
+        """SELECT id, repair_id, baslik, mesaj, okundu, created_at
+           FROM musteri_bildirimleri WHERE customer_id = $1 AND dukkan_id = $2
+           ORDER BY created_at DESC LIMIT 20""",
+        musteri["id"], d["id"],
+    )
+    okunmamis_bildirim = sum(1 for b in bildirimler if not b["okundu"])
+    if okunmamis_bildirim:
+        await db.execute(
+            "UPDATE musteri_bildirimleri SET okundu = true WHERE customer_id = $1 AND okundu = false",
+            musteri["id"],
+        )
+
     return {
         "ad": musteri["name"],
         "tamirler": [dict(r) for r in tamirler],
@@ -405,6 +422,8 @@ async def musteri_panelim(
         "takaslarim": [dict(r) for r in takaslarim],
         "borclar": [dict(r) for r in borclar],
         "okunmamis_mesaj": okunmamis or 0,
+        "bildirimler": [dict(r) for r in bildirimler],
+        "okunmamis_bildirim": okunmamis_bildirim,
     }
 
 

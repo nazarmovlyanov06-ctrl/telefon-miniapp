@@ -63,13 +63,25 @@ function SortTh({ label, col, sort, setSort }) {
   );
 }
 
-// Listeden, tamirin içine girmeden hızlı durum değiştirme — durum etiketine
-// dokununca açılır. Tam PUT yerine dar kapsamlı PATCH /repairs/{id}/status
-// kullanır, böylece kaydın diğer alanları (fiyat, arıza vb.) etkilenmez.
+// "bekliyor"dan doğrudan "hazır"a atlanamaz — RepairDetail.jsx'teki akış
+// kuralıyla aynı (backend de zorluyor). Buradan sadece bu dört "basit" duruma
+// tek tıkla geçilebilir; Teslim (fiyat/kasa) ve İptal (iade bilgisi) kendi
+// formlarını gerektirdiği için buradan değil, tamirin detayından yapılır.
+const DURUM_SIRASI = {
+  bekliyor: ["tamirde"],
+  tamirde: ["parca_bekleniyor", "hazir"],
+  parca_bekleniyor: ["tamirde", "hazir"],
+  hazir: ["tamirde"],
+  teslim: [],
+  iptal: [],
+};
+const HIZLI_DURUMLAR = ["bekliyor", "tamirde", "parca_bekleniyor", "hazir"];
+
 function DurumSecPencere({ repair, onClose, onDegisti }) {
   const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
   async function sec(status) {
-    if (status === repair.status || saving) { onClose(); return; }
+    if (status === repair.status || saving) return;
     setSaving(true);
     try {
       await api.updateRepairStatus(repair.id, status);
@@ -80,6 +92,7 @@ function DurumSecPencere({ repair, onClose, onDegisti }) {
       setSaving(false);
     }
   }
+  const erisilebilirler = DURUM_SIRASI[repair.status] || [];
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
       onClick={onClose}>
@@ -89,20 +102,37 @@ function DurumSecPencere({ repair, onClose, onDegisti }) {
           {repair.customer_name || "—"} · {repair.device_model}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {TABS.filter(t => t.key).map(s => (
-            <button key={s.key} disabled={saving} onClick={() => sec(s.key)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "12px 14px", borderRadius: 10, fontFamily: "inherit",
-                border: repair.status === s.key ? `1.5px solid ${STATUS_RENK[s.key]}` : "1px solid var(--divider)",
-                background: repair.status === s.key ? "rgba(255,255,255,0.05)" : "transparent",
-                color: "var(--text)", fontSize: 14, fontWeight: 600, cursor: "pointer",
-              }}>
-              {STATUS_LABEL[s.key]}
-              {repair.status === s.key && <Check size={16} stroke={STATUS_RENK[s.key]} strokeWidth={2.4} />}
-            </button>
-          ))}
+          {HIZLI_DURUMLAR.map(key => {
+            const buDurum = repair.status === key;
+            const erisilebilir = buDurum || erisilebilirler.includes(key);
+            return (
+              <button key={key} disabled={saving || !erisilebilir} onClick={() => sec(key)}
+                title={!erisilebilir ? `'${STATUS_LABEL[repair.status]}' durumundan doğrudan geçilemez` : undefined}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 14px", borderRadius: 10, fontFamily: "inherit",
+                  border: buDurum ? `1.5px solid ${STATUS_RENK[key]}` : "1px solid var(--divider)",
+                  background: buDurum ? "rgba(255,255,255,0.05)" : "transparent",
+                  color: "var(--text)", fontSize: 14, fontWeight: 600,
+                  cursor: erisilebilir ? "pointer" : "not-allowed",
+                  opacity: erisilebilir ? 1 : 0.35,
+                }}>
+                {STATUS_LABEL[key]}
+                {buDurum && <Check size={16} stroke={STATUS_RENK[key]} strokeWidth={2.4} />}
+              </button>
+            );
+          })}
         </div>
+        {repair.status !== "teslim" && repair.status !== "iptal" && (
+          <button onClick={() => navigate(`/repairs/${repair.id}`)}
+            style={{
+              width: "100%", marginTop: 10, padding: "10px 0", borderRadius: 10,
+              border: "1px dashed var(--divider)", background: "transparent",
+              color: "var(--hint)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+            }}>
+            Teslim Et / İptal Et — tamirin detayına git
+          </button>
+        )}
       </div>
     </div>
   );

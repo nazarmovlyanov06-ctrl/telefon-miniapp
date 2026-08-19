@@ -95,8 +95,31 @@ CREATE TABLE IF NOT EXISTS repairs (
     son_guncelleyen_id INTEGER REFERENCES kullanicilar(id),
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now(),
+    -- "Tamire Al"dan önce onaylanması zorunlu kontrol listesi — bekliyor
+    -- durumundan çıkınca kilitlenir (bkz. repairs.py DURUM_SIRASI).
+    on_odeme INTEGER DEFAULT 0,
+    musteri_onayi INTEGER DEFAULT 0,
+    eski_parca INTEGER DEFAULT 0,
+    veri_yedegi INTEGER DEFAULT 0,
+    -- Duruma özel ek bilgi: iptalde iade edilen kalemler + kime iade
+    -- edildiği, teslimde kime teslim edildiği (JSON, esnek yapı).
+    durum_detay JSONB,
     UNIQUE(dukkan_id, repair_no)
 );
+
+-- Tamir durum değişikliklerinde müşteri portalına düşen bildirimler
+-- (tamire alındı / parça bekleniyor / hazır / iptal / teslim vb.).
+CREATE TABLE IF NOT EXISTS musteri_bildirimleri (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+    repair_id INTEGER REFERENCES repairs(id) ON DELETE CASCADE,
+    baslik TEXT NOT NULL,
+    mesaj TEXT,
+    okundu BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_musteri_bildirimleri_customer ON musteri_bildirimleri(customer_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS parts (
     id SERIAL PRIMARY KEY,

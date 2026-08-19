@@ -4,7 +4,7 @@ import { api } from "../api";
 import {
   Wrench, LogOut, ShieldCheck, ShoppingBag, CircleX, Home, Send,
   CheckCircle2, CalendarClock, Repeat, CreditCard,
-  MessageCircle, Check, FileClock, Package, Store,
+  MessageCircle, Check, FileClock, Package, Store, Bell,
 } from "lucide-react";
 
 function tokenKey(slug) { return `musteri_token_${slug}`; }
@@ -221,6 +221,32 @@ function TamirKarti({ t, acik, onToggle }) {
   );
 }
 
+function BildirimlerBolumu({ bildirimler }) {
+  if (!bildirimler || bildirimler.length === 0) return null;
+  return (
+    <>
+      <div className="cp-section-title"><Bell size={15} strokeWidth={2} /> Bildirimler</div>
+      <div className="card">
+        {bildirimler.slice(0, 8).map((b, i) => (
+          <div key={b.id} style={{
+            padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none",
+            display: "flex", alignItems: "flex-start", gap: 8,
+          }}>
+            {!b.okundu && <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--blue)", marginTop: 5, flexShrink: 0 }} />}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: b.okundu ? 600 : 700, fontSize: 13, color: b.okundu ? "var(--text)" : "var(--text-strong)" }}>{b.baslik}</div>
+              {b.mesaj && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 2 }}>{b.mesaj}</div>}
+              <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3 }}>
+                {new Date(b.created_at).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function PanelSekmesi({ panel, onSekme }) {
   const acikTamirler = panel.tamirler.filter(t => t.status !== "teslim");
   const toplamBorc = panel.borclar.reduce((s, b) => s + Math.max(0, (b.total_amount || 0) - (b.paid_amount || 0)), 0);
@@ -229,6 +255,8 @@ function PanelSekmesi({ panel, onSekme }) {
 
   return (
     <>
+      <BildirimlerBolumu bildirimler={panel.bildirimler} />
+
       <div className="cp-summary-row">
         <button className="cp-summary-card" style={{ border: "none", textAlign: "left", cursor: "pointer", fontFamily: "inherit" }} onClick={() => onSekme("tamirler")}>
           <div className="val" style={{ color: acikTamirler.length ? "var(--blue)" : "var(--text)" }}>{acikTamirler.length}</div>
@@ -513,12 +541,13 @@ export default function MusteriPanel() {
   const [loading, setLoading] = useState(true);
   const [sekme, setSekme] = useState("panel");
   const [okunmamis, setOkunmamis] = useState(0);
+  const [okunmamisBildirim, setOkunmamisBildirim] = useState(0);
 
   function load() {
     const token = localStorage.getItem(tokenKey(slug));
     if (!token) { setLoading(false); return; }
     api.musteriPanelim(slug, token)
-      .then(p => { setPanel(p); setOkunmamis(p.okunmamis_mesaj || 0); })
+      .then(p => { setPanel(p); setOkunmamis(p.okunmamis_mesaj || 0); setOkunmamisBildirim(p.okunmamis_bildirim || 0); })
       .catch(() => { localStorage.removeItem(tokenKey(slug)); setPanel(null); })
       .finally(() => setLoading(false));
   }
@@ -540,7 +569,7 @@ export default function MusteriPanel() {
   }
 
   const NAV = [
-    { key: "panel", label: "Panel", ic: Home },
+    { key: "panel", label: "Panel", ic: Home, badge: okunmamisBildirim },
     { key: "tamirler", label: "Tamirler", ic: Wrench },
     { key: "urunler", label: "Ürünler", ic: Package },
     { key: "borclar", label: "Borçlar", ic: CreditCard },

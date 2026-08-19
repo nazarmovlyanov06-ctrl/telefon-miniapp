@@ -1,3 +1,4 @@
+import json
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
 from database import get_db
@@ -7,10 +8,48 @@ import datetime
 
 router = APIRouter(prefix="/repairs", tags=["repairs"])
 
+# Durum akışı: hangi durumdan hangilerine doğrudan geçilebilir. "bekliyor"dan
+# doğrudan "hazir"/"teslim"e atlanamaz — önce "tamirde"den geçmesi gerekir.
+# "iptal" (teslim hariç) her aktif durumdan erişilebilir; "teslim"/"iptal"
+# son durumlardır, oradan başka bir yere geçilemez.
+DURUM_SIRASI = {
+    "bekliyor": {"tamirde", "iptal"},
+    "tamirde": {"parca_bekleniyor", "hazir", "iptal"},
+    "parca_bekleniyor": {"tamirde", "hazir", "iptal"},
+    "hazir": {"teslim", "tamirde", "iptal"},
+    "teslim": set(),
+    "iptal": set(),
+}
+DURUM_LABEL_TR = {
+    "bekliyor": "Bekliyor", "tamirde": "Tamirde", "parca_bekleniyor": "Parça Bekleniyor",
+    "hazir": "Hazır", "teslim": "Teslim Edildi", "iptal": "İptal",
+}
+KONTROL_ALANLARI = ["on_odeme", "musteri_onayi", "eski_parca", "veri_yedegi"]
+
 
 def make_repair_no(last_id: int) -> str:
     today = datetime.date.today().strftime("%y%m%d")
     return f"T{today}{last_id + 1:04d}"
+
+
+async def _bildirim_ekle(db, dukkan_id, customer_id, repair_id, baslik, mesaj):
+    if not customer_id or not mesaj:
+        return
+    await db.execute(
+        "INSERT INTO musteri_bildirimleri (dukkan_id, customer_id, repair_id, baslik, mesaj) VALUES ($1,$2,$3,$4,$5)",
+        dukkan_id, customer_id, repair_id, baslik, mesaj,
+    )
+
+
+def _durum_gecisi_dogrula(eski_durum: str, yeni_durum: str):
+    if yeni_durum == eski_durum:
+        return
+    if yeni_durum not in DURUM_SIRASI.get(eski_durum, set()):
+        raise HTTPException(
+            400,
+            f"'{DURUM_LABEL_TR.get(eski_durum, eski_durum)}' durumundan "
+            f"'{DURUM_LABEL_TR.get(yeni_durum, yeni_durum)}' durumuna doğrudan geçilemez",
+        )
 
 
 @router.get("/")
@@ -76,7 +115,7 @@ async def get_ariza_onceriler(
     db: asyncpg.Connection = Depends(get_db),
 ):
     rows = await db.fetch(
-        """SELECT fault_desc, COUNT(*) as c FROM repairs
+        """SELECT MIN(fault_desc) as fault_desc, COUNT(*) as c FROM repairs
            WHERE dukkan_id = $1 AND fault_desc IS NOT NULL AND fault_desc != ''
            GROUP BY LOWER(TRIM(fault_desc)) ORDER BY c DESC LIMIT 20""",
         dukkan_id,
@@ -177,16 +216,32 @@ async def update_repair(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    now = datetime.datetime.now()
-    tamirde_at = now if body.get("status") == "tamirde" else None
-    completed_at = now if body.get("status") == "hazir" else None
-    delivered_at = now if body.get("status") == "teslim" else None
-
-    rrow = await db.fetchrow(
-        "SELECT repair_no, device_model FROM repairs WHERE id = $1 AND dukkan_id = $2",
+    mevcut = await db.fetchrow(
+        "SELECT repair_no, device_model, status, customer_id FROM repairs WHERE id = $1 AND dukkan_id = $2",
         repair_id, dukkan_id,
     )
-    repair_no = dict(rrow)["repair_no"] if rrow else ""
+    if not mevcut:
+        raise HTTPException(404, "Tamir bulunamadı")
+    repair_no = mevcut["repair_no"] or ""
+    eski_durum = mevcut["status"]
+    yeni_durum = body.get("status") or eski_durum
+    durum_degisiyor = yeni_durum != eski_durum
+    if durum_degisiyor:
+        _durum_gecisi_dogrula(eski_durum, yeni_durum)
+
+    now = datetime.datetime.now()
+    tamirde_at = now if yeni_durum == "tamirde" else None
+    completed_at = now if yeni_durum == "hazir" else None
+    delivered_at = now if yeni_durum == "teslim" else None
+
+    # "Kime teslim edildi" — sadece bu çağrı teslim'e geçiriyorsa kaydedilir,
+    # aksi halde mevcut durum_detay korunur (aşağıda COALESCE ile).
+    yeni_durum_detay = None
+    if durum_degisiyor and yeni_durum == "teslim":
+        yeni_durum_detay = json.dumps({
+            "teslim_alan_ad": body.get("teslim_alan_ad") or None,
+            "teslim_alan_tel": body.get("teslim_alan_tel") or None,
+        }, ensure_ascii=False)
 
     await db.execute(
         """UPDATE repairs SET
@@ -198,12 +253,13 @@ async def update_repair(
            tamirde_at=COALESCE(tamirde_at, $13),
            completed_at=COALESCE(completed_at, $14),
            delivered_at=COALESCE($15, delivered_at),
-           son_guncelleyen_id=$16,
+           durum_detay=COALESCE($16::jsonb, durum_detay),
+           son_guncelleyen_id=$17,
            updated_at=now()
-           WHERE id=$17 AND dukkan_id=$18""",
+           WHERE id=$18 AND dukkan_id=$19""",
         body.get("device_model"),
         body.get("fault_desc"),
-        body.get("status"),
+        yeni_durum,
         body.get("estimated_price"),
         body.get("final_price"),
         body.get("payment_type"),
@@ -216,12 +272,13 @@ async def update_repair(
         tamirde_at,
         completed_at,
         delivered_at,
+        yeni_durum_detay,
         user["id"],
         repair_id,
         dukkan_id,
     )
 
-    if body.get("status") == "teslim" and body.get("kasa_yazilsin"):
+    if yeni_durum == "teslim" and body.get("kasa_yazilsin"):
         final = float(body.get("final_price") or 0)
         if final > 0:
             cihaz = body.get("device_model", "")
@@ -235,6 +292,44 @@ async def update_repair(
                 f"Tamir #{repair_no} {cihaz}".strip(),
             )
 
+    if durum_degisiyor and yeni_durum == "teslim":
+        kime = body.get("teslim_alan_ad") or "size"
+        await _bildirim_ekle(
+            db, dukkan_id, mevcut["customer_id"], repair_id,
+            "Cihazınız teslim edildi",
+            f"#{repair_no} numaralı tamiriniz {kime} teslim edildi.",
+        )
+
+    return {"ok": True}
+
+
+@router.patch("/{repair_id}/kontrol")
+async def update_repair_kontrol(
+    repair_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Tamire almadan önceki kontrol listesi (ön ödeme/müşteri onayı/eski
+    parça/veri yedeği) — sadece 'bekliyor' durumundayken değiştirilebilir;
+    'tamire al' ile birlikte kilitlenir (bkz. update_repair_status)."""
+    mevcut = await db.fetchrow(
+        "SELECT status FROM repairs WHERE id=$1 AND dukkan_id=$2", repair_id, dukkan_id
+    )
+    if not mevcut:
+        raise HTTPException(404, "Tamir bulunamadı")
+    if mevcut["status"] != "bekliyor":
+        raise HTTPException(400, "Kontrol listesi sadece 'Bekliyor' durumundayken değiştirilebilir")
+
+    alan = body.get("alan")
+    if alan not in KONTROL_ALANLARI:
+        raise HTTPException(400, "Geçersiz kontrol alanı")
+    deger = 1 if body.get("deger") else 0
+    await db.execute(
+        f"UPDATE repairs SET {alan}=$1, updated_at=now() WHERE id=$2 AND dukkan_id=$3",
+        deger, repair_id, dukkan_id,
+    )
     return {"ok": True}
 
 
@@ -253,19 +348,67 @@ async def update_repair_status(
     status = body.get("status")
     if not status:
         raise HTTPException(400, "status gerekli")
+
+    mevcut = await db.fetchrow(
+        "SELECT status, customer_id, on_odeme, musteri_onayi, eski_parca, veri_yedegi FROM repairs WHERE id=$1 AND dukkan_id=$2",
+        repair_id, dukkan_id,
+    )
+    if not mevcut:
+        raise HTTPException(404, "Tamir bulunamadı")
+    eski_durum = mevcut["status"]
+    if status == eski_durum:
+        return {"ok": True}
+
+    # "Geri Al" bildirimi (RepairDetail.jsx) yanlışlıkla tıklanan bir durumu
+    # birkaç saniye içinde düzeltmek için akış kurallarını atlar — bu normal
+    # akıştan farklı, kullanıcının kendi az önceki hatasını düzeltmesi.
+    zorla = bool(body.get("zorla"))
+    if not zorla:
+        _durum_gecisi_dogrula(eski_durum, status)
+        if eski_durum == "bekliyor" and status == "tamirde":
+            if not all(mevcut[k] for k in KONTROL_ALANLARI):
+                raise HTTPException(400, "Tamire almadan önce kontrol listesini tamamlayın")
+
     now = datetime.datetime.now()
     tamirde_at = now if status == "tamirde" else None
     completed_at = now if status == "hazir" else None
-    await db.execute(
-        """UPDATE repairs SET
-           status=$1,
-           tamirde_at=COALESCE(tamirde_at, $2),
-           completed_at=COALESCE(completed_at, $3),
-           son_guncelleyen_id=$4,
-           updated_at=now()
-           WHERE id=$5 AND dukkan_id=$6""",
-        status, tamirde_at, completed_at, user["id"], repair_id, dukkan_id,
-    )
+
+    if status == "iptal":
+        iade = body.get("iade") or {}
+        durum_detay = json.dumps({
+            "iade_kalemler": iade.get("kalemler") or {},
+            "iade_kime_ad": iade.get("kime_ad") or None,
+            "iade_kime_tel": iade.get("kime_tel") or None,
+            "aciklama": iade.get("aciklama") or None,
+        }, ensure_ascii=False)
+        await db.execute(
+            """UPDATE repairs SET status=$1, durum_detay=$2::jsonb,
+               son_guncelleyen_id=$3, updated_at=now()
+               WHERE id=$4 AND dukkan_id=$5""",
+            status, durum_detay, user["id"], repair_id, dukkan_id,
+        )
+        kime = iade.get("kime_ad") or "size"
+        mesaj = f"Tamir talebiniz iptal edildi. Cihaz {kime} teslim edildi."
+    else:
+        await db.execute(
+            """UPDATE repairs SET
+               status=$1,
+               tamirde_at=COALESCE(tamirde_at, $2),
+               completed_at=COALESCE(completed_at, $3),
+               son_guncelleyen_id=$4,
+               updated_at=now()
+               WHERE id=$5 AND dukkan_id=$6""",
+            status, tamirde_at, completed_at, user["id"], repair_id, dukkan_id,
+        )
+        mesaj = {
+            "tamirde": "Cihazınız tamire alındı, çalışmalara başlandı.",
+            "parca_bekleniyor": "Cihazınız için parça bekleniyor.",
+            "hazir": "Cihazınız hazır! Servisimizden teslim alabilirsiniz.",
+        }.get(status)
+
+    if not zorla:
+        baslik = f"Durum güncellendi: {DURUM_LABEL_TR.get(status, status)}"
+        await _bildirim_ekle(db, dukkan_id, mevcut["customer_id"], repair_id, baslik, mesaj)
     return {"ok": True}
 
 
