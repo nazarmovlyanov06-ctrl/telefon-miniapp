@@ -79,12 +79,17 @@ const HIZLI_DURUMLAR = ["bekliyor", "tamirde", "parca_bekleniyor", "hazir"];
 
 function DurumSecPencere({ repair, onClose, onDegisti }) {
   const [saving, setSaving] = useState(false);
+  // "Parça Bekleniyor"a geçerken hangi parça olduğunu sormak için küçük
+  // bir ara adım — diğer durumlar direkt geçiyor, bunu direkt geçirince
+  // "hangi parça, ne zaman" hiçbir yere not düşülmüyordu.
+  const [parcaAsamasi, setParcaAsamasi] = useState(false);
+  const [parcaBilgi, setParcaBilgi] = useState({ ad: "", tahmini_tarih: "" });
   const navigate = useNavigate();
-  async function sec(status) {
+  async function sec(status, extra = {}) {
     if (status === repair.status || saving) return;
     setSaving(true);
     try {
-      await api.updateRepairStatus(repair.id, status);
+      await api.updateRepairStatus(repair.id, status, extra);
       onDegisti(repair.id, status);
       onClose();
     } catch (e) {
@@ -109,29 +114,50 @@ function DurumSecPencere({ repair, onClose, onDegisti }) {
         <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
           {repair.customer_name || "—"} · {repair.device_model}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {HIZLI_DURUMLAR.map(key => {
-            const buDurum = repair.status === key;
-            const erisilebilir = buDurum || erisilebilirler.includes(key);
-            return (
-              <button key={key} disabled={saving || !erisilebilir} onClick={() => sec(key)}
-                title={!erisilebilir ? `'${STATUS_LABEL[repair.status]}' durumundan doğrudan geçilemez` : undefined}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 14px", borderRadius: 10, fontFamily: "inherit",
-                  border: buDurum ? `1.5px solid ${STATUS_RENK[key]}` : "1px solid var(--divider)",
-                  background: buDurum ? "rgba(255,255,255,0.05)" : "transparent",
-                  color: "var(--text)", fontSize: 14, fontWeight: 600,
-                  cursor: erisilebilir ? "pointer" : "not-allowed",
-                  opacity: erisilebilir ? 1 : 0.35,
-                }}>
-                {STATUS_LABEL[key]}
-                {buDurum && <Check size={16} stroke={STATUS_RENK[key]} strokeWidth={2.4} />}
+        {parcaAsamasi ? (
+          <div>
+            <div style={{ fontSize: 12.5, color: "var(--hint)", marginBottom: 10 }}>
+              Hangi parça bekleniyor? (isterseniz boş bırakıp devam edin)
+            </div>
+            <input className="form-input" placeholder="Ör. Ekran, batarya, kamera modülü..." style={{ marginBottom: 8 }}
+              autoFocus value={parcaBilgi.ad} onChange={e => setParcaBilgi(f => ({ ...f, ad: e.target.value }))} />
+            <input className="form-input" type="date" style={{ marginBottom: 12 }}
+              value={parcaBilgi.tahmini_tarih} onChange={e => setParcaBilgi(f => ({ ...f, tahmini_tarih: e.target.value }))} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" disabled={saving}
+                onClick={() => sec("parca_bekleniyor", { parca_bilgisi: parcaBilgi })}
+                style={{ flex: 1 }}>
+                {saving ? "..." : "Kaydet"}
               </button>
-            );
-          })}
-        </div>
-        {repair.status !== "teslim" && repair.status !== "iptal" && (
+              <button className="btn btn-ghost" onClick={() => setParcaAsamasi(false)}>Geri</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {HIZLI_DURUMLAR.map(key => {
+              const buDurum = repair.status === key;
+              const erisilebilir = buDurum || erisilebilirler.includes(key);
+              return (
+                <button key={key} disabled={saving || !erisilebilir}
+                  onClick={() => key === "parca_bekleniyor" && !buDurum ? setParcaAsamasi(true) : sec(key)}
+                  title={!erisilebilir ? `'${STATUS_LABEL[repair.status]}' durumundan doğrudan geçilemez` : undefined}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "12px 14px", borderRadius: 10, fontFamily: "inherit",
+                    border: buDurum ? `1.5px solid ${STATUS_RENK[key]}` : "1px solid var(--divider)",
+                    background: buDurum ? "rgba(255,255,255,0.05)" : "transparent",
+                    color: "var(--text)", fontSize: 14, fontWeight: 600,
+                    cursor: erisilebilir ? "pointer" : "not-allowed",
+                    opacity: erisilebilir ? 1 : 0.35,
+                  }}>
+                  {STATUS_LABEL[key]}
+                  {buDurum && <Check size={16} stroke={STATUS_RENK[key]} strokeWidth={2.4} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {!parcaAsamasi && repair.status !== "teslim" && repair.status !== "iptal" && (
           <button onClick={() => navigate(`/repairs/${repair.id}`)}
             style={{
               width: "100%", marginTop: 10, padding: "10px 0", borderRadius: 10,
