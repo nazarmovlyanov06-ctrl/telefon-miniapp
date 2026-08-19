@@ -60,9 +60,11 @@ async def create_part(
         body.get("quantity", 0), body.get("purchase_price"),
     )
     await db.execute(
-        """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, tarih, created_by)
-           VALUES ($1, $2, 'giris', $3, 'yeni_parca', $4, $5)""",
+        """INSERT INTO stok_hareketleri
+           (dukkan_id, part_id, hareket, miktar, sebep, tarih, created_by, toptanci_id, birim_fiyat)
+           VALUES ($1, $2, 'giris', $3, 'yeni_parca', $4, $5, $6, $7)""",
         dukkan_id, row["id"], body.get("quantity", 0), date.today().isoformat(), user["id"],
+        body.get("toptanci_id"), body.get("purchase_price"),
     )
     return {"id": row["id"]}
 
@@ -158,9 +160,11 @@ async def stok_ekle(
                 miktar, toptanci_id, part_id, dukkan_id,
             )
         await db.execute(
-            """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
-               VALUES ($1, $2, 'giris', $3, 'stok_girisi', $4, $5, $6)""",
+            """INSERT INTO stok_hareketleri
+               (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by, toptanci_id, birim_fiyat)
+               VALUES ($1, $2, 'giris', $3, 'stok_girisi', $4, $5, $6, $7, $8)""",
             dukkan_id, part_id, miktar, body.get("aciklama"), date.today().isoformat(), user["id"],
+            toptanci_id, float(fiyat) if fiyat else None,
         )
         await _toptanci_alis_kaydet(db, dukkan_id, toptanci_id, part["name"], miktar, fiyat)
     return {"ok": True}
@@ -209,10 +213,13 @@ async def tum_hareketler(
     girişi / siparişten alındı) tek listede gösteriyor."""
     rows = await db.fetch(
         """SELECT h.id, h.part_id, h.miktar, h.sebep, h.aciklama, h.tarih, h.created_at,
-                  p.name as part_name, p.device_model, u.ad as yapan_adi
+                  h.birim_fiyat, h.birim_fiyat * h.miktar as toplam,
+                  p.name as part_name, p.device_model, u.ad as yapan_adi,
+                  t.ad as toptanci_adi
            FROM stok_hareketleri h
            JOIN parts p ON p.id = h.part_id
            LEFT JOIN kullanicilar u ON u.id = h.created_by
+           LEFT JOIN toptancilar t ON t.id = h.toptanci_id
            WHERE h.dukkan_id=$1 AND h.hareket='giris'
            ORDER BY h.created_at DESC LIMIT 100""",
         dukkan_id,
@@ -228,9 +235,10 @@ async def part_hareketler(
     db: asyncpg.Connection = Depends(get_db),
 ):
     rows = await db.fetch(
-        """SELECT h.*, u.ad as yapan_adi
+        """SELECT h.*, u.ad as yapan_adi, t.ad as toptanci_adi
            FROM stok_hareketleri h
            LEFT JOIN kullanicilar u ON u.id = h.created_by
+           LEFT JOIN toptancilar t ON t.id = h.toptanci_id
            WHERE h.part_id=$1 AND h.dukkan_id=$2 ORDER BY h.created_at DESC LIMIT 20""",
         part_id, dukkan_id,
     )

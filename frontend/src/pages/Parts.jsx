@@ -47,6 +47,12 @@ function relativeGun(dateStr) {
   return `${diff} gün önce`;
 }
 
+function fmtDateTime(d) {
+  if (!d) return "—";
+  const dt = new Date(d);
+  return dt.toLocaleDateString("tr-TR") + " " + dt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function Parts({ user }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -81,6 +87,7 @@ export default function Parts({ user }) {
   const [boughtExistingId, setBoughtExistingId] = useState(null);
   const [gecmisQ, setGecmisQ] = useState("");
   const [tumHareketler, setTumHareketler] = useState([]);
+  const [secilenHareket, setSecilenHareket] = useState(null);
   const [ekleDolarMode, setEkleDolarMode] = useState(false);
   const [ekleDolarMiktar, setEkleDolarMiktar] = useState("");
 
@@ -127,7 +134,15 @@ export default function Parts({ user }) {
   useEffect(() => {
     if (!boughtItem) { setMatchingParts([]); setBoughtExistingId(null); return; }
     api.parts({ q: boughtItem.part_name }).then(m => {
-      const matches = m.filter(p => p.quantity > 0).slice(0, 4);
+      // ⚠️ Önceden cihaz modeli hiç kontrol edilmeden ilk eşleşen parça
+      // otomatik seçiliyordu — "Redmi Note 10 Pro Arka Kamera" siparişi,
+      // stokta duran "iPhone 13 Arka Kamera" gibi BAŞKA bir cihazın aynı
+      // isimli parçasıyla yanlışlıkla birleştirilebiliyordu. Sipariş bir
+      // cihaz modeliyle geldiyse artık sadece o modelle eşleşenler önerilir.
+      const model = (boughtItem.device_model || "").trim().toLowerCase();
+      const matches = m.filter(p =>
+        p.quantity > 0 && (!model || (p.device_model || "").trim().toLowerCase() === model)
+      ).slice(0, 4);
       setMatchingParts(matches);
       setBoughtExistingId(matches.length > 0 ? matches[0].id : null);
     }).catch(() => {});
@@ -1304,7 +1319,8 @@ export default function Parts({ user }) {
               ) : filtreli.map((h) => {
                 const etiket = GECMIS_ETIKET[h.sebep] || { label: h.sebep, color: "var(--hint)" };
                 return (
-                  <div key={h.id} className="list-item" style={{ opacity: 0.9 }}>
+                  <div key={h.id} className="list-item" style={{ opacity: 0.9, cursor: "pointer" }}
+                    onClick={() => setSecilenHareket(h)}>
                     <div className="list-item-body">
                       <div className="list-item-title">{h.part_name}</div>
                       <div className="list-item-sub">
@@ -1327,6 +1343,82 @@ export default function Parts({ user }) {
               })
             }
           </>
+        );
+      })()}
+
+      {/* Hareket detayı — kimden, ne kadara, ne zaman */}
+      {secilenHareket && (() => {
+        const etiket = GECMIS_ETIKET[secilenHareket.sebep] || { label: secilenHareket.sebep, color: "var(--hint)" };
+        const h = secilenHareket;
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+            onClick={() => setSecilenHareket(null)}>
+            <div className="card" style={{ width: "100%", maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>{h.part_name}</span>
+                <button onClick={() => setSecilenHareket(null)} style={{ background: "none", border: "none", color: "var(--hint)", cursor: "pointer", display: "flex" }}>
+                  <X size={18} strokeWidth={2} />
+                </button>
+              </div>
+              <span style={{
+                display: "inline-block", marginBottom: 12, fontSize: 12, fontWeight: 600,
+                padding: "3px 9px", borderRadius: 7, background: `${etiket.color}22`, color: etiket.color,
+              }}>
+                {etiket.label}
+              </span>
+              <div className="card-row" style={{ padding: "8px 0" }}>
+                <span style={{ color: "var(--hint)", fontSize: 13 }}>Cihaz Modeli</span>
+                <span style={{ fontWeight: 500 }}>{h.device_model || "—"}</span>
+              </div>
+              <div className="divider" />
+              <div className="card-row" style={{ padding: "8px 0" }}>
+                <span style={{ color: "var(--hint)", fontSize: 13 }}>Miktar</span>
+                <span style={{ fontWeight: 500 }}>{h.miktar} adet</span>
+              </div>
+              <div className="divider" />
+              <div className="card-row" style={{ padding: "8px 0" }}>
+                <span style={{ color: "var(--hint)", fontSize: 13 }}>Kimden</span>
+                <span style={{ fontWeight: 500 }}>{h.toptanci_adi || "Belirtilmedi"}</span>
+              </div>
+              {h.birim_fiyat > 0 && (
+                <>
+                  <div className="divider" />
+                  <div className="card-row" style={{ padding: "8px 0" }}>
+                    <span style={{ color: "var(--hint)", fontSize: 13 }}>Birim Fiyat</span>
+                    <span style={{ fontWeight: 500 }}>{h.birim_fiyat.toLocaleString("tr-TR")}₺</span>
+                  </div>
+                  <div className="divider" />
+                  <div className="card-row" style={{ padding: "8px 0" }}>
+                    <span style={{ color: "var(--hint)", fontSize: 13 }}>Toplam</span>
+                    <span style={{ fontWeight: 700, color: "var(--orange)" }}>{h.toplam.toLocaleString("tr-TR")}₺</span>
+                  </div>
+                </>
+              )}
+              <div className="divider" />
+              <div className="card-row" style={{ padding: "8px 0" }}>
+                <span style={{ color: "var(--hint)", fontSize: 13 }}>Ne Zaman</span>
+                <span style={{ fontWeight: 500 }}>{fmtDateTime(h.created_at)}</span>
+              </div>
+              {h.yapan_adi && (
+                <>
+                  <div className="divider" />
+                  <div className="card-row" style={{ padding: "8px 0" }}>
+                    <span style={{ color: "var(--hint)", fontSize: 13 }}>Kim Yaptı</span>
+                    <span style={{ fontWeight: 500 }}>{h.yapan_adi}</span>
+                  </div>
+                </>
+              )}
+              {h.aciklama && (
+                <>
+                  <div className="divider" />
+                  <div className="card-row" style={{ padding: "8px 0" }}>
+                    <span style={{ color: "var(--hint)", fontSize: 13 }}>Not</span>
+                    <span style={{ fontWeight: 500 }}>{h.aciklama}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         );
       })()}
     </div>

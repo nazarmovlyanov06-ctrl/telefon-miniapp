@@ -81,6 +81,12 @@ async def mark_bought(
 
     stok_mesaj = None
     part_id_log = None
+    toptanci_id_log = None
+    if body.get("bought_from"):
+        topt_row = await db.fetchrow(
+            "SELECT id FROM toptancilar WHERE dukkan_id=$1 AND ad = $2", dukkan_id, body["bought_from"]
+        )
+        toptanci_id_log = topt_row["id"] if topt_row else None
     if body.get("stok_ekle") and item:
         miktar = int(body.get("stok_miktar") or item.get("quantity") or 1)
         parca_adi = item.get("part_name", "")
@@ -97,9 +103,16 @@ async def mark_bought(
                 )
                 stok_mesaj = f"guncellendi:{p_row['name'] if p_row else part_id_log}"
             else:
+                # ⚠️ Önceden sadece isimde LIKE '%...%' araması yapıyordu — cihaz
+                # modeli hiç kontrol edilmediği için "Arka Kamera" siparişi,
+                # BAŞKA bir cihazın (ör. "iPhone 13 Arka Kamera") stoğuna
+                # yanlışlıkla ekleniyordu. Artık isim VE cihaz modeli birebir
+                # (büyük/küçük harf duyarsız) eşleşmeli, yoksa yeni parça açılır.
                 existing = await db.fetchrow(
-                    "SELECT id, name FROM parts WHERE dukkan_id=$1 AND LOWER(name) LIKE $2 LIMIT 1",
-                    dukkan_id, f"%{parca_adi.lower()}%",
+                    """SELECT id, name FROM parts WHERE dukkan_id=$1
+                       AND LOWER(name) = LOWER($2)
+                       AND LOWER(COALESCE(device_model, '')) = LOWER(COALESCE($3, ''))""",
+                    dukkan_id, parca_adi, item.get("device_model"),
                 )
                 if existing:
                     part_id_log = existing["id"]
@@ -122,29 +135,27 @@ async def mark_bought(
 
             if part_id_log:
                 await db.execute(
-                    """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
-                       VALUES ($1, $2, 'giris', $3, 'siparis_alindi', $4, $5, $6)""",
+                    """INSERT INTO stok_hareketleri
+                       (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by, toptanci_id, birim_fiyat)
+                       VALUES ($1, $2, 'giris', $3, 'siparis_alindi', $4, $5, $6, $7, $8)""",
                     dukkan_id, part_id_log, miktar, body.get("bought_from"),
-                    date.today().isoformat(), user["id"],
+                    date.today().isoformat(), user["id"], toptanci_id_log,
+                    float(body.get("bought_price")) if body.get("bought_price") else None,
                 )
         except Exception as e:
             stok_mesaj = f"hata:{str(e)}"
 
-    if body.get("bought_from") and item:
+    if toptanci_id_log and item:
         try:
-            topt = await db.fetchrow(
-                "SELECT id FROM toptancilar WHERE dukkan_id=$1 AND ad = $2", dukkan_id, body["bought_from"]
+            miktar2 = int(body.get("stok_miktar") or item.get("quantity") or 1)
+            fiyat2 = float(body.get("bought_price") or 0)
+            birim = fiyat2 / miktar2 if miktar2 > 0 else fiyat2
+            await db.execute(
+                """INSERT INTO toptanci_alislar (dukkan_id, toptanci_id, urun, miktar, birim_fiyat, toplam, tarih)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                dukkan_id, toptanci_id_log, item.get("part_name", "Parça"),
+                miktar2, birim, fiyat2, date.today().isoformat(),
             )
-            if topt:
-                miktar2 = int(body.get("stok_miktar") or item.get("quantity") or 1)
-                fiyat2 = float(body.get("bought_price") or 0)
-                birim = fiyat2 / miktar2 if miktar2 > 0 else fiyat2
-                await db.execute(
-                    """INSERT INTO toptanci_alislar (dukkan_id, toptanci_id, urun, miktar, birim_fiyat, toplam, tarih)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7)""",
-                    dukkan_id, topt["id"], item.get("part_name", "Parça"),
-                    miktar2, birim, fiyat2, date.today().isoformat(),
-                )
         except Exception:
             log.warning("Toptancı alış geçmişi kaydı yazılamadı", exc_info=True)
 

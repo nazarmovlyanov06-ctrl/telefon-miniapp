@@ -495,6 +495,11 @@ CREATE TABLE IF NOT EXISTS stok_hareketleri (
     aciklama TEXT,
     tarih TEXT NOT NULL,
     created_by INTEGER REFERENCES kullanicilar(id),
+    -- Bu hareketin KENDİ anındaki toptancı/fiyatı — parts.toptanci_id ve
+    -- purchase_price zamanla değişebildiği için geçmişte "kimden ne kadara
+    -- alındığını" doğru göstermek için ayrı saklanır.
+    toptanci_id INTEGER REFERENCES toptancilar(id),
+    birim_fiyat REAL,
     created_at TIMESTAMP DEFAULT now()
 );
 
