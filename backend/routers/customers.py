@@ -1,7 +1,8 @@
+import secrets
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
 from database import get_db
-from auth import get_current_user, get_dukkan_id
+from auth import get_current_user, get_dukkan_id, hash_sifre
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -332,3 +333,29 @@ async def customer_repairs(
         customer_id, dukkan_id,
     )
     return [dict(r) for r in rows]
+
+
+@router.post("/{customer_id}/portal-sifre")
+async def customer_portal_sifre_belirle(
+    customer_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Müşteri portalı hesabı oluşturur (sifre_hash boşsa) veya unutulan
+    şifreyi sıfırlar (zaten varsa) — SMS/e-posta doğrulama altyapısı
+    olmadığından dükkan tarafı telefon numarasını zaten bildiği/gördüğü için
+    kendisi başlatıyor. Üretilen geçici şifre SADECE burada bir kez döner,
+    kaydedilmez — personel müşteriye kendisi iletir (WhatsApp vb.)."""
+    row = await db.fetchrow(
+        "SELECT id, name, phone, sifre_hash FROM customers WHERE id=$1 AND dukkan_id=$2",
+        customer_id, dukkan_id,
+    )
+    if not row:
+        raise HTTPException(404, "Müşteri bulunamadı")
+    if not row["phone"]:
+        raise HTTPException(400, "Portal hesabı için müşterinin telefon numarası kayıtlı olmalı")
+    yeni_hesap = row["sifre_hash"] is None
+    gecici = secrets.token_urlsafe(9)
+    await db.execute("UPDATE customers SET sifre_hash=$1 WHERE id=$2", hash_sifre(gecici), customer_id)
+    return {"ok": True, "phone": row["phone"], "gecici_sifre": gecici, "yeni_hesap": yeni_hesap}

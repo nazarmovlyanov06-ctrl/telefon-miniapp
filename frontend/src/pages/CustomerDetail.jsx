@@ -4,7 +4,7 @@ import { api } from "../api";
 import {
   User, Pencil, CircleX, Phone, FileText, Calendar,
   Wrench, Banknote, CalendarCheck, CreditCard, Smartphone, Package,
-  FileClock, CheckCircle2, Home, X, ArrowRight,
+  FileClock, CheckCircle2, Home, X, ArrowRight, KeyRound, Copy, Check, MessageCircle,
 } from "lucide-react";
 
 const STATUS_LABEL = {
@@ -89,6 +89,52 @@ function EtkinlikDetayModal({ ev, onClose }) {
   );
 }
 
+function PortalSonucModal({ sonuc, customerName, dukkanSlug, onClose }) {
+  const [kopyalandi, setKopyalandi] = useState(false);
+  const link = dukkanSlug ? `${window.location.origin}/magaza/${dukkanSlug}/panelim` : null;
+  const mesaj = [
+    `Merhaba ${customerName},`, "",
+    "Müşteri portalı hesap bilgileriniz:",
+    `Telefon: ${sonuc.phone}`,
+    `Şifre: ${sonuc.gecici_sifre}`,
+    link ? `Giriş: ${link}` : null,
+  ].filter(Boolean).join("\n");
+
+  async function kopyala() {
+    try { await navigator.clipboard.writeText(mesaj); setKopyalandi(true); setTimeout(() => setKopyalandi(false), 2000); }
+    catch { alert(mesaj); }
+  }
+  function whatsapptaGonder() {
+    const raw = (sonuc.phone || "").replace(/\D/g, "");
+    const num = raw.startsWith("90") ? raw : raw.startsWith("0") ? "9" + raw : "90" + raw;
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(mesaj)}`, "_blank");
+  }
+
+  return (
+    <OzetPencere baslik={sonuc.yeni_hesap ? "Portal Hesabı Oluşturuldu" : "Şifre Sıfırlandı"} ikon={KeyRound} renk="var(--success)" onClose={onClose}>
+      <div style={{ fontSize: 12.5, color: "var(--hint)", marginBottom: 12 }}>
+        Bu şifre sadece burada bir kez gösteriliyor — müşteriye kendiniz iletin.
+      </div>
+      <div style={{ background: "var(--bg2)", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+        <Row label="Telefon" value={sonuc.phone} />
+        <div className="divider" />
+        <div className="card-row" style={{ padding: "8px 0" }}>
+          <span style={{ color: "var(--hint)", fontSize: 13 }}>Şifre</span>
+          <span style={{ fontWeight: 700, fontFamily: "monospace", fontSize: 15, letterSpacing: 0.5 }}>{sonuc.gecici_sifre}</span>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn btn-ghost btn-sm" onClick={kopyala} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          {kopyalandi ? <><Check size={14} strokeWidth={2.4} /> Kopyalandı!</> : <><Copy size={14} strokeWidth={2} /> Kopyala</>}
+        </button>
+        <button className="btn btn-primary btn-sm" onClick={whatsapptaGonder} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <MessageCircle size={14} strokeWidth={2} /> WhatsApp'tan Gönder
+        </button>
+      </div>
+    </OzetPencere>
+  );
+}
+
 function Row({ label, value }) {
   return (
     <div className="card-row" style={{ padding: "8px 0" }}>
@@ -112,6 +158,9 @@ export default function CustomerDetail() {
   const [tab, setTab] = useState("ziyaretler");
   const [ozetAcik, setOzetAcik] = useState(null); // "ziyaret" | "tamir" | "harcama" | "bakiye" | null
   const [secilenEtkinlik, setSecilenEtkinlik] = useState(null); // 2.el/sıfır ziyaret detay penceresi
+  const [dukkanSlug, setDukkanSlug] = useState(null);
+  const [portalSaving, setPortalSaving] = useState(false);
+  const [portalSonuc, setPortalSonuc] = useState(null); // { gecici_sifre, phone, yeni_hesap }
 
   function ozetTumunuGor(hedefTab) {
     setOzetAcik(null);
@@ -119,6 +168,7 @@ export default function CustomerDetail() {
   }
 
   useEffect(() => { load(); }, [id]);
+  useEffect(() => { api.vitrinAyarlarim().then(r => setDukkanSlug(r.slug)).catch(() => {}); }, []);
 
   async function load() {
     try {
@@ -135,6 +185,17 @@ export default function CustomerDetail() {
       setDebts(d.filter(db => db.customer_id === parseInt(id)));
     } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
+  }
+
+  async function portalSifreOlustur() {
+    if (customer.portal_uye && !confirm("Mevcut portal şifresi geçersiz olacak ve yeni bir geçici şifre üretilecek. Devam edilsin mi?")) return;
+    setPortalSaving(true);
+    try {
+      const r = await api.customerPortalSifre(id);
+      setPortalSonuc(r);
+      setCustomer(c => ({ ...c, portal_uye: true }));
+    } catch (e) { alert(e.message || "İşlem başarısız"); }
+    finally { setPortalSaving(false); }
   }
 
   async function save(e) {
@@ -206,6 +267,15 @@ export default function CustomerDetail() {
           )}
           <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4, display: "flex", alignItems: "center", gap: 7 }}>
             <Calendar size={11} strokeWidth={2} /> Kayıt: {fmt(customer.created_at)}
+          </div>
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12.5, color: customer.portal_uye ? "var(--success)" : "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}>
+              <KeyRound size={13} strokeWidth={2} /> {customer.portal_uye ? "Müşteri Portalı: Üye" : "Müşteri Portalı: Hesap yok"}
+            </span>
+            <button className="btn btn-ghost btn-sm" onClick={portalSifreOlustur} disabled={portalSaving || !customer.phone}
+              title={!customer.phone ? "Portal hesabı için telefon numarası gerekli" : undefined}>
+              {portalSaving ? "..." : customer.portal_uye ? "Şifreyi Sıfırla" : "Portal Hesabı Oluştur"}
+            </button>
           </div>
         </div>
       )}
@@ -485,6 +555,11 @@ export default function CustomerDetail() {
 
       {secilenEtkinlik && (
         <EtkinlikDetayModal ev={secilenEtkinlik} onClose={() => setSecilenEtkinlik(null)} />
+      )}
+
+      {portalSonuc && (
+        <PortalSonucModal sonuc={portalSonuc} customerName={customer.name} dukkanSlug={dukkanSlug}
+          onClose={() => setPortalSonuc(null)} />
       )}
     </div>
   );

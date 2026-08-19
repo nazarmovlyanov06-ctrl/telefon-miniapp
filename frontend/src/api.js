@@ -151,6 +151,7 @@ export const api = {
   createCustomer: (data) => post("/customers/", data),
   updateCustomer: (id, data) => put(`/customers/${id}`, data),
   deleteCustomer: (id) => del(`/customers/${id}`),
+  customerPortalSifre: (id) => post(`/customers/${id}/portal-sifre`, {}),
 
   // Stok / Parca
   parts: (params = {}) => {
