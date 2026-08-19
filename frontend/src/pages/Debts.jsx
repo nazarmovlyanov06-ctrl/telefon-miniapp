@@ -418,11 +418,11 @@ export default function Debts() {
       )}
       {/* Ödeme modalı */}
       {payModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end" }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
           onClick={() => setPayModal(null)}>
           <div onClick={e => e.stopPropagation()} style={{
-            background: "var(--card)", borderRadius: "18px 18px 0 0",
-            width: "100%", padding: "20px 16px 40px",
+            background: "var(--card)", borderRadius: 18,
+            width: "100%", maxWidth: 480, padding: "20px 16px 40px",
           }}>
             <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
               {tab === "alacak" ? "Ödeme Al" : "Ödeme Yap"}

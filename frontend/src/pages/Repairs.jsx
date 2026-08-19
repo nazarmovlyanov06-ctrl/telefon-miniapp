@@ -107,9 +107,9 @@ function DurumSecPencere({ repair, onClose, onDegisti }) {
   }
   const erisilebilirler = DURUM_SIRASI[repair.status] || [];
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
       onClick={onClose}>
-      <div className="card" style={{ width: "100%", maxWidth: 480, margin: "0 auto", borderRadius: "20px 20px 0 0" }}
+      <div className="card" style={{ width: "100%", maxWidth: 480, margin: "0 auto", borderRadius: 20 }}
         onClick={e => e.stopPropagation()}>
         <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
           {repair.customer_name || "—"} · {repair.device_model}

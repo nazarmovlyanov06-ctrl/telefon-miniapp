@@ -1,3 +1,4 @@
+import json
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from database import get_db
@@ -122,18 +123,19 @@ async def create_cihaz(
 ):
     kimden = body.get("kimden") or ""
     kimden_telefon = body.get("kimden_telefon") or ""
+    aksesuarlar = json.dumps(body["aksesuarlar"], ensure_ascii=False) if body.get("aksesuarlar") else None
     async with db.transaction():
         row = await db.fetchrow(
             """INSERT INTO ikinci_el
                (dukkan_id, model, imei, renk, depolama, ram, ozellikler,
-                kimden, kimden_telefon, alis_fiyati, notlar, durum, kaynak)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'stokta', $12)
+                kimden, kimden_telefon, alis_fiyati, notlar, durum, kaynak, aksesuarlar)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'stokta', $12, $13::jsonb)
                RETURNING id""",
             dukkan_id, body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
             body.get("ram"), body.get("ozellikler"),
             kimden, kimden_telefon,
             float(body["alis_fiyati"]), body.get("notlar"),
-            body.get("kaynak", "dukkan"),
+            body.get("kaynak", "dukkan"), aksesuarlar,
         )
         if kimden and kimden_telefon:
             existing = await db.fetchrow(

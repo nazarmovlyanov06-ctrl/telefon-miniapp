@@ -224,9 +224,9 @@ export default function Loaner() {
       {fotoModal && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 210,
-          background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "flex-end", padding: 0
+          background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16
         }} onClick={() => setFotoModal(null)}>
-          <div className="card" style={{ width: "100%", borderRadius: "20px 20px 0 0", maxHeight: "80vh", overflowY: "auto" }}
+          <div className="card" style={{ width: "100%", maxWidth: 480, borderRadius: 20, maxHeight: "80vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
             <div className="card-row" style={{ marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>

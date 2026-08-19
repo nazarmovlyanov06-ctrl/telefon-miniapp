@@ -105,9 +105,9 @@ function tl(n) { return (n || 0).toLocaleString("tr-TR", { maximumFractionDigits
 
 function AltPencere({ children, onClose, maxWidth = 480 }) {
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
       onClick={onClose}>
-      <div className="card" style={{ width: "100%", maxWidth, margin: "0 auto", borderRadius: "20px 20px 0 0", maxHeight: "82vh", overflowY: "auto" }}
+      <div className="card" style={{ width: "100%", maxWidth, margin: "0 auto", borderRadius: 20, maxHeight: "82vh", overflowY: "auto" }}
         onClick={e => e.stopPropagation()}>
         {children}
       </div>

@@ -873,8 +873,8 @@ export default function Parts({ user }) {
 
           {/* ALDIM MODAL */}
           {boughtItem && (
-            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-              <div style={{ background: "var(--bg)", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px", width: "100%" }}>
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+              <div style={{ background: "var(--bg)", borderRadius: 20, padding: "20px 16px 32px", width: "100%", maxWidth: 480 }}>
                 <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}><CheckCircle2 size={16} strokeWidth={2} /> Alındı: {boughtItem.part_name}</div>
                 <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 14 }}>{boughtItem.device_model}</div>
                 <form onSubmit={submitBought}>

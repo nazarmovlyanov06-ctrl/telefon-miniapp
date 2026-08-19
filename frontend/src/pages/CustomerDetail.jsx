@@ -36,9 +36,9 @@ function fmtDateTime(d) {
 
 function OzetPencere({ baslik, ikon: Ikon, renk, children, onClose, onTumu }) {
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
       onClick={onClose}>
-      <div className="card" style={{ width: "100%", maxWidth: 480, margin: "0 auto", borderRadius: "20px 20px 0 0", maxHeight: "78vh", overflowY: "auto" }}
+      <div className="card" style={{ width: "100%", maxWidth: 480, margin: "0 auto", borderRadius: 20, maxHeight: "78vh", overflowY: "auto" }}
         onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <span style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 8, color: renk }}>
@@ -60,11 +60,16 @@ function OzetPencere({ baslik, ikon: Ikon, renk, children, onClose, onTumu }) {
   );
 }
 
+const AKSESUAR_ETIKETLERI = { kutu: "Kutu", sarj_aleti: "Şarj Aleti", kilif: "Kılıf", kulaklik: "Kulaklık" };
+
 function EtkinlikDetayModal({ ev, onClose }) {
   const t = TUR_LABEL[ev.tur] || { icon: null, label: ev.tur, color: "var(--hint)" };
   const Ikon = t.icon || Smartphone;
   const d = ev.detay || {};
   const ozellikler = [d.renk, d.depolama, d.ram].filter(Boolean).join(" · ");
+  let aksesuarlar = {};
+  try { aksesuarlar = d.aksesuarlar ? JSON.parse(d.aksesuarlar) : {}; } catch { /* eski/boş veri */ }
+  const gelenAksesuarlar = Object.entries(AKSESUAR_ETIKETLERI).filter(([k]) => aksesuarlar[k]).map(([, label]) => label);
   return (
     <OzetPencere baslik={d.model || ev.baslik} ikon={Ikon} renk={t.color} onClose={onClose}>
       <div style={{ fontWeight: 300, fontSize: 24, color: t.color, letterSpacing: -0.5, marginBottom: 4 }}>
@@ -76,6 +81,7 @@ function EtkinlikDetayModal({ ev, onClose }) {
       {ozellikler && <Row label="Özellikler" value={ozellikler} />}
       {d.imei && <><div className="divider" /><Row label="IMEI" value={d.imei} /></>}
       {d.durum_aciklama && <><div className="divider" /><Row label="Durum / Hasar" value={d.durum_aciklama} /></>}
+      {gelenAksesuarlar.length > 0 && <><div className="divider" /><Row label="Gelen Aksesuarlar" value={gelenAksesuarlar.join(", ")} /></>}
       {d.kimden && <><div className="divider" /><Row label="Kimden Alındı" value={d.kimden} /></>}
       {d.satis_kanali && <><div className="divider" /><Row label="Satış Kanalı" value={d.satis_kanali} /></>}
       {d.notlar && <><div className="divider" /><Row label="Not" value={d.notlar} /></>}

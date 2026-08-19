@@ -224,7 +224,7 @@ async def customer_gecmis(
                 "model": c["model"], "imei": c.get("imei"),
                 "renk": c.get("renk"), "depolama": c.get("depolama"), "ram": c.get("ram"),
                 "durum_aciklama": c.get("ozellikler"), "notlar": c.get("notlar"),
-                "kimden": c.get("kimden"),
+                "kimden": c.get("kimden"), "aksesuarlar": c.get("aksesuarlar"),
             },
         })
 
@@ -252,7 +252,7 @@ async def customer_gecmis(
                 "model": c["model"], "imei": c.get("imei"),
                 "renk": c.get("renk"), "depolama": c.get("depolama"), "ram": c.get("ram"),
                 "durum_aciklama": c.get("ozellikler"), "notlar": c.get("notlar"),
-                "satis_kanali": c.get("satis_kanali"),
+                "satis_kanali": c.get("satis_kanali"), "aksesuarlar": c.get("aksesuarlar"),
             },
         })
 
@@ -279,7 +279,7 @@ async def customer_gecmis(
             "detay": {
                 "model": c["model"], "imei": c.get("imei"),
                 "renk": c.get("renk"), "depolama": c.get("depolama"),
-                "notlar": c.get("notlar"), "kimden": c.get("kimden"),
+                "notlar": c.get("notlar"), "kimden": c.get("kimden"), "aksesuarlar": c.get("aksesuarlar"),
             },
         })
 
@@ -306,7 +306,7 @@ async def customer_gecmis(
             "detay": {
                 "model": c["model"], "imei": c.get("imei"),
                 "renk": c.get("renk"), "depolama": c.get("depolama"),
-                "notlar": c.get("notlar"), "satis_kanali": c.get("satis_kanali"),
+                "notlar": c.get("notlar"), "satis_kanali": c.get("satis_kanali"), "aksesuarlar": c.get("aksesuarlar"),
             },
         })
 

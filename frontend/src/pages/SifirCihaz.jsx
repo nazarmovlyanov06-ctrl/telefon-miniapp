@@ -8,6 +8,8 @@ import {
   User, Phone, Radio, History, X, Inbox, Send, Clock,
 } from "lucide-react";
 
+const AKSESUAR_ETIKETLERI = { kutu: "Kutu", sarj_aleti: "Şarj Aleti", kilif: "Kılıf", kulaklik: "Kulaklık" };
+
 export default function SifirCihaz({ user }) {
   const navigate = useNavigate();
   const [priceHidden, setPriceHidden] = useState(() => localStorage.getItem("priceHidden") === "1");
@@ -31,7 +33,7 @@ export default function SifirCihaz({ user }) {
 
   const [form, setForm] = useState({
     model: "", imei: "", renk: "", depolama: "", kimden: "", kimden_telefon: "",
-    kaynak: "dukkan", alis_fiyati: "", alis_tarihi: today(), notlar: ""
+    kaynak: "dukkan", alis_fiyati: "", alis_tarihi: today(), notlar: "", aksesuarlar: {}
   });
   const [satForm, setSatForm] = useState({
     satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "",
@@ -79,7 +81,7 @@ export default function SifirCihaz({ user }) {
     try {
       await api.createSifir({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
       setShowForm(false);
-      setForm({ model: "", imei: "", renk: "", depolama: "", kimden: "", kimden_telefon: "", kaynak: "dukkan", alis_fiyati: "", alis_tarihi: today(), notlar: "" });
+      setForm({ model: "", imei: "", renk: "", depolama: "", kimden: "", kimden_telefon: "", kaynak: "dukkan", alis_fiyati: "", alis_tarihi: today(), notlar: "", aksesuarlar: {} });
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -191,6 +193,27 @@ export default function SifirCihaz({ user }) {
                     <input className="form-input" value={form.depolama}
                       onChange={e => setForm({ ...form, depolama: e.target.value })}
                       placeholder="128GB, 256GB..." />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Gelen Aksesuarlar</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {Object.entries(AKSESUAR_ETIKETLERI).map(([key, label]) => {
+                      const secili = !!form.aksesuarlar[key];
+                      return (
+                        <button key={key} type="button"
+                          onClick={() => setForm(f => ({ ...f, aksesuarlar: { ...f.aksesuarlar, [key]: !secili } }))}
+                          style={{
+                            padding: "5px 11px", borderRadius: 20, fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+                            cursor: "pointer",
+                            border: `1px solid ${secili ? "var(--accent)" : "var(--border)"}`,
+                            background: secili ? "rgba(94,168,255,0.12)" : "transparent",
+                            color: secili ? "var(--accent)" : "var(--hint)",
+                          }}>
+                          {label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="form-group">
@@ -454,11 +477,11 @@ export default function SifirCihaz({ user }) {
       )}
       {/* IMEI Geçmiş Modalı */}
       {imeiModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end" }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
           onClick={() => setImeiModal(null)}>
           <div onClick={e => e.stopPropagation()} style={{
-            background: "var(--card)", borderRadius: "18px 18px 0 0",
-            width: "100%", maxHeight: "85vh", overflowY: "auto", padding: "20px 16px 32px",
+            background: "var(--card)", borderRadius: 18,
+            width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", padding: "20px 16px 32px",
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>

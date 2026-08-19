@@ -783,7 +783,7 @@ export default function RepairDetail({ user }) {
 
       {/* Fiş modal */}
       {fisModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 16 }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
           onClick={() => setFisModal(false)}>
           <div className="card" style={{ width: "100%", maxWidth: 480, maxHeight: "80vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
@@ -811,7 +811,7 @@ export default function RepairDetail({ user }) {
 
       {/* Dijital fiş / QR modal */}
       {qrModal && dukkanSlug && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 16 }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
           onClick={() => setQrModal(false)}>
           <div className="card" style={{ width: "100%", maxWidth: 380, textAlign: "center" }}
             onClick={e => e.stopPropagation()}>

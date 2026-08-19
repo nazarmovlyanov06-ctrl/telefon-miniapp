@@ -312,9 +312,9 @@ export default function NewRepair() {
 
       {/* Şablon Modal */}
       {sablonModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", padding: 16 }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
           onClick={() => setSablonModal(false)}>
-          <div className="card" style={{ width: "100%", maxHeight: "70vh", overflowY: "auto" }}
+          <div className="card" style={{ width: "100%", maxWidth: 480, maxHeight: "70vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 7 }}><Star size={15} strokeWidth={2} /> Şablon Seç</div>
             {sablonlar.map(s => (

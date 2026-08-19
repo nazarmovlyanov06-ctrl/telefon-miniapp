@@ -192,9 +192,9 @@ export default function Garanti() {
       )}
 
       {showTamirPicker && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", padding: 16 }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
           onClick={() => setShowTamirPicker(false)}>
-          <div className="card" style={{ width: "100%", maxHeight: "60vh", overflowY: "auto" }}
+          <div className="card" style={{ width: "100%", maxWidth: 480, maxHeight: "60vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
             <div style={{ fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}><CheckCircle2 size={15} strokeWidth={2} /> Hazır Tamir Seç</div>
             {hazirTamirler.map(t => (

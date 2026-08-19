@@ -297,6 +297,7 @@ CREATE TABLE IF NOT EXISTS ikinci_el (
     kaynak TEXT DEFAULT 'dukkan',
     customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     gorsel_url TEXT,
+    aksesuarlar JSONB,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -462,6 +463,7 @@ CREATE TABLE IF NOT EXISTS sifir_cihazlar (
     notlar TEXT,
     customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     gorsel_url TEXT,
+    aksesuarlar JSONB,
     created_at TIMESTAMP DEFAULT now()
 );
 
