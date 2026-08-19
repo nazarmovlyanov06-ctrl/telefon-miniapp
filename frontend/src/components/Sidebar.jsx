@@ -20,7 +20,7 @@ const ANA = [
 
 const FINANS = [
   { path: "/kasa", icon: Landmark, label: "Kasa", patronOnly: true },
-  { path: "/gider", icon: TrendingDown, label: "Giderler", patronOnly: true },
+  { path: "/gider", icon: TrendingDown, label: "Giderler" },
   { path: "/hedef", icon: Target, label: "Hedef" },
   { path: "/debts", icon: CreditCard, label: "Borçlar" },
 ];

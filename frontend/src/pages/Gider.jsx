@@ -6,7 +6,7 @@ import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolu
 
 const KATEGORILER = ["Kira", "Elektrik", "Su", "İnternet", "Vergi", "Sigorta", "Malzeme", "Diğer"];
 
-export default function Gider() {
+export default function Gider({ user }) {
   const navigate = useNavigate();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -126,7 +126,9 @@ export default function Gider() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontWeight: 700, color: "var(--danger)" }}>{(g.tutar || 0).toLocaleString("tr-TR")} ₺</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => sil(g.id)} style={{ padding: "4px 8px", display: "flex" }}><Trash2 size={13} strokeWidth={2} /></button>
+              {user?.rol === "patron" && (
+                <button className="btn btn-ghost btn-sm" onClick={() => sil(g.id)} style={{ padding: "4px 8px", display: "flex" }}><Trash2 size={13} strokeWidth={2} /></button>
+              )}
             </div>
           </div>
         </div>

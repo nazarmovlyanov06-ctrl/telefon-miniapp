@@ -19,7 +19,6 @@ async def list_giderler(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    _patron_kontrol(user)
     bugun = date.today()
     ay_basi = bugun.replace(day=1).isoformat()
     rows = await db.fetch(
@@ -38,7 +37,6 @@ async def create_gider(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    _patron_kontrol(user)
     tarih = body.get("tarih", date.today().isoformat())
     tutar = float(body["tutar"])
     aciklama = f"{body['kategori']}: {body.get('aciklama', '')}".strip(": ")
