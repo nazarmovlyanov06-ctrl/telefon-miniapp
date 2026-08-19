@@ -247,7 +247,10 @@ export const api = {
   kasaDuzelt: (data) => post("/kasa/duzelt", data),
 
   // Gider
-  giderList: () => get("/giderler/"),
+  giderList: (params = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return get(`/giderler/${q ? "?" + q : ""}`);
+  },
   createGider: (data) => post("/giderler/", data),
   deleteGider: (id) => del(`/giderler/${id}`),
   giderKategorileri: () => get("/giderler/kategoriler"),

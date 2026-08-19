@@ -1,10 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { CircleX, Trash2 } from "lucide-react";
+import { CircleX, Trash2, Search } from "lucide-react";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 
 const DEFAULT_KATEGORILER = ["Kira", "Elektrik", "Su", "İnternet", "Vergi", "Sigorta", "Malzeme", "Diğer"];
+
+const PERIYOT = [
+  { key: "bugun", label: "Bugün" },
+  { key: "hafta", label: "Bu Hafta" },
+  { key: "ay", label: "Bu Ay" },
+  { key: "ozel", label: "Özel" },
+];
+
+function bugunISO() { return new Date().toISOString().slice(0, 10); }
+function gunOnce(gun) {
+  const d = new Date();
+  d.setDate(d.getDate() - gun);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function Gider({ user }) {
   const navigate = useNavigate();
@@ -15,6 +29,10 @@ export default function Gider({ user }) {
   const [kategoriler, setKategoriler] = useState(DEFAULT_KATEGORILER);
   const [ozelKategoriMod, setOzelKategoriMod] = useState(false);
   const [form, setForm] = useState({ kategori: "Kira", tutar: "", aciklama: "", tarih: today(), odemeler: null, taksit_sayi: "1", alacakli_adi: "" });
+  const [periyot, setPeriyot] = useState("ay");
+  const [ozelBaslangic, setOzelBaslangic] = useState(() => gunOnce(7));
+  const [ozelBitis, setOzelBitis] = useState(bugunISO);
+  const [arama, setArama] = useState("");
 
   // Dükkanın ortak kategori listesi — önceden cihaza özel localStorage'daydı,
   // bir çalışanın eklediği kategori başka çalışanda hiç görünmüyordu.
@@ -33,11 +51,27 @@ export default function Gider({ user }) {
     try { await api.giderKategoriEkle(k); } catch { /* zaten varsa sorun değil */ }
   }
 
-  useEffect(() => { load(); kategorileriYukle(); }, []);
+  useEffect(() => { kategorileriYukle(); }, []);
+
+  useEffect(() => {
+    if (periyot === "ozel" && (!ozelBaslangic || !ozelBitis)) return;
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periyot, ozelBaslangic, ozelBitis]);
+
+  // Arama yazarken her tuşta değil, 300ms bekleyip sakinleşince çek.
+  const ilkYuklemeRef = useRef(true);
+  useEffect(() => {
+    if (ilkYuklemeRef.current) { ilkYuklemeRef.current = false; return; }
+    const t = setTimeout(load, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arama]);
 
   async function load() {
+    setLoading(true);
     try {
-      const res = await api.giderList();
+      const res = await api.giderList({ periyot, baslangic: ozelBaslangic, bitis: ozelBitis, q: arama });
       setList(res.giderler || res || []);
     } finally { setLoading(false); }
   }
@@ -81,7 +115,10 @@ export default function Gider({ user }) {
   const formAlinan = (form.odemeler || varsayilanOdemeSatirlari(formTutar)).reduce((s, o) => s + (parseFloat(o.tutar) || 0), 0);
   const kalanBorc = formTutar - formAlinan;
 
-  if (loading) return <div className="loading">Yükleniyor...</div>;
+  const periyotLabel = {
+    bugun: "bugün", hafta: "bu hafta", ay: "bu ay",
+    ozel: `${ozelBaslangic?.split("-").reverse().join(".")} – ${ozelBitis?.split("-").reverse().join(".")}`,
+  };
 
   return (
     <div className="page">
@@ -91,12 +128,47 @@ export default function Gider({ user }) {
         <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Ekle</button>
       </div>
 
+      {/* Periyot seçici */}
+      <div style={{ display: "flex", background: "var(--bg2)", borderRadius: 12, padding: 3, gap: 3, marginBottom: 10 }}>
+        {PERIYOT.map(p => (
+          <button key={p.key} onClick={() => setPeriyot(p.key)}
+            style={{
+              flex: 1, padding: "8px 0", borderRadius: 10, border: "none", cursor: "pointer",
+              fontWeight: 600, fontSize: 13, transition: "all 0.15s",
+              background: periyot === p.key ? "var(--bg)" : "transparent",
+              color: periyot === p.key ? "var(--text)" : "var(--hint)",
+              boxShadow: periyot === p.key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+            }}>{p.label}</button>
+        ))}
+      </div>
+
+      {periyot === "ozel" && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+          <input type="date" className="form-input" style={{ flex: 1 }}
+            value={ozelBaslangic} max={ozelBitis}
+            onChange={e => setOzelBaslangic(e.target.value)} />
+          <span style={{ color: "var(--hint)", fontSize: 13 }}>—</span>
+          <input type="date" className="form-input" style={{ flex: 1 }}
+            value={ozelBitis} min={ozelBaslangic} max={bugunISO()}
+            onChange={e => setOzelBitis(e.target.value)} />
+        </div>
+      )}
+
+      <div className="form-group" style={{ position: "relative", marginBottom: 10 }}>
+        <input className="form-input" style={{ paddingLeft: 36 }} value={arama}
+          onChange={e => setArama(e.target.value)} placeholder="Kategori veya açıklamada ara..." />
+        <Search size={15} strokeWidth={2} stroke="var(--hint)"
+          style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+      </div>
+
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="card-row">
-          <span style={{ color: "var(--hint)" }}>Bu Ay Toplam Gider</span>
+          <span style={{ color: "var(--hint)" }}>Toplam Gider ({periyotLabel[periyot]})</span>
           <span style={{ fontWeight: 700, fontSize: 18, color: "var(--danger)" }}>{toplam.toLocaleString("tr-TR")} ₺</span>
         </div>
       </div>
+
+      {loading && <div className="loading">Yükleniyor...</div>}
 
       {showForm && (
         <div className="card">
@@ -155,8 +227,10 @@ export default function Gider({ user }) {
         </div>
       )}
 
-      {list.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Bu ay gider kaydı yok</div>
+      {!loading && list.length === 0 ? (
+        <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>
+          {arama ? "Aramayla eşleşen gider kaydı yok" : "Bu dönemde gider kaydı yok"}
+        </div>
       ) : list.map(g => (
         <div key={g.id} className="card">
           <div className="card-row">

@@ -1,9 +1,9 @@
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from database import get_db
 from auth import get_current_user, get_dukkan_id
 from odeme_yardimci import kaydet_odeme
-from datetime import date
+from datetime import date, timedelta
 
 router = APIRouter(prefix="/giderler", tags=["gider"])
 
@@ -15,19 +15,42 @@ def _patron_kontrol(user):
 
 @router.get("/")
 async def list_giderler(
+    periyot: str = Query("ay"),
+    baslangic_q: str = Query(None, alias="baslangic"),
+    bitis_q: str = Query(None, alias="bitis"),
+    q: str = Query(None),
     dukkan_id: int = Depends(get_dukkan_id),
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
+    # Kasa'daki periyot seçiciyle aynı desen — önceden hep "bu ay"a sabitliydi,
+    # eski/farklı dönem giderlerine bakma imkanı hiç yoktu.
     bugun = date.today()
-    ay_basi = bugun.replace(day=1).isoformat()
+    if periyot == "ozel" and baslangic_q and bitis_q:
+        baslangic, bitis = baslangic_q, bitis_q
+    elif periyot == "bugun":
+        baslangic = bitis = bugun.isoformat()
+    elif periyot == "hafta":
+        baslangic = (bugun - timedelta(days=bugun.weekday())).isoformat()
+        bitis = bugun.isoformat()
+    else:  # "ay" (varsayılan)
+        baslangic = bugun.replace(day=1).isoformat()
+        bitis = bugun.isoformat()
+
+    where = ["dukkan_id = $1", "tarih >= $2", "tarih <= $3"]
+    params = [dukkan_id, baslangic, bitis]
+    if q:
+        params.append(f"%{q}%")
+        where.append(f"(kategori ILIKE ${len(params)} OR aciklama ILIKE ${len(params)})")
+    where_sql = " AND ".join(where)
+
     rows = await db.fetch(
-        "SELECT * FROM giderler WHERE dukkan_id = $1 AND tarih >= $2 ORDER BY tarih DESC, id DESC",
-        dukkan_id, ay_basi,
+        f"SELECT * FROM giderler WHERE {where_sql} ORDER BY tarih DESC, id DESC",
+        *params,
     )
     rows = [dict(r) for r in rows]
     toplam = sum(r["tutar"] for r in rows)
-    return {"toplam": toplam, "giderler": rows}
+    return {"toplam": toplam, "giderler": rows, "baslangic": baslangic, "bitis": bitis}
 
 
 @router.get("/kategoriler")
