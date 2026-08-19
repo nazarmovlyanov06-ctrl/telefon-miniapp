@@ -6,34 +6,34 @@ import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolu
 
 const DEFAULT_KATEGORILER = ["Kira", "Elektrik", "Su", "İnternet", "Vergi", "Sigorta", "Malzeme", "Diğer"];
 
-function loadKats() {
-  try { return JSON.parse(localStorage.getItem("gider_kategorileri")) || DEFAULT_KATEGORILER; }
-  catch { return DEFAULT_KATEGORILER; }
-}
-function saveKats(cats) {
-  localStorage.setItem("gider_kategorileri", JSON.stringify(cats));
-}
-
 export default function Gider({ user }) {
   const navigate = useNavigate();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [err, setErr] = useState("");
-  const [kategoriler, setKategoriler] = useState(loadKats);
+  const [kategoriler, setKategoriler] = useState(DEFAULT_KATEGORILER);
   const [ozelKategoriMod, setOzelKategoriMod] = useState(false);
   const [form, setForm] = useState({ kategori: "Kira", tutar: "", aciklama: "", tarih: today(), odemeler: null, taksit_sayi: "1", alacakli_adi: "" });
 
-  function kategoriEkle(ad) {
-    const k = ad.trim();
-    if (k && !kategoriler.includes(k)) {
-      const yeni = [...kategoriler, k];
-      setKategoriler(yeni);
-      saveKats(yeni);
-    }
+  // Dükkanın ortak kategori listesi — önceden cihaza özel localStorage'daydı,
+  // bir çalışanın eklediği kategori başka çalışanda hiç görünmüyordu.
+  async function kategorileriYukle() {
+    try {
+      const r = await api.giderKategorileri();
+      const ozel = (r.kategoriler || []).filter(k => !DEFAULT_KATEGORILER.includes(k));
+      setKategoriler([...DEFAULT_KATEGORILER, ...ozel]);
+    } catch { /* varsayılan listeyle devam */ }
   }
 
-  useEffect(() => { load(); }, []);
+  async function kategoriEkle(ad) {
+    const k = ad.trim();
+    if (!k || kategoriler.includes(k)) return;
+    setKategoriler(kl => [...kl, k]);
+    try { await api.giderKategoriEkle(k); } catch { /* zaten varsa sorun değil */ }
+  }
+
+  useEffect(() => { load(); kategorileriYukle(); }, []);
 
   async function load() {
     try {

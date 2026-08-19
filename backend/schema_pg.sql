@@ -247,6 +247,14 @@ CREATE TABLE IF NOT EXISTS giderler (
     created_at TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS gider_kategorileri (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    ad TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT now(),
+    UNIQUE (dukkan_id, ad)
+);
+
 CREATE TABLE IF NOT EXISTS debts (
     id SERIAL PRIMARY KEY,
     dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,

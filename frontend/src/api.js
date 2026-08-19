@@ -250,6 +250,8 @@ export const api = {
   giderList: () => get("/giderler/"),
   createGider: (data) => post("/giderler/", data),
   deleteGider: (id) => del(`/giderler/${id}`),
+  giderKategorileri: () => get("/giderler/kategoriler"),
+  giderKategoriEkle: (ad) => post("/giderler/kategoriler", { ad }),
 
   // Loaner
   loanerList: () => get("/loaner/"),

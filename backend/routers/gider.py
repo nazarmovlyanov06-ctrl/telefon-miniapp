@@ -30,6 +30,35 @@ async def list_giderler(
     return {"toplam": toplam, "giderler": rows}
 
 
+@router.get("/kategoriler")
+async def list_kategoriler(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch(
+        "SELECT ad FROM gider_kategorileri WHERE dukkan_id=$1 ORDER BY ad", dukkan_id
+    )
+    return {"kategoriler": [r["ad"] for r in rows]}
+
+
+@router.post("/kategoriler")
+async def add_kategori(
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    ad = (body.get("ad") or "").strip()
+    if not ad:
+        raise HTTPException(400, "Kategori adı boş olamaz")
+    await db.execute(
+        "INSERT INTO gider_kategorileri (dukkan_id, ad) VALUES ($1, $2) ON CONFLICT (dukkan_id, ad) DO NOTHING",
+        dukkan_id, ad,
+    )
+    return {"ok": True}
+
+
 @router.post("/")
 async def create_gider(
     body: dict,
