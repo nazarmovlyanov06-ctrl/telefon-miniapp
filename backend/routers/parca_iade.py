@@ -212,13 +212,15 @@ async def update_durum(
                     dukkan_id, date.today().isoformat(), odeme_yontemi, tutar, f"Parça iade parası: {parca_adi}",
                 )
                 # add_iade sırasında beklenen_tutar>0 ise burada 'alacak' olarak bir
-                # borç açılmıştı — para gelince o borç hiç kapatılmıyordu, bu yüzden
-                # Alacaklarımız kalıcı olarak şişiyordu VE biri aynı borcu Borçlar
-                # sayfasından ayrıca "tahsil edilmiş" işaretlerse para iki kez kasaya
-                # yazılabiliyordu. source_id ile açılan borcu burada tam ödenmiş sayıyoruz.
+                # borç açılmıştı. Alınan tutar kadarını ödenmiş sayıyoruz — beklenen
+                # tutardan AZ girilirse (toptancı kısmi ödedi) borç tamamen değil,
+                # sadece o kadarıyla kapanır; kalan Alacaklarımız'da görünmeye devam
+                # eder. Önceden 'tutar' ne olursa olsun borcun TAMAMI kapatılıyordu —
+                # kısmi ödemede kalan tutar sessizce kayboluyordu.
                 await db.execute(
-                    "UPDATE debts SET paid_amount = total_amount WHERE dukkan_id=$1 AND source_type='parca_iade' AND source_id=$2",
-                    dukkan_id, iade_id,
+                    """UPDATE debts SET paid_amount = LEAST(paid_amount + $1, total_amount)
+                       WHERE dukkan_id=$2 AND source_type='parca_iade' AND source_id=$3""",
+                    tutar, dukkan_id, iade_id,
                 )
         elif yeni_durum == "reddedildi":
             # Toptancı iadeyi kabul etmedi — bu para hiç gelmeyecek, açılmış

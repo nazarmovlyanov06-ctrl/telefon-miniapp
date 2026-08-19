@@ -410,6 +410,11 @@ export default function ParcaIade({ user }) {
               <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>
                 Bu tutar kasaya otomatik girilir
               </div>
+              {paraModal.beklenen_tutar > 0 && alinanTutar && parseFloat(alinanTutar) < paraModal.beklenen_tutar && (
+                <div style={{ fontSize: 11.5, color: "var(--orange)", marginTop: 4 }}>
+                  Kısmi ödeme — kalan ₺{(paraModal.beklenen_tutar - parseFloat(alinanTutar)).toLocaleString("tr-TR")} Borçlar'da Alacaklarımız olarak kalmaya devam edecek
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Ödeme Yöntemi</label>
