@@ -232,6 +232,32 @@ async def genel_stats(
     rows = await db.fetch("SELECT status, COUNT(*) as c FROM repairs WHERE dukkan_id=$1 GROUP BY status", dukkan_id)
     tamir_durum = {r["status"]: r["c"] for r in rows}
 
+    # Hangi toptancı parça iadelerini en çok reddediyor — sonuçlanmış (red/kabul/
+    # değişim) iadeler üzerinden oran hesaplanır, hâlâ bekleyen/gönderilmiş
+    # olanlar sayıma girmez (henüz sonuç belli değil).
+    toptanci_red_rows = await db.fetch(
+        """SELECT COALESCE(t.ad, 'Toptancı belirtilmedi') as toptanci_adi,
+                  COUNT(*) FILTER (WHERE p.durum = 'reddedildi') as red_sayisi,
+                  COUNT(*) FILTER (WHERE p.durum IN ('reddedildi', 'para_iade_alindi', 'parca_degisimi')) as sonuclanan
+           FROM parca_iadeler p
+           LEFT JOIN toptancilar t ON p.toptanci_id = t.id
+           WHERE p.dukkan_id = $1
+           GROUP BY t.id, t.ad
+           HAVING COUNT(*) FILTER (WHERE p.durum = 'reddedildi') > 0
+           ORDER BY red_sayisi DESC, sonuclanan DESC
+           LIMIT 10""",
+        dukkan_id,
+    )
+    toptanci_red = [
+        {
+            "toptanci_adi": r["toptanci_adi"],
+            "red_sayisi": r["red_sayisi"],
+            "sonuclanan": r["sonuclanan"],
+            "red_orani": round(r["red_sayisi"] / r["sonuclanan"] * 100) if r["sonuclanan"] else 0,
+        }
+        for r in toptanci_red_rows
+    ]
+
     async def scalar(sql, *params):
         return await db.fetchval(sql, *params) or 0
 
@@ -241,6 +267,7 @@ async def genel_stats(
         "ariza_top": ariza_top,
         "musteri_top": musteri_top,
         "tamir_durum": tamir_durum,
+        "toptanci_red": toptanci_red,
         "sayilar": {
             "musteri": await scalar("SELECT COUNT(*) FROM customers WHERE dukkan_id=$1", dukkan_id),
             "tamir_toplam": await scalar("SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1", dukkan_id),

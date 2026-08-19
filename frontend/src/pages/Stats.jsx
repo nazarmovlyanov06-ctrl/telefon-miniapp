@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import {
   BarChart3, Users, Wrench, Smartphone, Package, Cog, Headphones,
-  Star, Frown,
+  Star, Frown, Ban,
 } from "lucide-react";
 
 const DURUM_LABEL = {
@@ -204,6 +204,35 @@ export default function Stats() {
                 </div>
               );
             })}
+          </div>
+        </>
+      )}
+
+      {/* Parça iadesini en çok reddeden toptancılar */}
+      {data.toptanci_red?.length > 0 && (
+        <>
+          <div className="section-title">Parça İademizi En Çok Reddeden Toptancılar</div>
+          <div className="card">
+            {data.toptanci_red.map((t, i) => (
+              <div key={i} style={{ marginBottom: i < data.toptanci_red.length - 1 ? 12 : 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 13 }}>
+                  <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Ban size={12} stroke="var(--danger)" strokeWidth={2} /> {t.toptanci_adi}
+                  </span>
+                  <span style={{ color: "var(--danger)", fontWeight: 700, flexShrink: 0 }}>
+                    {t.red_sayisi}/{t.sonuclanan} (%{t.red_orani})
+                  </span>
+                </div>
+                <div style={{ height: 6, background: "var(--bg2)", borderRadius: 4 }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${t.red_orani}%`,
+                    background: "var(--danger)",
+                    borderRadius: 4,
+                  }} />
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}
