@@ -107,10 +107,20 @@ async def update_durum(
             tutar = float(body.get("alinan_tutar") or iade.get("beklenen_tutar") or 0)
             if tutar > 0:
                 parca_adi = iade.get("parca", "Parça")
+                odeme_yontemi = body.get("odeme_yontemi") or "nakit"
                 await db.execute(
                     """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-                       VALUES ($1, $2, 'giris', 'nakit', $3, $4, 'parca_iade')""",
-                    dukkan_id, date.today().isoformat(), tutar, f"Parça iade parası: {parca_adi}",
+                       VALUES ($1, $2, 'giris', $3, $4, $5, 'parca_iade')""",
+                    dukkan_id, date.today().isoformat(), odeme_yontemi, tutar, f"Parça iade parası: {parca_adi}",
+                )
+                # add_iade sırasında beklenen_tutar>0 ise burada 'alacak' olarak bir
+                # borç açılmıştı — para gelince o borç hiç kapatılmıyordu, bu yüzden
+                # Alacaklarımız kalıcı olarak şişiyordu VE biri aynı borcu Borçlar
+                # sayfasından ayrıca "tahsil edilmiş" işaretlerse para iki kez kasaya
+                # yazılabiliyordu. source_id ile açılan borcu burada tam ödenmiş sayıyoruz.
+                await db.execute(
+                    "UPDATE debts SET paid_amount = total_amount WHERE dukkan_id=$1 AND source_type='parca_iade' AND source_id=$2",
+                    dukkan_id, iade_id,
                 )
 
     return {"ok": True}

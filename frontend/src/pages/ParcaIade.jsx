@@ -26,6 +26,7 @@ export default function ParcaIade() {
   const [showParcaOner, setShowParcaOner] = useState(false);
   const [paraModal, setParaModal] = useState(null);
   const [alinanTutar, setAlinanTutar] = useState("");
+  const [odemeYontemi, setOdemeYontemi] = useState("nakit");
   const dolarKuru = parseFloat(localStorage.getItem("son_dolar_kuru") || "0");
 
   useEffect(() => {
@@ -103,11 +104,12 @@ export default function ParcaIade() {
   function openParaModal(item) {
     setParaModal(item);
     setAlinanTutar(item.beklenen_tutar > 0 ? String(item.beklenen_tutar) : "");
+    setOdemeYontemi("nakit");
   }
 
   async function submitParaAlindi() {
     if (!paraModal) return;
-    await api.updateParcaIadeDurum(paraModal.id, "para_iade_alindi", alinanTutar ? parseFloat(alinanTutar) : 0);
+    await api.updateParcaIadeDurum(paraModal.id, "para_iade_alindi", alinanTutar ? parseFloat(alinanTutar) : 0, odemeYontemi);
     setParaModal(null);
     setAlinanTutar("");
     load();
@@ -265,6 +267,13 @@ export default function ParcaIade() {
               <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>
                 Bu tutar kasaya otomatik girilir
               </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Ödeme Yöntemi</label>
+              <select className="form-select" value={odemeYontemi} onChange={e => setOdemeYontemi(e.target.value)}>
+                <option value="nakit">Nakit</option>
+                <option value="kart">Kart</option>
+              </select>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn btn-primary" onClick={submitParaAlindi} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>

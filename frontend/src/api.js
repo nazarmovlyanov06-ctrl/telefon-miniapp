@@ -289,7 +289,7 @@ export const api = {
   // Parca Iade
   parcaIadeList: () => get("/parca-iade/"),
   createParcaIade: (data) => post("/parca-iade/", data),
-  updateParcaIadeDurum: (id, durum, alinan_tutar) => put(`/parca-iade/${id}/durum`, { durum, alinan_tutar }),
+  updateParcaIadeDurum: (id, durum, alinan_tutar, odeme_yontemi) => put(`/parca-iade/${id}/durum`, { durum, alinan_tutar, odeme_yontemi }),
 
   // Çalışan Bildirim (Şikayet/Övgü)
   geriBildirimCalisanlar: () => get("/geri-bildirim/calisanlar"),
