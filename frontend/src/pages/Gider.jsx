@@ -4,7 +4,15 @@ import { api } from "../api";
 import { CircleX, Trash2 } from "lucide-react";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 
-const KATEGORILER = ["Kira", "Elektrik", "Su", "İnternet", "Vergi", "Sigorta", "Malzeme", "Diğer"];
+const DEFAULT_KATEGORILER = ["Kira", "Elektrik", "Su", "İnternet", "Vergi", "Sigorta", "Malzeme", "Diğer"];
+
+function loadKats() {
+  try { return JSON.parse(localStorage.getItem("gider_kategorileri")) || DEFAULT_KATEGORILER; }
+  catch { return DEFAULT_KATEGORILER; }
+}
+function saveKats(cats) {
+  localStorage.setItem("gider_kategorileri", JSON.stringify(cats));
+}
 
 export default function Gider({ user }) {
   const navigate = useNavigate();
@@ -12,7 +20,18 @@ export default function Gider({ user }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [err, setErr] = useState("");
+  const [kategoriler, setKategoriler] = useState(loadKats);
+  const [ozelKategoriMod, setOzelKategoriMod] = useState(false);
   const [form, setForm] = useState({ kategori: "Kira", tutar: "", aciklama: "", tarih: today(), odemeler: null, taksit_sayi: "1", alacakli_adi: "" });
+
+  function kategoriEkle(ad) {
+    const k = ad.trim();
+    if (k && !kategoriler.includes(k)) {
+      const yeni = [...kategoriler, k];
+      setKategoriler(yeni);
+      saveKats(yeni);
+    }
+  }
 
   useEffect(() => { load(); }, []);
 
@@ -33,11 +52,17 @@ export default function Gider({ user }) {
       setErr("Kalan tutar borç yazılacaksa kime borçlanıldığı girilmeli");
       return;
     }
+    if (!form.kategori.trim()) {
+      setErr("Kategori girilmeli");
+      return;
+    }
     try {
       await api.createGider({
         ...form, tutar, odemeler, taksit_sayi: parseInt(form.taksit_sayi) || 1,
       });
+      kategoriEkle(form.kategori);
       setShowForm(false);
+      setOzelKategoriMod(false);
       setForm({ kategori: "Kira", tutar: "", aciklama: "", tarih: today(), odemeler: null, taksit_sayi: "1", alacakli_adi: "" });
       load();
     } catch (e) {
@@ -79,9 +104,25 @@ export default function Gider({ user }) {
             {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
             <div className="form-group">
               <label className="form-label">Kategori</label>
-              <select className="form-select" value={form.kategori} onChange={e => setForm({ ...form, kategori: e.target.value })}>
-                {KATEGORILER.map(k => <option key={k}>{k}</option>)}
-              </select>
+              {ozelKategoriMod ? (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input className="form-input" autoFocus placeholder="Yeni kategori adı"
+                    value={form.kategori} onChange={e => setForm({ ...form, kategori: e.target.value })} />
+                  <button type="button" className="btn btn-ghost btn-sm"
+                    onClick={() => { setOzelKategoriMod(false); setForm(f => ({ ...f, kategori: kategoriler[0] })); }}>
+                    Vazgeç
+                  </button>
+                </div>
+              ) : (
+                <select className="form-select" value={form.kategori}
+                  onChange={e => {
+                    if (e.target.value === "__yeni__") { setOzelKategoriMod(true); setForm(f => ({ ...f, kategori: "" })); }
+                    else setForm({ ...form, kategori: e.target.value });
+                  }}>
+                  {kategoriler.map(k => <option key={k}>{k}</option>)}
+                  <option value="__yeni__">+ Yeni Kategori Ekle</option>
+                </select>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Tutar (₺) *</label>
