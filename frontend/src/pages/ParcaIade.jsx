@@ -15,6 +15,7 @@ const DURUM_META = {
   parca_degisimi: { label: "Parça Değişimi", icon: Repeat, bg: "rgba(94,168,255,0.15)", color: "var(--blue)" },
 };
 const SONUCLANAN_DURUMLAR = ["para_iade_alindi", "reddedildi", "parca_degisimi"];
+const DURUM_SIRASI = ["bekliyor", "gönderildi", "para_iade_alindi", "parca_degisimi", "reddedildi"];
 // "Bekliyor" durumu 7 günü, "Gönderildi" durumu 14 günü geçince unutulmuş
 // sayılır — toptancıya hiç gönderilmemiş ya da haftalarca cevap gelmemiş
 // iadeler için hatırlatma yoktu, listenin dibinde sessizce kaybolabiliyorlardı.
@@ -62,6 +63,7 @@ export default function ParcaIade({ user }) {
   const dolarKuru = dollarRate || 0;
   const [arama, setArama] = useState("");
   const [filtreToptanciId, setFiltreToptanciId] = useState("");
+  const [durumFiltre, setDurumFiltre] = useState("tumu");
 
   async function fetchDollarRate() {
     setKurLoading(true);
@@ -294,6 +296,13 @@ export default function ParcaIade({ user }) {
     return esik && gunSayisiHesapla(ref) > esik;
   }).length;
 
+  // Durumlar önceden hepsi tek bir listede karışık duruyordu — artık her
+  // durum için ayrı sayaçlı çip + ayrı başlıklı bölüm var, bir çipe tıklayınca
+  // sadece o durum gösteriliyor.
+  const durumSayilari = DURUM_SIRASI.reduce((acc, d) => { acc[d] = list.filter(i => i.durum === d).length; return acc; }, {});
+  const gorunenListe = durumFiltre === "tumu" ? list : list.filter(i => i.durum === durumFiltre);
+  const gorunurDurumlar = DURUM_SIRASI.filter(d => durumFiltre === "tumu" || d === durumFiltre);
+
   if (loading) return <div className="loading">Yükleniyor...</div>;
 
   return (
@@ -311,6 +320,39 @@ export default function ParcaIade({ user }) {
           <option value="">Tüm Toptancılar</option>
           {toptancilar.map(t => <option key={t.id} value={t.id}>{t.ad}</option>)}
         </select>
+      </div>
+
+      {/* Durum çipleri — hepsi karışık görünmesin diye, tıklayınca sadece o durum gösterilir */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, overflowX: "auto", paddingBottom: 2 }}>
+        <button onClick={() => setDurumFiltre("tumu")}
+          style={{
+            flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 20,
+            border: "1.5px solid", borderColor: durumFiltre === "tumu" ? "var(--accent)" : "var(--border)",
+            background: durumFiltre === "tumu" ? "rgba(99,102,241,0.12)" : "var(--bg2)",
+            color: durumFiltre === "tumu" ? "var(--accent)" : "var(--hint)",
+            fontWeight: 700, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+          }}>
+          Tümü ({list.length})
+        </button>
+        {DURUM_SIRASI.map(d => {
+          const sayi = durumSayilari[d] || 0;
+          if (sayi === 0) return null;
+          const meta = DURUM_META[d];
+          const DIcon = meta.icon;
+          const secili = durumFiltre === d;
+          return (
+            <button key={d} onClick={() => setDurumFiltre(d)}
+              style={{
+                flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 20,
+                border: "1.5px solid", borderColor: secili ? meta.color : "var(--border)",
+                background: secili ? meta.bg : "var(--bg2)",
+                color: secili ? meta.color : "var(--hint)",
+                fontWeight: 700, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+              }}>
+              <DIcon size={12} strokeWidth={2} /> {meta.label} ({sayi})
+            </button>
+          );
+        })}
       </div>
 
       {bekleyen.length > 0 && (
@@ -616,124 +658,117 @@ export default function ParcaIade({ user }) {
           <div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}><Package size={40} stroke="var(--dim)" strokeWidth={1.5} /></div>
           {arama || filtreToptanciId ? "Aramayla eşleşen iade kaydı yok" : "İade kaydı yok"}
         </div>
+      ) : gorunenListe.length === 0 ? (
+        <div className="empty">
+          <div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}><Package size={40} stroke="var(--dim)" strokeWidth={1.5} /></div>
+          Bu durumda kayıt yok
+        </div>
       ) : (
-        <>
-          {bekleyen.map(i => {
-            const meta = DURUM_META[i.durum] || { label: i.durum, icon: Package, bg: "var(--bg2)", color: "var(--hint)" };
-            const MetaIcon = meta.icon;
-            const referansTarih = i.durum === "gönderildi" ? (i.son_durum_degisiklik_at || i.created_at) : i.created_at;
-            const gunSayisi = gunSayisiHesapla(referansTarih);
-            const esikGun = ESKI_ESIK_GUN[i.durum];
-            const eski = esikGun && gunSayisi > esikGun;
-            return (
-              <div key={i.id} className="card">
-                <div className="card-row">
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{i.parca}</div>
-                    <div style={{ fontSize: 13, color: "var(--hint)" }}>
-                      {i.toptanci_adi ? `${i.toptanci_adi} · ` : ""}{i.miktar} adet
-                      {i.beklenen_tutar > 0 ? ` · ₺${i.beklenen_tutar.toLocaleString("tr-TR")} bekleniyor` : ""}
-                    </div>
-                    {i.sebep && <div style={{ fontSize: 12, color: "var(--hint)" }}>{i.sebep}</div>}
-                    {(i.olusturan_adi || i.son_degistiren_adi) && (
-                      <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
-                        <User size={10} strokeWidth={2} />
-                        {i.durum === "bekliyor"
-                          ? (i.olusturan_adi ? `Ekleyen: ${i.olusturan_adi}` : null)
-                          : (i.son_degistiren_adi ? `Son işlem: ${i.son_degistiren_adi}` : (i.olusturan_adi ? `Ekleyen: ${i.olusturan_adi}` : null))}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{
-                      display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20,
-                      fontSize: 12, fontWeight: 600,
-                      background: meta.bg, color: meta.color,
-                    }}>
-                      <MetaIcon size={12} strokeWidth={2} /> {meta.label}
-                    </div>
-                    {eski && (
-                      <div style={{
-                        display: "flex", alignItems: "center", gap: 4, marginTop: 5, justifyContent: "flex-end",
-                        fontSize: 11, fontWeight: 700, color: "var(--danger)",
-                      }}>
-                        <TriangleAlert size={11} strokeWidth={2} /> {gunSayisi} gündür {i.durum}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                  {i.durum === "bekliyor" && (
-                    <>
-                      <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "gönderildi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <Truck size={13} strokeWidth={2} /> Gönderildi
-                      </button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => duzenle(i)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <Pencil size={13} strokeWidth={2} /> Düzenle
-                      </button>
-                    </>
-                  )}
-                  {i.durum === "gönderildi" && (
-                    <>
-                      <button className="btn btn-primary btn-sm" onClick={() => updateDurum(i.id, "para_iade_alindi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <Banknote size={13} strokeWidth={2} /> Para Alındı
-                      </button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "parca_degisimi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <Repeat size={13} strokeWidth={2} /> Parça Değişimi
-                      </button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "reddedildi")}
-                        style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--red)" }}>
-                        <Ban size={13} strokeWidth={2} /> Reddedildi
-                      </button>
-                    </>
-                  )}
-                  {user?.rol === "patron" && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => setDeleteId(i.id)}
-                      style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--hint)", marginLeft: "auto" }}>
-                      <Trash2 size={13} strokeWidth={2} />
-                    </button>
-                  )}
-                </div>
+        gorunurDurumlar.map(d => {
+          const grupItems = gorunenListe.filter(i => i.durum === d);
+          if (grupItems.length === 0) return null;
+          const meta = DURUM_META[d];
+          const BaslikIcon = meta.icon;
+          const editable = d === "bekliyor" || d === "gönderildi";
+          return (
+            <div key={d}>
+              <div className="section-title" style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 6, color: meta.color }}>
+                <BaslikIcon size={13} strokeWidth={2} /> {meta.label} ({grupItems.length})
               </div>
-            );
-          })}
-          {tamamlanan.length > 0 && (
-            <>
-              <div className="section-title" style={{ marginTop: 16 }}>Sonuçlananlar ({tamamlanan.length})</div>
-              {tamamlanan.map(i => {
-                const meta = DURUM_META[i.durum] || DURUM_META.para_iade_alindi;
-                const MetaIcon = meta.icon;
-                return (
-                  <div key={i.id} className="card" style={{ opacity: 0.75 }}>
-                    <div className="card-row">
-                      <div>
-                        <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
-                          <MetaIcon size={13} stroke={meta.color} strokeWidth={2} /> {i.parca}
-                        </div>
-                        <div style={{ fontSize: 12, color: "var(--hint)" }}>
-                          {i.toptanci_adi ? `${i.toptanci_adi} · ` : ""}{i.miktar} adet
-                          {i.beklenen_tutar > 0 ? ` · ₺${i.beklenen_tutar.toLocaleString("tr-TR")}` : ""}
-                        </div>
-                        {i.son_degistiren_adi && (
-                          <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
-                            <User size={10} strokeWidth={2} /> {i.son_degistiren_adi}
-                          </div>
-                        )}
+              {grupItems.map(i => editable ? (
+                <div key={i.id} className="card">
+                  <div className="card-row">
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{i.parca}</div>
+                      <div style={{ fontSize: 13, color: "var(--hint)" }}>
+                        {i.toptanci_adi ? `${i.toptanci_adi} · ` : ""}{i.miktar} adet
+                        {i.beklenen_tutar > 0 ? ` · ₺${i.beklenen_tutar.toLocaleString("tr-TR")} bekleniyor` : ""}
                       </div>
-                      <div style={{
-                        display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20,
-                        fontSize: 12, fontWeight: 600,
-                        background: meta.bg, color: meta.color,
-                      }}>
-                        <MetaIcon size={12} strokeWidth={2} /> {meta.label}
-                      </div>
+                      {i.sebep && <div style={{ fontSize: 12, color: "var(--hint)" }}>{i.sebep}</div>}
+                      {(i.olusturan_adi || i.son_degistiren_adi) && (
+                        <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                          <User size={10} strokeWidth={2} />
+                          {i.durum === "bekliyor"
+                            ? (i.olusturan_adi ? `Ekleyen: ${i.olusturan_adi}` : null)
+                            : (i.son_degistiren_adi ? `Son işlem: ${i.son_degistiren_adi}` : (i.olusturan_adi ? `Ekleyen: ${i.olusturan_adi}` : null))}
+                        </div>
+                      )}
                     </div>
+                    {(() => {
+                      const referansTarih = i.durum === "gönderildi" ? (i.son_durum_degisiklik_at || i.created_at) : i.created_at;
+                      const gunSayisi = gunSayisiHesapla(referansTarih);
+                      const esikGun = ESKI_ESIK_GUN[i.durum];
+                      const eski = esikGun && gunSayisi > esikGun;
+                      return eski && (
+                        <div style={{
+                          display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                          fontSize: 11, fontWeight: 700, color: "var(--danger)",
+                        }}>
+                          <TriangleAlert size={11} strokeWidth={2} /> {gunSayisi} gündür
+                        </div>
+                      );
+                    })()}
                   </div>
-                );
-              })}
-            </>
-          )}
-        </>
+                  <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                    {i.durum === "bekliyor" && (
+                      <>
+                        <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "gönderildi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <Truck size={13} strokeWidth={2} /> Gönderildi
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => duzenle(i)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <Pencil size={13} strokeWidth={2} /> Düzenle
+                        </button>
+                      </>
+                    )}
+                    {i.durum === "gönderildi" && (
+                      <>
+                        <button className="btn btn-primary btn-sm" onClick={() => updateDurum(i.id, "para_iade_alindi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <Banknote size={13} strokeWidth={2} /> Para Alındı
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "parca_degisimi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <Repeat size={13} strokeWidth={2} /> Parça Değişimi
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "reddedildi")}
+                          style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--red)" }}>
+                          <Ban size={13} strokeWidth={2} /> Reddedildi
+                        </button>
+                      </>
+                    )}
+                    {user?.rol === "patron" && (
+                      <button className="btn btn-ghost btn-sm" onClick={() => setDeleteId(i.id)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--hint)", marginLeft: "auto" }}>
+                        <Trash2 size={13} strokeWidth={2} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div key={i.id} className="card" style={{ opacity: 0.75 }}>
+                  <div className="card-row">
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{i.parca}</div>
+                      <div style={{ fontSize: 12, color: "var(--hint)" }}>
+                        {i.toptanci_adi ? `${i.toptanci_adi} · ` : ""}{i.miktar} adet
+                        {i.beklenen_tutar > 0 ? ` · ₺${i.beklenen_tutar.toLocaleString("tr-TR")}` : ""}
+                      </div>
+                      {i.son_degistiren_adi && (
+                        <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                          <User size={10} strokeWidth={2} /> {i.son_degistiren_adi}
+                        </div>
+                      )}
+                    </div>
+                    {user?.rol === "patron" && i.durum !== "para_iade_alindi" && (
+                      <button className="btn btn-ghost btn-sm" onClick={() => setDeleteId(i.id)}
+                        style={{ display: "flex", color: "var(--hint)", flexShrink: 0 }}>
+                        <Trash2 size={13} strokeWidth={2} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })
       )}
 
       {deleteId && (
