@@ -12,7 +12,7 @@ export const TUM_MODULLER = [
   { icon: Wrench, label: "Tamirler", path: "/repairs", color: "var(--orange)" },
   { icon: Users, label: "Müşteriler", path: "/customers", color: "var(--blue)" },
   { icon: Package, label: "Stok", path: "/parts", color: "var(--purple)" },
-  { icon: Landmark, label: "Kasa", path: "/kasa", color: "var(--green)" },
+  { icon: Landmark, label: "Kasa", path: "/kasa", color: "var(--green)", patronOnly: true },
   { icon: TrendingDown, label: "Giderler", path: "/gider", color: "var(--red)" },
   { icon: Target, label: "Hedef", path: "/hedef", color: "var(--blue)" },
   { icon: CreditCard, label: "Borçlar", path: "/debts", color: "var(--purple)" },

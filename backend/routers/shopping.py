@@ -147,6 +147,14 @@ async def mark_bought(
         except Exception as e:
             stok_mesaj = f"hata:{str(e)}"
 
+    if body.get("bought_price") and float(body["bought_price"]) > 0:
+        await db.execute(
+            """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+               VALUES ($1, $2, 'cikis', 'nakit', $3, $4, 'parca_alim')""",
+            dukkan_id, date.today().isoformat(), float(body["bought_price"]),
+            f"Sipariş alındı: {item.get('part_name', 'Parça')}" + (f" ({body['bought_from']})" if body.get("bought_from") else ""),
+        )
+
     if toptanci_id_log and item:
         try:
             miktar2 = int(body.get("stok_miktar") or item.get("quantity") or 1)

@@ -113,7 +113,7 @@ export default function Sidebar({ dukkanAdi, user }) {
         {dukkanAdi || "Telefon Servis"}
       </div>
       <Grup items={ANA} pathname={pathname} navigate={navigate} rozetler={rozetler} />
-      <Grup label="Finans" items={FINANS} pathname={pathname} navigate={navigate} />
+      <Grup label="Finans" items={user?.rol === "patron" ? FINANS : FINANS.filter(i => i.path !== "/kasa")} pathname={pathname} navigate={navigate} />
       <Grup label="Satış & Stok" items={SATIS_STOK} pathname={pathname} navigate={navigate} />
       <Grup label="Müşteri" items={MUSTERI} pathname={pathname} navigate={navigate} />
       <Grup label="Mağaza" items={MAGAZA} pathname={pathname} navigate={navigate} />

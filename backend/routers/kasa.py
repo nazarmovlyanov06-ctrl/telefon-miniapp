@@ -50,6 +50,8 @@ async def belirli_gun(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
+    if user["rol"] != "patron":
+        raise HTTPException(403, "Sadece patron")
     return await _gun_ozet(db, dukkan_id, tarih)
 
 
@@ -60,6 +62,8 @@ async def manuel_hareket(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
+    if user["rol"] != "patron":
+        raise HTTPException(403, "Sadece patron")
     row = await db.fetchrow(
         """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id""",
@@ -83,6 +87,8 @@ async def kasa_ozet(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
+    if user["rol"] != "patron":
+        raise HTTPException(403, "Sadece patron")
     today = date.today()
 
     if periyot == "ozel" and baslangic_q and bitis_q:

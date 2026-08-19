@@ -6,20 +6,24 @@ import { siraOku, altMenuAdediOku, degisimiDinle } from "../altMenuAyarlari";
 
 const HIDE_ON = ["/ai", "/search"];
 
-function ortaModulleriOku() {
+function ortaModulleriOku(patron) {
   const sira = siraOku();
   const adet = altMenuAdediOku();
-  return sira.slice(0, adet)
+  return sira
     .map(p => TUM_MODULLER.find(m => m.path === p))
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter(m => patron || !m.patronOnly)
+    .slice(0, adet);
 }
 
-export default function BottomNav() {
+export default function BottomNav({ user }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [orta, setOrta] = useState(ortaModulleriOku);
+  const patron = user?.rol === "patron";
+  const [orta, setOrta] = useState(() => ortaModulleriOku(patron));
 
-  useEffect(() => degisimiDinle(() => setOrta(ortaModulleriOku())), []);
+  useEffect(() => setOrta(ortaModulleriOku(patron)), [patron]);
+  useEffect(() => degisimiDinle(() => setOrta(ortaModulleriOku(patron))), [patron]);
 
   if (HIDE_ON.includes(pathname)) return null;
 

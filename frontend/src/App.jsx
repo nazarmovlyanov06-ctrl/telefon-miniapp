@@ -146,7 +146,7 @@ function AppRoutes({ user }) {
         <Route path="/toptanci" element={<Toptanci />} />
         <Route path="/ikinciel" element={<IkinciEl user={user} />} />
         <Route path="/garanti" element={<Garanti />} />
-        <Route path="/kasa" element={<Kasa />} />
+        <Route path="/kasa" element={user?.rol === "patron" ? <Kasa /> : <Navigate to="/" replace />} />
         <Route path="/gider" element={<Gider />} />
         <Route path="/loaner" element={<Loaner />} />
         <Route path="/aksesuar" element={<Aksesuar user={user} />} />
@@ -167,7 +167,7 @@ function AppRoutes({ user }) {
         <Route path="/vitrin-takas" element={<VitrinTakas />} />
         <Route path="/musteri-mesajlari" element={<MusteriMesajlari />} />
       </Routes>
-      <BottomNav />
+      <BottomNav user={user} />
     </NavShell>
   );
 }

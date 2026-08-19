@@ -108,7 +108,10 @@ export default function More({ user }) {
     setDuzenleMod(false);
   }
 
-  const modullerHaritasi = Object.fromEntries(TUM_MODULLER.map(m => [m.path, m]));
+  const patron = user?.rol === "patron";
+  const modullerHaritasi = Object.fromEntries(
+    TUM_MODULLER.filter(m => patron || !m.patronOnly).map(m => [m.path, m])
+  );
   const gosterilecekSira = duzenleMod ? sira : sira.slice(altMenuAdedi);
 
   return (
