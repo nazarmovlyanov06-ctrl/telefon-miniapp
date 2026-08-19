@@ -432,6 +432,12 @@ body {
   box-shadow: var(--edge-lit), var(--edge-dark), var(--lift) !important;
   backdrop-filter: none !important;
   color: var(--text) !important;
+  animation: backBtnSoluk 2.4s ease-in-out infinite;
+}
+.back-btn-pulse:active { opacity: 1 !important; animation: none; }
+@keyframes backBtnSoluk {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.85; }
 }
 
 .ac-dropdown {
