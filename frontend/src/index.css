@@ -266,6 +266,10 @@ body {
 .nav-icon { font-size: 21px; line-height: 1; display: flex; }
 .nav-icon svg { width: 21px; height: 21px; }
 
+/* Alt menüde 5'ten fazla öğe varsa eşit-genişlik yerine yatay kaydırma */
+.bottom-nav-scroll { overflow-x: auto; justify-content: flex-start; }
+.bottom-nav-scroll .nav-item { flex: 0 0 64px; }
+
 /* ── Masaüstü kenar menü ─────────────────────────────────── */
 
 .sidebar {

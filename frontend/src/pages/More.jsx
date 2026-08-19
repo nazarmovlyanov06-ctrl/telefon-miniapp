@@ -2,55 +2,84 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { api, setToken } from "../api";
 import {
-  Landmark, TrendingDown, Target, CreditCard,
-  Smartphone, Headphones, Factory, Undo2,
-  ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
-  Banknote, BarChart3, ScanLine, Settings, LogOut, LifeBuoy, Megaphone, X,
-  Store, CalendarClock, Star, Repeat, MessageCircle,
+  LogOut, Megaphone, X,
+  SlidersHorizontal, Check, GripVertical, Minus, Plus,
 } from "lucide-react";
-
-const ITEMS = [
-  // Finans
-  { icon: Landmark, label: "Kasa", path: "/kasa", color: "var(--green)" },
-  { icon: TrendingDown, label: "Giderler", path: "/gider", color: "var(--red)" },
-  { icon: Target, label: "Hedef", path: "/hedef", color: "var(--blue)" },
-  { icon: CreditCard, label: "Borçlar", path: "/debts", color: "var(--purple)" },
-  // Satış & Stok
-  { icon: Smartphone, label: "2. El", path: "/ikinciel", color: "var(--green)" },
-  { icon: Headphones, label: "Aksesuar", path: "/aksesuar", color: "var(--orange)" },
-  // Tedarik & İade
-  { icon: Factory, label: "Toptancı", path: "/toptanci", color: "var(--blue)" },
-  { icon: Undo2, label: "Parça İade", path: "/parca-iade", color: "var(--gold)" },
-  // Müşteri
-  { icon: ShieldCheck, label: "Garanti", path: "/garanti", color: "var(--green)" },
-  { icon: PhoneCall, label: "Yedek Tel", path: "/loaner", color: "var(--blue)" },
-  { icon: Ban, label: "Kara Liste", path: "/karalist", color: "var(--red)" },
-  { icon: MessageSquareWarning, label: "Şikayet/Övgü", path: "/geri-bildirim", color: "var(--orange)", badge: true },
-  // Mağaza
-  { icon: Store, label: "Vitrin Ayarları", path: "/vitrin-ayarlari", color: "var(--gold)" },
-  { icon: CalendarClock, label: "Randevu Talepleri", path: "/randevu-talepleri", color: "var(--blue)" },
-  { icon: Star, label: "Değerlendirmeler", path: "/vitrin-degerlendirme", color: "var(--orange)" },
-  { icon: Repeat, label: "Takas Teklifleri", path: "/vitrin-takas", color: "var(--blue2)" },
-  { icon: MessageCircle, label: "Müşteri Mesajları", path: "/musteri-mesajlari", color: "var(--green)" },
-  // Çalışan
-  { icon: Banknote, label: "Maaş", path: "/maas", color: "var(--purple)" },
-  // Araçlar
-  { icon: BarChart3, label: "İstatistik", path: "/stats", color: "var(--gold)" },
-  { icon: ScanLine, label: "IMEI", path: "/imei", color: "var(--gray)" },
-  { icon: LifeBuoy, label: "Destek", path: "/destek", color: "var(--blue2)" },
-  { icon: Settings, label: "Ayarlar", path: "/settings", color: "var(--gray)" },
-];
+import { TUM_MODULLER } from "../moduleCatalog";
+import {
+  siraOku, siraYaz, altMenuAdediOku, altMenuAdediYaz,
+  ALT_MENU_MIN, ALT_MENU_MAX,
+} from "../altMenuAyarlari";
+import useSurukleSirala from "../useSurukleSirala";
 
 const ROLE_LABELS = {
   patron: "Patron", teknisyen: "Teknisyen",
   satis: "Satış", cirak: "Çırak", super_admin: "Süper Admin",
 };
 
+function ModulKarti({ mod, altMenude, kilitli, titriyor, suruklenen, gecikme, refCallback, onBasBasla, onClick, bildirimSayisi }) {
+  const Icon = mod.icon;
+  const sinif = suruklenen === mod.path ? "dash-blok-suruklenen" : titriyor ? "dash-blok-titriyor" : "";
+  return (
+    <div
+      ref={refCallback}
+      onPointerDown={kilitli ? undefined : (e) => onBasBasla(e, mod.path)}
+      className={kilitli ? "" : "dash-blok-sarmal"}
+      style={{ touchAction: kilitli ? "auto" : "none" }}
+    >
+      <div className={sinif} style={{ animationDelay: gecikme }}>
+        <div onClick={onClick}
+          style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 7, cursor: "pointer", pointerEvents: (!kilitli && titriyor) ? "none" : "auto",
+          }}>
+          <div style={{ position: "relative", width: 50, height: 50 }}>
+            <div style={{
+              position: "absolute", inset: 0, borderRadius: 14,
+              background: mod.color, filter: "blur(12px)", opacity: 0.3,
+              transform: "translateY(5px) scale(1.06)",
+            }} />
+            <div style={{
+              position: "relative", width: 50, height: 50, borderRadius: 14,
+              background: "linear-gradient(135deg, var(--surf-hi), var(--surf-lo))",
+              boxShadow: altMenude
+                ? "0 0 0 1.5px var(--gold), var(--edge-lit), var(--edge-dark), var(--lift)"
+                : "var(--edge-lit), var(--edge-dark), var(--lift)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Icon size={20} stroke={mod.color} strokeWidth={1.8} />
+              {mod.badge && bildirimSayisi > 0 && (
+                <div style={{
+                  position: "absolute", top: -4, right: -4,
+                  background: "var(--red)", color: "#191b20",
+                  borderRadius: "50%", width: 17, height: 17,
+                  fontSize: 10, fontWeight: 800,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 0 0 2px var(--bg)",
+                }}>
+                  {bildirimSayisi}
+                </div>
+              )}
+            </div>
+          </div>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--title)", textAlign: "center", lineHeight: 1.2 }}>
+            {mod.label}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function More({ user }) {
   const navigate = useNavigate();
   const [bildirimSayisi, setBildirimSayisi] = useState(0);
   const [duyurular, setDuyurular] = useState([]);
-  const items = ITEMS;
+  const [duzenleMod, setDuzenleMod] = useState(false);
+  const [altMenuAdedi, setAltMenuAdediState] = useState(altMenuAdediOku);
+
+  const { sira, setSira, titriyor, suruklenen, refs, basBasla, disariCik } =
+    useSurukleSirala(siraOku(), (yeni) => siraYaz(yeni));
 
   useEffect(() => {
     api.geriBildirimBekleyen().then(r => setBildirimSayisi(r.bekleyen || 0)).catch(() => {});
@@ -67,6 +96,20 @@ export default function More({ user }) {
     api.destekDuyuruGorundu(id).catch(() => {});
     setDuyurular(d => d.filter(x => x.id !== id));
   }
+
+  function adediDegistir(delta) {
+    const yeni = Math.min(Math.max(altMenuAdedi + delta, ALT_MENU_MIN), ALT_MENU_MAX);
+    setAltMenuAdediState(yeni);
+    altMenuAdediYaz(yeni);
+  }
+
+  function duzenlemeyiBitir() {
+    disariCik();
+    setDuzenleMod(false);
+  }
+
+  const modullerHaritasi = Object.fromEntries(TUM_MODULLER.map(m => [m.path, m]));
+  const gosterilecekSira = duzenleMod ? sira : sira.slice(altMenuAdedi);
 
   return (
     <div className="page" style={{ paddingBottom: 90 }}>
@@ -106,48 +149,68 @@ export default function More({ user }) {
         </div>
       )}
 
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div className="section-title" style={{ margin: 0 }}>Modüller</div>
+        {duzenleMod ? (
+          <button onClick={duzenlemeyiBitir}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--green)", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, padding: "4px 6px" }}>
+            <Check size={13} strokeWidth={2.4} /> Bitti
+          </button>
+        ) : (
+          <button onClick={() => setDuzenleMod(true)}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, padding: "4px 6px" }}>
+            <SlidersHorizontal size={12} strokeWidth={2} /> Düzenle
+          </button>
+        )}
+      </div>
+
+      {duzenleMod && (
+        <div style={{ fontSize: 11.5, color: "var(--hint)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+          <GripVertical size={13} strokeWidth={2} />
+          Basılı tutup sürükleyin — çizginin üstüne taşırsanız alt menüye girer
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        {items.map(item => {
-          const Icon = item.icon;
-          return (
-            <div key={item.path} onClick={() => navigate(item.path)}
-              style={{
-                display: "flex", flexDirection: "column", alignItems: "center",
-                gap: 7, cursor: "pointer", userSelect: "none",
-              }}
-            >
-              <div style={{ position: "relative", width: 50, height: 50 }}>
-                <div style={{
-                  position: "absolute", inset: 0, borderRadius: 14,
-                  background: item.color, filter: "blur(12px)", opacity: 0.3,
-                  transform: "translateY(5px) scale(1.06)",
-                }} />
-                <div style={{
-                  position: "relative", width: 50, height: 50, borderRadius: 14,
-                  background: "linear-gradient(135deg, var(--surf-hi), var(--surf-lo))",
-                  boxShadow: "var(--edge-lit), var(--edge-dark), var(--lift)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
+        {gosterilecekSira.map((path, i) => {
+          const mod = modullerHaritasi[path];
+          if (!mod) return null;
+          const cizgidenSonra = duzenleMod && i === altMenuAdedi;
+          return [
+              cizgidenSonra && (
+                <div key={`${path}-cizgi`} style={{
+                  gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10,
+                  margin: "4px 0", padding: "6px 0", borderTop: "1.5px dashed var(--gold)",
                 }}>
-                  <Icon size={20} stroke={item.color} strokeWidth={1.8} />
-                  {item.badge && bildirimSayisi > 0 && (
-                    <div style={{
-                      position: "absolute", top: -4, right: -4,
-                      background: "var(--red)", color: "#191b20",
-                      borderRadius: "50%", width: 17, height: 17,
-                      fontSize: 10, fontWeight: 800,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      boxShadow: "0 0 0 2px var(--bg)",
-                    }}>
-                      {bildirimSayisi}
-                    </div>
-                  )}
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--gold)", whiteSpace: "nowrap" }}>
+                    ↑ ALT MENÜDE ({altMenuAdedi})
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                    <button onClick={() => adediDegistir(-1)} disabled={altMenuAdedi <= ALT_MENU_MIN}
+                      style={{ width: 22, height: 22, borderRadius: 6, border: "1px solid var(--divider)", background: "transparent", color: "var(--hint)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Minus size={11} strokeWidth={2.4} />
+                    </button>
+                    <button onClick={() => adediDegistir(1)} disabled={altMenuAdedi >= ALT_MENU_MAX}
+                      style={{ width: 22, height: 22, borderRadius: 6, border: "1px solid var(--divider)", background: "transparent", color: "var(--hint)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Plus size={11} strokeWidth={2.4} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--title)", textAlign: "center", lineHeight: 1.2 }}>
-                {item.label}
-              </span>
-            </div>
-          );
+              ),
+              <ModulKarti
+                key={path}
+                mod={mod}
+                altMenude={duzenleMod && i < altMenuAdedi}
+                kilitli={!duzenleMod}
+                titriyor={titriyor}
+                suruklenen={suruklenen}
+                gecikme={titriyor && suruklenen !== path ? (i % 2 === 0 ? "0s" : "-0.15s") : undefined}
+                refCallback={el => { refs.current[path] = el; }}
+                onBasBasla={basBasla}
+                onClick={() => !titriyor && navigate(mod.path)}
+                bildirimSayisi={bildirimSayisi}
+              />,
+            ];
         })}
       </div>
     </div>
