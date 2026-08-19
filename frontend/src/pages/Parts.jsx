@@ -707,13 +707,24 @@ export default function Parts({ user }) {
                     <div className="list-item-body" style={{ cursor: "pointer" }} onClick={() => openPanel(p, "ekle")}>
                       <div className="list-item-title">{p.name}</div>
                       <div className="list-item-sub">
-                        {p.device_model} · {p.part_type}
-                        {(p.purchase_price || p.sale_price) && (
-                          priceHidden ? " · Alış: •••₺ · Satış: •••₺" :
-                          ` · Alış: ${(p.purchase_price || 0).toLocaleString("tr-TR")}₺ · Satış: ${p.sale_price ? p.sale_price.toLocaleString("tr-TR") + "₺" : "—"}`
-                        )}
-                        {p.toptanci_adi ? ` · ${p.toptanci_adi}` : ""}
+                        {p.device_model} · {p.part_type}{p.toptanci_adi ? ` · ${p.toptanci_adi}` : ""}
                       </div>
+                      {(p.purchase_price || p.sale_price) && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 4 }}>
+                          {p.purchase_price > 0 && (
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 6,
+                              background: "rgba(94,168,255,0.12)", color: "var(--blue)" }}>
+                              Alış {priceHidden ? "•••" : `${p.purchase_price.toLocaleString("tr-TR")}₺`}
+                            </span>
+                          )}
+                          {p.sale_price > 0 && (
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 6,
+                              background: "rgba(74,222,128,0.12)", color: "var(--success)" }}>
+                              Satış {priceHidden ? "•••" : `${p.sale_price.toLocaleString("tr-TR")}₺`}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ textAlign: "right" }}>
