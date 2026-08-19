@@ -4,7 +4,7 @@ import { api } from "../api";
 import {
   User, Pencil, CircleX, Phone, FileText, Calendar,
   Wrench, Banknote, CalendarCheck, CreditCard, Smartphone, Package,
-  FileClock, CheckCircle2, Home,
+  FileClock, CheckCircle2, Home, X, ArrowRight,
 } from "lucide-react";
 
 const STATUS_LABEL = {
@@ -34,6 +34,32 @@ function fmtDateTime(d) {
   return dt.toLocaleDateString("tr-TR") + " " + dt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function OzetPencere({ baslik, ikon: Ikon, renk, children, onClose, onTumu }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      onClick={onClose}>
+      <div className="card" style={{ width: "100%", maxWidth: 480, margin: "0 auto", borderRadius: "20px 20px 0 0", maxHeight: "78vh", overflowY: "auto" }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <span style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 8, color: renk }}>
+            <Ikon size={16} strokeWidth={2} /> {baslik}
+          </span>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--hint)", cursor: "pointer", display: "flex" }}>
+            <X size={18} strokeWidth={2} />
+          </button>
+        </div>
+        {children}
+        {onTumu && (
+          <button className="btn btn-ghost btn-sm" onClick={onTumu}
+            style={{ width: "100%", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            Tümünü Gör <ArrowRight size={13} strokeWidth={2.4} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -46,6 +72,12 @@ export default function CustomerDetail() {
   const [form, setForm] = useState({ name: "", phone: "", notes: "" });
   const [err, setErr] = useState("");
   const [tab, setTab] = useState("ziyaretler");
+  const [ozetAcik, setOzetAcik] = useState(null); // "ziyaret" | "tamir" | "harcama" | "bakiye" | null
+
+  function ozetTumunuGor(hedefTab) {
+    setOzetAcik(null);
+    setTab(hedefTab);
+  }
 
   useEffect(() => { load(); }, [id]);
 
@@ -142,12 +174,13 @@ export default function CustomerDetail() {
       {/* Özet */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginBottom: 12 }}>
         {[
-          { val: ziyaretSayisi, label: "Ziyaret", color: "var(--accent)" },
-          { val: repairs.length, label: "Tamir", color: "var(--text)" },
-          { val: `${totalRepairs.toLocaleString("tr-TR")}₺`, label: "Harcama", color: "var(--text)" },
-          { val: `${Math.abs(totalDebt).toLocaleString("tr-TR")}₺`, label: totalDebt > 0 ? "Borç" : "Bakiye", color: totalDebt > 0 ? "var(--red)" : "var(--success)" },
+          { key: "ziyaret", val: ziyaretSayisi, label: "Ziyaret", color: "var(--accent)" },
+          { key: "tamir", val: repairs.length, label: "Tamir", color: "var(--text)" },
+          { key: "harcama", val: `${totalRepairs.toLocaleString("tr-TR")}₺`, label: "Harcama", color: "var(--text)" },
+          { key: "bakiye", val: `${Math.abs(totalDebt).toLocaleString("tr-TR")}₺`, label: totalDebt > 0 ? "Borç" : "Bakiye", color: totalDebt > 0 ? "var(--red)" : "var(--success)" },
         ].map(s => (
-          <div key={s.label} className="card" style={{ textAlign: "center", margin: 0, padding: "10px 4px" }}>
+          <div key={s.label} className="card" onClick={() => setOzetAcik(s.key)}
+            style={{ textAlign: "center", margin: 0, padding: "10px 4px", cursor: "pointer" }}>
             <div style={{ fontWeight: 700, fontSize: 15, color: s.color }}>{s.val}</div>
             <div style={{ fontSize: 10, color: "var(--hint)", marginTop: 2 }}>{s.label}</div>
           </div>
@@ -326,6 +359,86 @@ export default function CustomerDetail() {
             </div>
           );
         })
+      )}
+
+      {/* Özet kartları — Ziyaret/Tamir/Harcama/Bakiye tıklanınca küçük pencere */}
+      {ozetAcik === "ziyaret" && (
+        <OzetPencere baslik="Ziyaretler" ikon={CalendarCheck} renk="var(--accent)"
+          onClose={() => setOzetAcik(null)} onTumu={() => ozetTumunuGor("ziyaretler")}>
+          {gecmis.length === 0 ? (
+            <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Henüz ziyaret yok</div>
+          ) : gecmis.slice(0, 8).map((ev, i) => {
+            const t = TUR_LABEL[ev.tur] || { label: ev.tur, color: "var(--hint)" };
+            return (
+              <div key={i} className="card-row" style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{ev.baslik}</div>
+                  <div style={{ fontSize: 11, color: t.color, marginTop: 2 }}>{t.label} · {fmt(ev.tarih)}</div>
+                </div>
+                {ev.tutar ? <span style={{ fontWeight: 700, fontSize: 13 }}>{Number(ev.tutar).toLocaleString("tr-TR")}₺</span> : null}
+              </div>
+            );
+          })}
+        </OzetPencere>
+      )}
+
+      {ozetAcik === "tamir" && (
+        <OzetPencere baslik="Tamirler" ikon={Wrench} renk="var(--blue)"
+          onClose={() => setOzetAcik(null)} onTumu={() => ozetTumunuGor("tamirler")}>
+          {repairs.length === 0 ? (
+            <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Tamir kaydı yok</div>
+          ) : repairs.slice(0, 8).map((r, i) => (
+            <div key={r.id} className="card-row" style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>#{r.repair_no} · {r.device_model}</div>
+                <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>{fmt(r.created_at)}</div>
+              </div>
+              <span className={`badge badge-${r.status}`}>{STATUS_LABEL[r.status] || r.status}</span>
+            </div>
+          ))}
+        </OzetPencere>
+      )}
+
+      {ozetAcik === "harcama" && (
+        <OzetPencere baslik="Harcama Dökümü" ikon={Banknote} renk="var(--orange)"
+          onClose={() => setOzetAcik(null)} onTumu={() => ozetTumunuGor("tamirler")}>
+          <div style={{ fontWeight: 300, fontSize: 24, color: "var(--orange)", letterSpacing: -0.5, marginBottom: 12 }}>
+            {totalRepairs.toLocaleString("tr-TR")}₺
+          </div>
+          {repairs.filter(r => r.final_price || r.estimated_price).length === 0 ? (
+            <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Ücretli tamir yok</div>
+          ) : repairs.filter(r => r.final_price || r.estimated_price).slice(0, 8).map((r, i) => (
+            <div key={r.id} className="card-row" style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>#{r.repair_no} · {r.device_model}</div>
+                <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>{fmt(r.created_at)}{!r.final_price ? " · tahmini" : ""}</div>
+              </div>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>{(r.final_price || r.estimated_price).toLocaleString("tr-TR")}₺</span>
+            </div>
+          ))}
+        </OzetPencere>
+      )}
+
+      {ozetAcik === "bakiye" && (
+        <OzetPencere baslik={totalDebt > 0 ? "Borçlar" : "Bakiye"} ikon={CreditCard} renk={totalDebt > 0 ? "var(--red)" : "var(--success)"}
+          onClose={() => setOzetAcik(null)} onTumu={() => ozetTumunuGor("borclar")}>
+          {debts.length === 0 ? (
+            <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Borç kaydı yok</div>
+          ) : debts.slice(0, 8).map((d, i) => {
+            const kalan = (d.total_amount || d.amount || 0) - (d.paid_amount || d.paid || 0);
+            return (
+              <div key={d.id} className="card-row" style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{d.description || d.notes || "Borç"}</div>
+                  <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>{fmt(d.created_at)}{d.due_date ? ` · Vade: ${d.due_date}` : ""}</div>
+                </div>
+                <span style={{ fontWeight: 700, fontSize: 13, color: kalan > 0 ? "var(--red)" : "var(--success)" }}>
+                  {kalan.toLocaleString("tr-TR")}₺
+                </span>
+              </div>
+            );
+          })}
+        </OzetPencere>
       )}
     </div>
   );
