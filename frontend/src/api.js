@@ -164,6 +164,7 @@ export const api = {
   kullanPart: (id, data) => post(`/parts/${id}/kullan`, data),
   stokEkle: (id, data) => post(`/parts/${id}/stok-ekle`, data),
   partHareketler: (id) => get(`/parts/${id}/hareketler`),
+  tumHareketler: () => get(`/parts/hareketler/tumu`),
   orders: () => get("/parts/orders/"),
   createOrder: (data) => post("/parts/orders/", data),
   markArrived: (id) => put(`/parts/orders/${id}/arrive`, {}),

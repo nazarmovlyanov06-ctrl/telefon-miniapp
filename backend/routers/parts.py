@@ -59,6 +59,11 @@ async def create_part(
         db, dukkan_id, body.get("toptanci_id"), body["name"],
         body.get("quantity", 0), body.get("purchase_price"),
     )
+    await db.execute(
+        """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, tarih, created_by)
+           VALUES ($1, $2, 'giris', $3, 'yeni_parca', $4, $5)""",
+        dukkan_id, row["id"], body.get("quantity", 0), date.today().isoformat(), user["id"],
+    )
     return {"id": row["id"]}
 
 
@@ -149,7 +154,7 @@ async def stok_ekle(
             )
         await db.execute(
             """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
-               VALUES ($1, $2, 'giris', $3, 'satin_alma', $4, $5, $6)""",
+               VALUES ($1, $2, 'giris', $3, 'stok_girisi', $4, $5, $6)""",
             dukkan_id, part_id, miktar, body.get("aciklama"), date.today().isoformat(), user["id"],
         )
         await _toptanci_alis_kaydet(db, dukkan_id, toptanci_id, part["name"], miktar, fiyat)
@@ -184,6 +189,30 @@ async def kullan_part(
             date.today().isoformat(), user["id"],
         )
     return {"ok": True, "kalan": part["quantity"] - miktar}
+
+
+@router.get("/hareketler/tumu")
+async def tum_hareketler(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Stok & Siparişler > Geçmiş sekmesi — daha önce sadece sipariş
+    listesinden 'Aldım' ile tamamlananları gösteriyordu; yeni parça
+    eklendiğinde veya doğrudan stok girildiğinde hiç görünmüyordu.
+    Artık parts tablosundaki TÜM giriş hareketlerini (yeni parça / stok
+    girişi / siparişten alındı) tek listede gösteriyor."""
+    rows = await db.fetch(
+        """SELECT h.id, h.part_id, h.miktar, h.sebep, h.aciklama, h.tarih, h.created_at,
+                  p.name as part_name, p.device_model, u.ad as yapan_adi
+           FROM stok_hareketleri h
+           JOIN parts p ON p.id = h.part_id
+           LEFT JOIN kullanicilar u ON u.id = h.created_by
+           WHERE h.dukkan_id=$1 AND h.hareket='giris'
+           ORDER BY h.created_at DESC LIMIT 100""",
+        dukkan_id,
+    )
+    return [dict(r) for r in rows]
 
 
 @router.get("/{part_id}/hareketler")

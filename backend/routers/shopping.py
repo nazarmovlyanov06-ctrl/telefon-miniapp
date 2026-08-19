@@ -123,7 +123,7 @@ async def mark_bought(
             if part_id_log:
                 await db.execute(
                     """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
-                       VALUES ($1, $2, 'giris', $3, 'satin_alma', $4, $5, $6)""",
+                       VALUES ($1, $2, 'giris', $3, 'siparis_alindi', $4, $5, $6)""",
                     dukkan_id, part_id_log, miktar, body.get("bought_from"),
                     date.today().isoformat(), user["id"],
                 )

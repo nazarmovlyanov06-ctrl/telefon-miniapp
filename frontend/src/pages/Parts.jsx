@@ -16,6 +16,12 @@ const TABS = [
   { key: "gecmis", label: "Geçmiş" },
 ];
 
+const GECMIS_ETIKET = {
+  yeni_parca: { label: "Yeni Eklendi", color: "var(--success)" },
+  stok_girisi: { label: "Stok Girildi", color: "var(--blue)" },
+  siparis_alindi: { label: "Siparişten Alındı", color: "var(--accent)" },
+};
+
 const PARCA_TURLERI_VARSAYILAN = [
   "Ekran", "Batarya", "Entegre", "Şarj Soketi", "Arka Kapak",
   "Kamera", "Hoparlör", "Mikrofon", "Diğer",
@@ -68,6 +74,7 @@ export default function Parts({ user }) {
   const [matchingParts, setMatchingParts] = useState([]);
   const [boughtExistingId, setBoughtExistingId] = useState(null);
   const [gecmisQ, setGecmisQ] = useState("");
+  const [tumHareketler, setTumHareketler] = useState([]);
   const [ekleDolarMode, setEkleDolarMode] = useState(false);
   const [ekleDolarMiktar, setEkleDolarMiktar] = useState("");
 
@@ -127,6 +134,8 @@ export default function Parts({ user }) {
       if (q) params.q = q;
       if (lowStock) params.low_stock = true;
       api.parts(params).then(setParts).finally(() => setLoading(false));
+    } else if (tab === "gecmis") {
+      api.tumHareketler().then(setTumHareketler).finally(() => setLoading(false));
     } else {
       api.shopping().then(setShopping).finally(() => setLoading(false));
     }
@@ -690,7 +699,10 @@ export default function Parts({ user }) {
           {loading ? <div className="loading">Yükleniyor...</div> : (() => {
             function renderPart(p) {
               const isSelected = selectedPart?.id === p.id;
-              const SEBEP_LABEL = { tamir: "Tamire", satis: "Satış", hasar: "Hasar", diger: "Diğer", satin_alma: "Satın Alındı" };
+              const SEBEP_LABEL = {
+                tamir: "Tamire", satis: "Satış", hasar: "Hasar", diger: "Diğer",
+                yeni_parca: "Yeni Eklendi", stok_girisi: "Stok Girildi", siparis_alindi: "Siparişten Alındı",
+              };
               const PartIcon = partTypeIcon(p.part_type);
               return (
                 <div key={p.id}>
@@ -1255,42 +1267,49 @@ export default function Parts({ user }) {
         </>
       )}
 
-      {/* GEÇMİŞ TAB — alisveris_listesi alındı */}
-      {tab === "gecmis" && (
-        <>
-          <div className="search-bar" style={{ marginBottom: 10 }}>
-            <input className="search-input" placeholder="Geçmişte ara..." value={gecmisQ} onChange={e => setGecmisQ(e.target.value)} />
-          </div>
-          {loading ? <div className="loading">Yükleniyor...</div> :
-            shopping.alindi.filter(i =>
-              !gecmisQ || i.part_name.toLowerCase().includes(gecmisQ.toLowerCase()) ||
-              (i.device_model || "").toLowerCase().includes(gecmisQ.toLowerCase()) ||
-              (i.bought_from || "").toLowerCase().includes(gecmisQ.toLowerCase())
-            ).length === 0 ? (
-              <div className="empty"><div className="empty-icon" style={{display:"flex",justifyContent:"center"}}><CheckCircle2 size={40} stroke="var(--dim)" strokeWidth={1.5}/></div>Henüz alınan parça yok</div>
-            ) : shopping.alindi.filter(i =>
-              !gecmisQ || i.part_name.toLowerCase().includes(gecmisQ.toLowerCase()) ||
-              (i.device_model || "").toLowerCase().includes(gecmisQ.toLowerCase()) ||
-              (i.bought_from || "").toLowerCase().includes(gecmisQ.toLowerCase())
-            ).map((item) => (
-              <div key={item.id} className="list-item" style={{ opacity: 0.9 }}>
-                <div className="list-item-body">
-                  <div className="list-item-title" style={{ display: "flex", alignItems: "center", gap: 7 }}><CheckCircle2 size={14} strokeWidth={2} /> {item.part_name}</div>
-                  <div className="list-item-sub">
-                    {item.device_model ? `${item.device_model} · ` : ""}
-                    {item.bought_from || "Toptancı belirtilmedi"}
-                    {item.bought_price ? ` · ₺${item.bought_price}` : ""}
+      {/* GEÇMİŞ TAB — tüm stok giriş hareketleri: yeni parça / stok girişi / siparişten alındı */}
+      {tab === "gecmis" && (() => {
+        const filtreli = tumHareketler.filter(h =>
+          !gecmisQ || h.part_name.toLowerCase().includes(gecmisQ.toLowerCase()) ||
+          (h.device_model || "").toLowerCase().includes(gecmisQ.toLowerCase()) ||
+          (GECMIS_ETIKET[h.sebep]?.label || "").toLowerCase().includes(gecmisQ.toLowerCase())
+        );
+        return (
+          <>
+            <div className="search-bar" style={{ marginBottom: 10 }}>
+              <input className="search-input" placeholder="Geçmişte ara..." value={gecmisQ} onChange={e => setGecmisQ(e.target.value)} />
+            </div>
+            {loading ? <div className="loading">Yükleniyor...</div> :
+              filtreli.length === 0 ? (
+                <div className="empty"><div className="empty-icon" style={{display:"flex",justifyContent:"center"}}><CheckCircle2 size={40} stroke="var(--dim)" strokeWidth={1.5}/></div>Henüz stok hareketi yok</div>
+              ) : filtreli.map((h) => {
+                const etiket = GECMIS_ETIKET[h.sebep] || { label: h.sebep, color: "var(--hint)" };
+                return (
+                  <div key={h.id} className="list-item" style={{ opacity: 0.9 }}>
+                    <div className="list-item-body">
+                      <div className="list-item-title">{h.part_name}</div>
+                      <div className="list-item-sub">
+                        {h.device_model ? `${h.device_model} · ` : ""}{h.yapan_adi || "—"}
+                      </div>
+                      <span style={{
+                        display: "inline-block", marginTop: 4, fontSize: 11, fontWeight: 600,
+                        padding: "2px 7px", borderRadius: 6,
+                        background: `${etiket.color}22`, color: etiket.color,
+                      }}>
+                        {etiket.label}
+                      </span>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>×{h.miktar}</div>
+                      <div style={{ fontSize: 11, color: "var(--hint)" }}>{relativeGun(h.created_at)}</div>
+                    </div>
                   </div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>×{item.quantity}</div>
-                  <div style={{ fontSize: 11, color: "var(--hint)" }}>{relativeGun(item.bought_at)}</div>
-                </div>
-              </div>
-            ))
-          }
-        </>
-      )}
+                );
+              })
+            }
+          </>
+        );
+      })()}
     </div>
   );
 }
