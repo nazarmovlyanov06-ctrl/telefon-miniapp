@@ -3,6 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from database import get_db
 from auth import get_current_user, get_dukkan_id
 from typing import Optional
+from datetime import date
+
+# debts.source_type -> kasa_hareketleri.kaynak (gelir tahsilatı için).
+# Taksitli 2.el/sıfır satışta peşinat satış anında zaten kasaya yazılıyor,
+# kalan tutar burada 'alacak' olarak bekliyor — bu yüzden ileride tahsil
+# edilince aynı gelir kaynağına (2el_satis/sifir_satis) sayılmalı, "manuel"
+# oluşturulan alacaklar ise kaynak dökümünde "Diğer"e düşer.
+_ALACAK_KAYNAK = {"2el_taksit": "2el_satis", "sifir_taksit": "sifir_satis"}
 
 router = APIRouter(prefix="/debts", tags=["debts"])
 
@@ -122,6 +130,7 @@ async def pay_debt(
         raise HTTPException(404, "Borc bulunamadi")
 
     new_paid = debt["paid_amount"] + amount
+    odeme_yontemi = body.get("payment_type", "nakit")
     async with db.transaction():
         await db.execute(
             "UPDATE debts SET paid_amount = $1 WHERE id = $2 AND dukkan_id = $3",
@@ -130,6 +139,26 @@ async def pay_debt(
         await db.execute(
             """INSERT INTO debt_payments (dukkan_id, debt_id, amount, payment_type, notes, created_by)
                VALUES ($1, $2, $3, $4, $5, $6)""",
-            dukkan_id, debt_id, amount, body.get("payment_type", "nakit"), body.get("notes"), user["id"],
+            dukkan_id, debt_id, amount, odeme_yontemi, body.get("notes"), user["id"],
         )
+        # Borç tahsilatı/ödemesi de kasadan gerçek para hareketi — daha önce
+        # buraya hiç yazılmıyordu, bu yüzden taksitle satılan bir cihazın
+        # kalan ödemesi tahsil edilse bile Kasa'da hiç gelir olarak görünmüyordu.
+        if amount and float(amount) > 0:
+            borc_turu = debt["borc_turu"] or "alacak"
+            if borc_turu == "alacak":
+                kaynak = _ALACAK_KAYNAK.get(debt["source_type"], "diger")
+                await db.execute(
+                    """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+                       VALUES ($1, $2, 'gelir', $3, $4, $5, $6)""",
+                    dukkan_id, date.today().isoformat(), odeme_yontemi, float(amount),
+                    f"Borç tahsilatı: {debt['notes'] or ''}".strip(": "), kaynak,
+                )
+            else:
+                await db.execute(
+                    """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+                       VALUES ($1, $2, 'cikis', $3, $4, $5, 'borc_odeme')""",
+                    dukkan_id, date.today().isoformat(), odeme_yontemi, float(amount),
+                    f"Dükkan borcu ödemesi: {debt['alacakli_adi'] or ''}".strip(": "),
+                )
     return {"ok": True, "new_paid": new_paid}
