@@ -287,7 +287,10 @@ export const api = {
   deleteKara: (id) => del(`/kara-liste/${id}`),
 
   // Parca Iade
-  parcaIadeList: () => get("/parca-iade/"),
+  parcaIadeList: (params = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return get(`/parca-iade/${q ? "?" + q : ""}`);
+  },
   createParcaIade: (data) => post("/parca-iade/", data),
   updateParcaIade: (id, data) => put(`/parca-iade/${id}`, data),
   deleteParcaIade: (id) => del(`/parca-iade/${id}`),

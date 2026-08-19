@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import {
@@ -15,6 +15,15 @@ const DURUM_META = {
   parca_degisimi: { label: "Parça Değişimi", icon: Repeat, bg: "rgba(94,168,255,0.15)", color: "var(--blue)" },
 };
 const SONUCLANAN_DURUMLAR = ["para_iade_alindi", "reddedildi", "parca_degisimi"];
+// "Bekliyor" durumu 7 günü, "Gönderildi" durumu 14 günü geçince unutulmuş
+// sayılır — toptancıya hiç gönderilmemiş ya da haftalarca cevap gelmemiş
+// iadeler için hatırlatma yoktu, listenin dibinde sessizce kaybolabiliyorlardı.
+const ESKI_ESIK_GUN = { bekliyor: 7, gönderildi: 14 };
+
+function gunSayisiHesapla(tarihStr) {
+  if (!tarihStr) return 0;
+  return Math.floor((Date.now() - new Date(tarihStr).getTime()) / 86400000);
+}
 
 export default function ParcaIade({ user }) {
   const navigate = useNavigate();
@@ -51,6 +60,8 @@ export default function ParcaIade({ user }) {
   });
   const [kurLoading, setKurLoading] = useState(false);
   const dolarKuru = dollarRate || 0;
+  const [arama, setArama] = useState("");
+  const [filtreToptanciId, setFiltreToptanciId] = useState("");
 
   async function fetchDollarRate() {
     setKurLoading(true);
@@ -83,7 +94,7 @@ export default function ParcaIade({ user }) {
   async function load() {
     try {
       const [l, t, p] = await Promise.all([
-        api.parcaIadeList(),
+        api.parcaIadeList({ q: arama, toptanci_id: filtreToptanciId }),
         api.toptanciList(),
         api.parts(),
       ]);
@@ -93,6 +104,19 @@ export default function ParcaIade({ user }) {
     } finally { setLoading(false); }
     return true;
   }
+
+  // Arama/filtre değişince listeyi yeniden çek — yazarken her tuşta değil,
+  // 300ms bekleyip sakinleşince (debounce). İlk mount'ta load() zaten
+  // çektiği için burada tekrar çekmiyoruz.
+  const ilkYuklemeRef = useRef(true);
+  useEffect(() => {
+    if (ilkYuklemeRef.current) { ilkYuklemeRef.current = false; return; }
+    const t = setTimeout(() => {
+      api.parcaIadeList({ q: arama, toptanci_id: filtreToptanciId }).then(setList).catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arama, filtreToptanciId]);
 
   function handleParcaArama(val) {
     setParcaArama(val);
@@ -264,6 +288,11 @@ export default function ParcaIade({ user }) {
 
   const bekleyen = list.filter(i => !SONUCLANAN_DURUMLAR.includes(i.durum));
   const tamamlanan = list.filter(i => SONUCLANAN_DURUMLAR.includes(i.durum));
+  const eskiSayisi = bekleyen.filter(i => {
+    const ref = i.durum === "gönderildi" ? (i.son_durum_degisiklik_at || i.created_at) : i.created_at;
+    const esik = ESKI_ESIK_GUN[i.durum];
+    return esik && gunSayisiHesapla(ref) > esik;
+  }).length;
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
 
@@ -273,6 +302,15 @@ export default function ParcaIade({ user }) {
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
         <h1 className="page-title" style={{ margin: 0 }}>Parça İade</h1>
         <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(true); setErr(""); }}>+ İade</button>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <input className="form-input" style={{ flex: 1 }} value={arama} onChange={e => setArama(e.target.value)}
+          placeholder="Parça adı ara..." />
+        <select className="form-select" style={{ flex: 1 }} value={filtreToptanciId} onChange={e => setFiltreToptanciId(e.target.value)}>
+          <option value="">Tüm Toptancılar</option>
+          {toptancilar.map(t => <option key={t.id} value={t.id}>{t.ad}</option>)}
+        </select>
       </div>
 
       {bekleyen.length > 0 && (
@@ -287,6 +325,14 @@ export default function ParcaIade({ user }) {
               <span style={{ fontWeight: 700, color: "var(--accent)" }}>
                 ₺{bekleyen.reduce((s, i) => s + (i.beklenen_tutar || 0), 0).toLocaleString("tr-TR")}
               </span>
+            </div>
+          )}
+          {eskiSayisi > 0 && (
+            <div className="card-row" style={{ marginTop: 4 }}>
+              <span style={{ color: "var(--danger)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+                <TriangleAlert size={12} strokeWidth={2} /> Unutulmuş görünüyor
+              </span>
+              <span style={{ fontWeight: 700, color: "var(--danger)" }}>{eskiSayisi} adet</span>
             </div>
           )}
         </div>
@@ -568,13 +614,17 @@ export default function ParcaIade({ user }) {
       {list.length === 0 ? (
         <div className="empty">
           <div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}><Package size={40} stroke="var(--dim)" strokeWidth={1.5} /></div>
-          İade kaydı yok
+          {arama || filtreToptanciId ? "Aramayla eşleşen iade kaydı yok" : "İade kaydı yok"}
         </div>
       ) : (
         <>
           {bekleyen.map(i => {
             const meta = DURUM_META[i.durum] || { label: i.durum, icon: Package, bg: "var(--bg2)", color: "var(--hint)" };
             const MetaIcon = meta.icon;
+            const referansTarih = i.durum === "gönderildi" ? (i.son_durum_degisiklik_at || i.created_at) : i.created_at;
+            const gunSayisi = gunSayisiHesapla(referansTarih);
+            const esikGun = ESKI_ESIK_GUN[i.durum];
+            const eski = esikGun && gunSayisi > esikGun;
             return (
               <div key={i.id} className="card">
                 <div className="card-row">
@@ -602,6 +652,14 @@ export default function ParcaIade({ user }) {
                     }}>
                       <MetaIcon size={12} strokeWidth={2} /> {meta.label}
                     </div>
+                    {eski && (
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 4, marginTop: 5, justifyContent: "flex-end",
+                        fontSize: 11, fontWeight: 700, color: "var(--danger)",
+                      }}>
+                        <TriangleAlert size={11} strokeWidth={2} /> {gunSayisi} gündür {i.durum}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>

@@ -1,5 +1,5 @@
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from database import get_db
 from auth import get_current_user, get_dukkan_id
 from odeme_yardimci import kaydet_odeme
@@ -12,25 +12,52 @@ router = APIRouter(prefix="/parca-iade", tags=["parca-iade"])
 # frontend'in bildiği hiçbir duruma denk gelmediği için o kayıtların üzerinde
 # HİÇ buton çıkmıyordu, sonsuza dek "bekleyen" sayılıp ilerletilemiyordu.
 GECERLI_DURUMLAR = {"bekliyor", "gönderildi", "para_iade_alindi", "reddedildi", "parca_degisimi"}
+SONUCLANAN_DURUMLAR = ("para_iade_alindi", "reddedildi", "parca_degisimi")
 
 
 @router.get("/")
 async def list_iade(
+    q: str = Query(None),
+    toptanci_id: int = Query(None),
     dukkan_id: int = Depends(get_dukkan_id),
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    rows = await db.fetch(
-        """SELECT p.*, t.ad as toptanci_adi, u1.ad as olusturan_adi, u2.ad as son_degistiren_adi
-           FROM parca_iadeler p
-           LEFT JOIN toptancilar t ON p.toptanci_id = t.id
-           LEFT JOIN kullanicilar u1 ON p.created_by = u1.id
-           LEFT JOIN kullanicilar u2 ON p.son_durum_degistiren_id = u2.id
-           WHERE p.dukkan_id = $1
-           ORDER BY p.created_at DESC""",
-        dukkan_id,
+    where = ["p.dukkan_id = $1"]
+    params = [dukkan_id]
+    if q:
+        params.append(f"%{q}%")
+        where.append(f"p.parca ILIKE ${len(params)}")
+    if toptanci_id:
+        params.append(toptanci_id)
+        where.append(f"p.toptanci_id = ${len(params)}")
+    where_sql = " AND ".join(where)
+
+    # Bekleyen/gönderilmiş kayıtlar (henüz sonuçlanmamış) her zaman TAMAMI
+    # döner — takip edilmesi gerekenler asla sınırla dışarıda kalmasın.
+    # Sonuçlanmış (para alındı/reddedildi/parça değişimi) kayıtlar liste
+    # zamanla büyüsün diye 200 ile sınırlı, en yeniden eskiye.
+    bekleyen_rows = await db.fetch(
+        f"""SELECT p.*, t.ad as toptanci_adi, u1.ad as olusturan_adi, u2.ad as son_degistiren_adi
+            FROM parca_iadeler p
+            LEFT JOIN toptancilar t ON p.toptanci_id = t.id
+            LEFT JOIN kullanicilar u1 ON p.created_by = u1.id
+            LEFT JOIN kullanicilar u2 ON p.son_durum_degistiren_id = u2.id
+            WHERE {where_sql} AND p.durum NOT IN {SONUCLANAN_DURUMLAR}
+            ORDER BY p.created_at ASC""",
+        *params,
     )
-    return [dict(r) for r in rows]
+    sonuclanan_rows = await db.fetch(
+        f"""SELECT p.*, t.ad as toptanci_adi, u1.ad as olusturan_adi, u2.ad as son_degistiren_adi
+            FROM parca_iadeler p
+            LEFT JOIN toptancilar t ON p.toptanci_id = t.id
+            LEFT JOIN kullanicilar u1 ON p.created_by = u1.id
+            LEFT JOIN kullanicilar u2 ON p.son_durum_degistiren_id = u2.id
+            WHERE {where_sql} AND p.durum IN {SONUCLANAN_DURUMLAR}
+            ORDER BY p.created_at DESC LIMIT 200""",
+        *params,
+    )
+    return [dict(r) for r in bekleyen_rows] + [dict(r) for r in sonuclanan_rows]
 
 
 @router.post("/")
