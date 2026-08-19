@@ -544,8 +544,16 @@ export default function Debts({ user }) {
                   onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))}
                   placeholder="0" />
                 <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>
+                  {payModal.payment_type === "taksit" && payModal.installment_count > 1 && (
+                    <>Aylık taksit: ₺{Math.round((payModal.total_amount || 0) / (payModal.installment_count || 1)).toLocaleString("tr-TR")} · </>
+                  )}
                   Kalan: ₺{(payModal.remaining || 0).toLocaleString("tr-TR")}
                 </div>
+                {payModal.payment_type === "taksit" && payModal.installment_count > 1 && (
+                  <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 4 }}>
+                    Bu sadece 1 aylık öneri — dilerseniz birden fazla ayı tek seferde (ör. tamamını) yatırabilirsiniz, taksit sayacı ödenen toplam tutara göre otomatik güncellenir.
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label className="form-label">Ödeme Yöntemi</label>
