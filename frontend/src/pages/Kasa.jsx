@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import {
   Wrench, Smartphone, Package, Headphones, Undo2, Briefcase,
-  Banknote, CreditCard, Wallet, X,
+  Banknote, CreditCard, Wallet, X, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 const PERIYOT = [
@@ -37,6 +37,10 @@ export default function Kasa() {
   const [duzeltForm, setDuzeltForm] = useState({ tur: "giris", tutar: "", aciklama: "Manuel düzeltme", odeme_yontemi: "nakit" });
   const [err, setErr] = useState("");
   const [detay, setDetay] = useState(null); // "gelir" | "gider" | "net" | null
+  const [borcTip, setBorcTip] = useState(null); // "alacak" | "dukkan_borcu" | null
+  const [borcListe, setBorcListe] = useState(null);
+  const [kaynakDetay, setKaynakDetay] = useState(null); // kaynak key | null
+  const [hareketlerAcik, setHareketlerAcik] = useState(true);
   const tapRef = useRef(0);
   const tapTimer = useRef(null);
 
@@ -50,6 +54,12 @@ export default function Kasa() {
   }
 
   useEffect(() => { load(); }, [periyot]);
+
+  useEffect(() => {
+    if (!borcTip) return;
+    setBorcListe(null);
+    api.debts(borcTip).then(setBorcListe).catch(() => setBorcListe([]));
+  }, [borcTip]);
 
   async function load() {
     setLoading(true);
@@ -157,13 +167,13 @@ export default function Kasa() {
           {/* Alacak / Dükkan Borcu */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
             <div className="card" style={{ margin: 0, cursor: "pointer", borderLeft: "3px solid var(--success)" }}
-              onClick={() => navigate("/debts?tab=alacak")}>
+              onClick={() => setBorcTip("alacak")}>
               <div style={{ fontSize: 11, color: "var(--success)", marginBottom: 4, fontWeight: 600 }}>Alacaklarımız</div>
               <div style={{ fontWeight: 700, fontSize: 18, color: "var(--success)" }}>{fmt(ozet.alacak_toplam)} ₺</div>
               <div style={{ fontSize: 10, color: "var(--hint)", marginTop: 3 }}>{ozet.alacak_sayi} müşteri →</div>
             </div>
             <div className="card" style={{ margin: 0, cursor: "pointer", borderLeft: "3px solid var(--danger)" }}
-              onClick={() => navigate("/debts?tab=dukkan_borcu")}>
+              onClick={() => setBorcTip("dukkan_borcu")}>
               <div style={{ fontSize: 11, color: "var(--danger)", marginBottom: 4, fontWeight: 600 }}>Dükkan Borçları</div>
               <div style={{ fontWeight: 700, fontSize: 18, color: "var(--danger)" }}>{fmt(ozet.dukkan_borcu)} ₺</div>
               <div style={{ fontSize: 10, color: "var(--hint)", marginTop: 3 }}>{ozet.dukkan_sayi} alacaklı →</div>
@@ -200,22 +210,26 @@ export default function Kasa() {
           {ozet.gelir_kaynaklar?.length > 0 && (
             <>
               <div className="section-title">Gelir Kaynakları</div>
-              <div className="card" style={{ marginBottom: 14 }}>
-                {ozet.gelir_kaynaklar.map((g) => (
-                  <div key={g.kaynak}>
-                    <div className="card-row" style={{ padding: "6px 0" }}>
-                      <span style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}>{(() => { const I = KAYNAK_ICON[g.kaynak] || Briefcase; return <I size={13} strokeWidth={2} />; })()} {g.label}</span>
-                      <span style={{ fontWeight: 600, fontSize: 13, color: "var(--success)" }}>{fmt(g.tutar)} ₺</span>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+                {ozet.gelir_kaynaklar.map((g) => {
+                  const Icon = KAYNAK_ICON[g.kaynak] || Briefcase;
+                  return (
+                    <div key={g.kaynak} className="card" style={{ margin: 0, cursor: "pointer" }}
+                      onClick={() => setKaynakDetay(g.kaynak)}>
+                      <div style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 6, color: "var(--hint)", marginBottom: 4 }}>
+                        <Icon size={13} strokeWidth={2} /> {g.label}
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 16, color: "var(--success)" }}>{fmt(g.tutar)} ₺</div>
+                      <div style={{ height: 4, background: "var(--bg2)", borderRadius: 3, marginTop: 6, overflow: "hidden" }}>
+                        <div style={{
+                          height: "100%", borderRadius: 3, background: "var(--accent)",
+                          width: `${Math.round((g.tutar / maxGelir) * 100)}%`,
+                          transition: "width 0.4s ease",
+                        }} />
+                      </div>
                     </div>
-                    <div style={{ height: 5, background: "var(--bg2)", borderRadius: 3, margin: "0 0 6px", overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", borderRadius: 3, background: "var(--accent)",
-                        width: `${Math.round((g.tutar / maxGelir) * 100)}%`,
-                        transition: "width 0.4s ease",
-                      }} />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -223,8 +237,12 @@ export default function Kasa() {
           {/* Son hareketler */}
           {ozet.hareketler?.length > 0 && (
             <>
-              <div className="section-title">Son Hareketler</div>
-              {ozet.hareketler.map(h => {
+              <div className="section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+                onClick={() => setHareketlerAcik(v => !v)}>
+                <span>Son Hareketler</span>
+                {hareketlerAcik ? <ChevronUp size={16} stroke="var(--hint)" strokeWidth={2} /> : <ChevronDown size={16} stroke="var(--hint)" strokeWidth={2} />}
+              </div>
+              {hareketlerAcik && ozet.hareketler.map(h => {
                 const isGelir = h.tur === "giris" || h.tur === "gelir";
                 return (
                   <div key={h.id} className="card" style={{ marginBottom: 6 }}>
@@ -303,6 +321,95 @@ export default function Kasa() {
             {ozet.hareketler?.length >= 30 && (
               <div style={{ textAlign: "center", color: "var(--hint)", fontSize: 11, marginTop: 8 }}>
                 Sadece en son 30 hareket gösteriliyor
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Borç/Alacak Detay Penceresi */}
+      {borcTip && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }} onClick={() => setBorcTip(null)}>
+          <div className="card" style={{ maxWidth: 420, width: "100%", maxHeight: "78vh", overflowY: "auto", margin: 0, display: "flex", flexDirection: "column" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>
+                {borcTip === "alacak" ? "Alacaklarımız" : "Dükkan Borçları"}
+              </div>
+              <button onClick={() => setBorcTip(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex" }}>
+                <X size={18} strokeWidth={2} />
+              </button>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              {borcListe === null ? (
+                <div style={{ textAlign: "center", color: "var(--hint)", padding: 24, fontSize: 13 }}>Yükleniyor...</div>
+              ) : borcListe.length === 0 ? (
+                <div style={{ textAlign: "center", color: "var(--hint)", padding: 24, fontSize: 13 }}>Kayıt yok</div>
+              ) : borcListe.map(b => (
+                <div key={b.id} className="card-row" style={{ padding: "8px 0", borderBottom: "1px solid var(--bg2)" }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{b.customer_name}</div>
+                    <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>
+                      {b.due_date ? `Vade: ${b.due_date}` : "Vade yok"}
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: borcTip === "alacak" ? "var(--success)" : "var(--danger)" }}>
+                    {fmt(b.remaining)} ₺
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button className="btn btn-ghost btn-sm" style={{ marginTop: 12 }}
+              onClick={() => { const t = borcTip; setBorcTip(null); navigate(`/debts?tab=${t}`); }}>
+              Tümü →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Gelir Kaynağı Detay Penceresi */}
+      {kaynakDetay && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }} onClick={() => setKaynakDetay(null)}>
+          <div className="card" style={{ maxWidth: 420, width: "100%", maxHeight: "78vh", overflowY: "auto", margin: 0 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>
+                {ozet.gelir_kaynaklar?.find(g => g.kaynak === kaynakDetay)?.label || "Gelir Kaynağı"}
+                <span style={{ fontWeight: 500, fontSize: 12, color: "var(--hint)", marginLeft: 6 }}>({periyotLabel[periyot]})</span>
+              </div>
+              <button onClick={() => setKaynakDetay(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", display: "flex" }}>
+                <X size={18} strokeWidth={2} />
+              </button>
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 18, color: "var(--success)", marginBottom: 10 }}>
+              {fmt(ozet.gelir_kaynaklar?.find(g => g.kaynak === kaynakDetay)?.tutar)} ₺
+            </div>
+            {(() => {
+              const liste = (ozet.hareketler || []).filter(h => h.kaynak === kaynakDetay);
+              if (liste.length === 0) {
+                return <div style={{ textAlign: "center", color: "var(--hint)", padding: 20, fontSize: 13 }}>Bu listede detay hareket bulunamadı</div>;
+              }
+              return liste.map(h => (
+                <div key={h.id} className="card-row" style={{ padding: "8px 0", borderBottom: "1px solid var(--bg2)" }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{h.aciklama || "—"}</div>
+                    <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>{h.odeme_yontemi} · {h.tarih}</div>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "var(--success)" }}>+{fmt(h.tutar)} ₺</div>
+                </div>
+              ));
+            })()}
+            {ozet.hareketler?.length >= 30 && (
+              <div style={{ textAlign: "center", color: "var(--hint)", fontSize: 11, marginTop: 8 }}>
+                Sadece en son 30 hareket içinden gösteriliyor
               </div>
             )}
           </div>
