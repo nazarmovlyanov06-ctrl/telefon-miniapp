@@ -77,19 +77,25 @@ async def manuel_hareket(
 @router.get("/ozet")
 async def kasa_ozet(
     periyot: str = Query("bugun"),
+    baslangic_q: str = Query(None, alias="baslangic"),
+    bitis_q: str = Query(None, alias="bitis"),
     dukkan_id: int = Depends(get_dukkan_id),
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
     today = date.today()
 
-    if periyot == "hafta":
-        baslangic = (today - timedelta(days=today.weekday())).isoformat()
-    elif periyot == "ay":
-        baslangic = today.replace(day=1).isoformat()
+    if periyot == "ozel" and baslangic_q and bitis_q:
+        baslangic = baslangic_q
+        bitis = bitis_q
     else:
-        baslangic = today.isoformat()
-    bitis = today.isoformat()
+        if periyot == "hafta":
+            baslangic = (today - timedelta(days=today.weekday())).isoformat()
+        elif periyot == "ay":
+            baslangic = today.replace(day=1).isoformat()
+        else:
+            baslangic = today.isoformat()
+        bitis = today.isoformat()
 
     async def scalar(sql, *params):
         return float(await db.fetchval(sql, *params) or 0)

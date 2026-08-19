@@ -10,7 +10,15 @@ const PERIYOT = [
   { key: "bugun", label: "Bugün" },
   { key: "hafta", label: "Bu Hafta" },
   { key: "ay", label: "Bu Ay" },
+  { key: "ozel", label: "Özel" },
 ];
+
+function bugunISO() { return new Date().toISOString().slice(0, 10); }
+function gunOnce(gun) {
+  const d = new Date();
+  d.setDate(d.getDate() - gun);
+  return d.toISOString().slice(0, 10);
+}
 
 const KAYNAK_ICON = {
   tamir: Wrench,
@@ -41,6 +49,8 @@ export default function Kasa() {
   const [borcListe, setBorcListe] = useState(null);
   const [kaynakDetay, setKaynakDetay] = useState(null); // kaynak key | null
   const [hareketlerAcik, setHareketlerAcik] = useState(true);
+  const [ozelBaslangic, setOzelBaslangic] = useState(() => gunOnce(7));
+  const [ozelBitis, setOzelBitis] = useState(bugunISO);
   const tapRef = useRef(0);
   const tapTimer = useRef(null);
 
@@ -53,7 +63,11 @@ export default function Kasa() {
     });
   }
 
-  useEffect(() => { load(); }, [periyot]);
+  useEffect(() => {
+    if (periyot === "ozel" && (!ozelBaslangic || !ozelBitis)) return;
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periyot, ozelBaslangic, ozelBitis]);
 
   useEffect(() => {
     if (!borcTip) return;
@@ -63,7 +77,7 @@ export default function Kasa() {
 
   async function load() {
     setLoading(true);
-    try { setOzet(await api.kasaOzet(periyot)); }
+    try { setOzet(await api.kasaOzet(periyot, ozelBaslangic, ozelBitis)); }
     finally { setLoading(false); }
   }
 
@@ -99,7 +113,10 @@ export default function Kasa() {
   }
 
   const maxGelir = ozet ? Math.max(...(ozet.gelir_kaynaklar || []).map(g => g.tutar), 1) : 1;
-  const periyotLabel = { bugun: "bugün", hafta: "bu hafta", ay: "bu ay" };
+  const periyotLabel = {
+    bugun: "bugün", hafta: "bu hafta", ay: "bu ay",
+    ozel: `${ozelBaslangic?.split("-").reverse().join(".")} – ${ozelBitis?.split("-").reverse().join(".")}`,
+  };
 
   return (
     <div className="page" style={{ paddingBottom: 90 }}>
@@ -124,6 +141,18 @@ export default function Kasa() {
             }}>{p.label}</button>
         ))}
       </div>
+
+      {periyot === "ozel" && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+          <input type="date" className="form-input" style={{ flex: 1 }}
+            value={ozelBaslangic} max={ozelBitis}
+            onChange={e => setOzelBaslangic(e.target.value)} />
+          <span style={{ color: "var(--hint)", fontSize: 13 }}>—</span>
+          <input type="date" className="form-input" style={{ flex: 1 }}
+            value={ozelBitis} min={ozelBaslangic} max={bugunISO()}
+            onChange={e => setOzelBitis(e.target.value)} />
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: "center", color: "var(--hint)", padding: 48 }}>Yükleniyor...</div>

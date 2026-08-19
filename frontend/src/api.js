@@ -237,7 +237,10 @@ export const api = {
   kapatGaranti: (id) => put(`/garantiler/${id}/kapat`, {}),
 
   // Kasa
-  kasaOzet: (periyot = "bugun") => get(`/kasa/ozet?periyot=${periyot}`),
+  kasaOzet: (periyot = "bugun", baslangic, bitis) => get(
+    `/kasa/ozet?periyot=${periyot}` +
+    (periyot === "ozel" && baslangic && bitis ? `&baslangic=${baslangic}&bitis=${bitis}` : "")
+  ),
   kasaBugun: () => get("/kasa/bugun"),
   kasaTarih: (tarih) => get(`/kasa/tarih/${tarih}`),
   kasaGider: (data) => post("/kasa/gider", data),
