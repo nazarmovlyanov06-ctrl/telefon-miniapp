@@ -60,6 +60,38 @@ function OzetPencere({ baslik, ikon: Ikon, renk, children, onClose, onTumu }) {
   );
 }
 
+function EtkinlikDetayModal({ ev, onClose }) {
+  const t = TUR_LABEL[ev.tur] || { icon: null, label: ev.tur, color: "var(--hint)" };
+  const Ikon = t.icon || Smartphone;
+  const d = ev.detay || {};
+  const ozellikler = [d.renk, d.depolama, d.ram].filter(Boolean).join(" · ");
+  return (
+    <OzetPencere baslik={d.model || ev.baslik} ikon={Ikon} renk={t.color} onClose={onClose}>
+      <div style={{ fontWeight: 300, fontSize: 24, color: t.color, letterSpacing: -0.5, marginBottom: 4 }}>
+        {ev.tutar ? `${Number(ev.tutar).toLocaleString("tr-TR")}₺` : "—"}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 14 }}>
+        {t.label} · {fmtDateTime(ev.tarih) || fmt(ev.tarih)}
+      </div>
+      {ozellikler && <Row label="Özellikler" value={ozellikler} />}
+      {d.imei && <><div className="divider" /><Row label="IMEI" value={d.imei} /></>}
+      {d.durum_aciklama && <><div className="divider" /><Row label="Durum / Hasar" value={d.durum_aciklama} /></>}
+      {d.kimden && <><div className="divider" /><Row label="Kimden Alındı" value={d.kimden} /></>}
+      {d.satis_kanali && <><div className="divider" /><Row label="Satış Kanalı" value={d.satis_kanali} /></>}
+      {d.notlar && <><div className="divider" /><Row label="Not" value={d.notlar} /></>}
+    </OzetPencere>
+  );
+}
+
+function Row({ label, value }) {
+  return (
+    <div className="card-row" style={{ padding: "8px 0" }}>
+      <span style={{ color: "var(--hint)", fontSize: 13 }}>{label}</span>
+      <span style={{ fontWeight: 500, maxWidth: "60%", textAlign: "right" }}>{value}</span>
+    </div>
+  );
+}
+
 export default function CustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -73,6 +105,7 @@ export default function CustomerDetail() {
   const [err, setErr] = useState("");
   const [tab, setTab] = useState("ziyaretler");
   const [ozetAcik, setOzetAcik] = useState(null); // "ziyaret" | "tamir" | "harcama" | "bakiye" | null
+  const [secilenEtkinlik, setSecilenEtkinlik] = useState(null); // 2.el/sıfır ziyaret detay penceresi
 
   function ozetTumunuGor(hedefTab) {
     setOzetAcik(null);
@@ -232,8 +265,8 @@ export default function CustomerDetail() {
                   {/* İçerik */}
                   <div
                     className="card"
-                    style={{ flex: 1, margin: 0, padding: "10px 12px", cursor: ev.repair_id ? "pointer" : "default" }}
-                    onClick={() => ev.repair_id && navigate(`/repairs/${ev.repair_id}`)}
+                    style={{ flex: 1, margin: 0, padding: "10px 12px", cursor: (ev.repair_id || ev.detay) ? "pointer" : "default" }}
+                    onClick={() => ev.repair_id ? navigate(`/repairs/${ev.repair_id}`) : ev.detay && setSecilenEtkinlik(ev)}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div>
@@ -275,7 +308,7 @@ export default function CustomerDetail() {
                       </div>
                     )}
 
-                    {ev.repair_id && (
+                    {(ev.repair_id || ev.detay) && (
                       <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 4 }}>
                         Detaya git →
                       </div>
@@ -411,6 +444,9 @@ export default function CustomerDetail() {
             <div key={r.id} className="card-row" style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none" }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>#{r.repair_no} · {r.device_model}</div>
+                <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>
+                  {r.kullanilan_parcalar ? `${r.kullanilan_parcalar} değişimi` : (r.fault_desc || "—")}
+                </div>
                 <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 2 }}>{fmt(r.created_at)}{!r.final_price ? " · tahmini" : ""}</div>
               </div>
               <span style={{ fontWeight: 700, fontSize: 13 }}>{(r.final_price || r.estimated_price).toLocaleString("tr-TR")}₺</span>
@@ -439,6 +475,10 @@ export default function CustomerDetail() {
             );
           })}
         </OzetPencere>
+      )}
+
+      {secilenEtkinlik && (
+        <EtkinlikDetayModal ev={secilenEtkinlik} onClose={() => setSecilenEtkinlik(null)} />
       )}
     </div>
   );

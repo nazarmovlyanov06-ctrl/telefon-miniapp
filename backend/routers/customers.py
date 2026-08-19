@@ -220,6 +220,12 @@ async def customer_gecmis(
             "alt": f"Bize sattı · IMEI: {c.get('imei') or '—'}",
             "tutar": c.get("alis_fiyati"),
             "tarih": c.get("alis_tarihi") or c.get("created_at"),
+            "detay": {
+                "model": c["model"], "imei": c.get("imei"),
+                "renk": c.get("renk"), "depolama": c.get("depolama"), "ram": c.get("ram"),
+                "durum_aciklama": c.get("ozellikler"), "notlar": c.get("notlar"),
+                "kimden": c.get("kimden"),
+            },
         })
 
     # 2.El — bizden aldı (musteri_adi)
@@ -242,6 +248,12 @@ async def customer_gecmis(
             "alt": f"Satın aldı · IMEI: {c.get('imei') or '—'}",
             "tutar": c.get("satis_fiyati"),
             "tarih": c.get("satis_tarihi") or c.get("created_at"),
+            "detay": {
+                "model": c["model"], "imei": c.get("imei"),
+                "renk": c.get("renk"), "depolama": c.get("depolama"), "ram": c.get("ram"),
+                "durum_aciklama": c.get("ozellikler"), "notlar": c.get("notlar"),
+                "satis_kanali": c.get("satis_kanali"),
+            },
         })
 
     # Sıfır — bize sattı
@@ -264,6 +276,11 @@ async def customer_gecmis(
             "alt": f"Sıfır cihaz · Bize sattı",
             "tutar": c.get("alis_fiyati"),
             "tarih": c.get("alis_tarihi") or c.get("created_at"),
+            "detay": {
+                "model": c["model"], "imei": c.get("imei"),
+                "renk": c.get("renk"), "depolama": c.get("depolama"),
+                "notlar": c.get("notlar"), "kimden": c.get("kimden"),
+            },
         })
 
     # Sıfır — bizden aldı
@@ -286,6 +303,11 @@ async def customer_gecmis(
             "alt": f"Sıfır cihaz · Satın aldı",
             "tutar": c.get("satis_fiyati"),
             "tarih": c.get("satis_tarihi") or c.get("created_at"),
+            "detay": {
+                "model": c["model"], "imei": c.get("imei"),
+                "renk": c.get("renk"), "depolama": c.get("depolama"),
+                "notlar": c.get("notlar"), "satis_kanali": c.get("satis_kanali"),
+            },
         })
 
     events.sort(key=lambda x: x.get("tarih") or "", reverse=True)
@@ -300,7 +322,9 @@ async def customer_repairs(
     db: asyncpg.Connection = Depends(get_db),
 ):
     rows = await db.fetch(
-        """SELECT r.*, u.ad as assigned_name
+        """SELECT r.*, u.ad as assigned_name,
+                  (SELECT STRING_AGG(p.name, ', ') FROM repair_parts rp
+                   JOIN parts p ON p.id = rp.part_id WHERE rp.repair_id = r.id) AS kullanilan_parcalar
            FROM repairs r
            LEFT JOIN kullanicilar u ON r.assigned_to = u.id
            WHERE r.customer_id = $1 AND r.dukkan_id = $2
