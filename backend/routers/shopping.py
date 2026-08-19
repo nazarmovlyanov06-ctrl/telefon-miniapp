@@ -125,10 +125,12 @@ async def mark_bought(
                     ins = await db.fetchrow(
                         """INSERT INTO parts (dukkan_id, name, device_model, part_type, quantity,
                            min_quantity, purchase_price, sale_price, created_by)
-                           VALUES ($1, $2, $3, $4, $5, 2, $6, 0, $7) RETURNING id""",
+                           VALUES ($1, $2, $3, $4, $5, 2, $6, $7, $8) RETURNING id""",
                         dukkan_id, parca_adi, item.get("device_model"),
                         body.get("part_type") or item.get("part_type"),
-                        miktar, float(body.get("bought_price") or 0), user["id"],
+                        miktar, float(body.get("bought_price") or 0),
+                        float(body.get("sale_price")) if body.get("sale_price") else 0,
+                        user["id"],
                     )
                     part_id_log = ins["id"]
                     stok_mesaj = f"yeni:{parca_adi}"

@@ -71,7 +71,7 @@ export default function Parts({ user }) {
 
   // Aldım modal
   const [boughtItem, setBoughtItem] = useState(null);
-  const [boughtData, setBoughtData] = useState({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "" });
+  const [boughtData, setBoughtData] = useState({ toptanci: "", fiyat: "", salePrice: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "" });
   const [toptancilar, setToptancilar] = useState([]);
   const [toptanciOner, setToptanciOner] = useState([]);
   const [showToptanciOner, setShowToptanciOner] = useState(false);
@@ -204,6 +204,7 @@ export default function Parts({ user }) {
       await api.markBought(boughtItem.id, {
         bought_from: toptanciAdi,
         bought_price: boughtData.fiyat ? parseFloat(boughtData.fiyat) : null,
+        sale_price: boughtData.salePrice ? parseFloat(boughtData.salePrice) : null,
         stok_ekle: boughtData.stokEkle,
         stok_miktar: parseInt(boughtData.stokMiktar) || 1,
         part_type: boughtData.partType || null,
@@ -212,7 +213,7 @@ export default function Parts({ user }) {
       const willAddStock = boughtData.stokEkle;
       const partName = boughtItem.part_name;
       setBoughtItem(null);
-      setBoughtData({ toptanci: "", fiyat: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "" });
+      setBoughtData({ toptanci: "", fiyat: "", salePrice: "", stokEkle: true, stokMiktar: "1", partType: "", dollarMode: false, dollarAmount: "" });
       api.shopping().then(setShopping);
       if (willAddStock) {
         setQ(partName);
@@ -1248,6 +1249,14 @@ export default function Parts({ user }) {
                         <PartTypePicker value={boughtData.partType}
                           onChange={v => setBoughtData(d => ({ ...d, partType: v }))}
                           customTypes={parcaTurleri} onAddCustom={turEkle} onRemoveCustom={turSil} />
+                      </div>
+                    )}
+                    {boughtData.stokEkle && boughtExistingId === null && (
+                      <div className="form-group" style={{ marginTop: 8, marginBottom: 0 }}>
+                        <label className="form-label">Satış Fiyatı (₺)</label>
+                        <input className="form-input" type="number" step="0.01" value={boughtData.salePrice}
+                          onChange={e => setBoughtData(d => ({ ...d, salePrice: e.target.value }))}
+                          placeholder="Müşteriye satılacak fiyat — opsiyonel" />
                       </div>
                     )}
                     {boughtData.stokEkle && matchingParts.length > 0 && (
