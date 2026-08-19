@@ -55,7 +55,27 @@ async def create_part(
         body.get("toptanci_id"),
         user["id"],
     )
+    await _toptanci_alis_kaydet(
+        db, dukkan_id, body.get("toptanci_id"), body["name"],
+        body.get("quantity", 0), body.get("purchase_price"),
+    )
     return {"id": row["id"]}
+
+
+async def _toptanci_alis_kaydet(db, dukkan_id, toptanci_id, urun, miktar, birim_fiyat):
+    """Bir toptancı seçilip fiyat girildiyse bu alımı toptancının kendi alış
+    geçmişine de yazar — yoksa Toptancılar sayfasında o toptancıya tıklayınca
+    hiçbir şey görünmüyordu (parça stoğuna bağlanan alım, toptancı_alislar
+    tablosuna hiç yazılmıyordu)."""
+    if not toptanci_id or not birim_fiyat:
+        return
+    miktar = max(int(miktar or 1), 1)
+    fiyat = float(birim_fiyat)
+    await db.execute(
+        """INSERT INTO toptanci_alislar (dukkan_id, toptanci_id, urun, miktar, birim_fiyat, toplam, tarih)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+        dukkan_id, toptanci_id, urun, miktar, fiyat, fiyat * miktar, date.today().isoformat(),
+    )
 
 
 @router.put("/{part_id}")
@@ -132,6 +152,7 @@ async def stok_ekle(
                VALUES ($1, $2, 'giris', $3, 'satin_alma', $4, $5, $6)""",
             dukkan_id, part_id, miktar, body.get("aciklama"), date.today().isoformat(), user["id"],
         )
+        await _toptanci_alis_kaydet(db, dukkan_id, toptanci_id, part["name"], miktar, fiyat)
     return {"ok": True}
 
 

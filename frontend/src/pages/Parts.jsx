@@ -73,7 +73,7 @@ export default function Parts({ user }) {
 
   // Stok ekle formu
   const [showAddForm, setShowAddForm] = useState(false);
-  const [addForm, setAddForm] = useState({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", toptanci: "", toptanci_id: null });
+  const [addForm, setAddForm] = useState({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null });
   const [addErr, setAddErr] = useState("");
   const [addDolarMode, setAddDolarMode] = useState(false);
   const [addDolarMiktar, setAddDolarMiktar] = useState("");
@@ -91,6 +91,8 @@ export default function Parts({ user }) {
   const [ekleErr, setEkleErr] = useState("");
   const [ekleTopOner, setEkleTopOner] = useState([]);
   const [showEkleTopOner, setShowEkleTopOner] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", device_model: "", part_type: "", min_quantity: "2", purchase_price: "", sale_price: "" });
+  const [editErr, setEditErr] = useState("");
 
   // Yeni parça form — mevcut parça önerisi
   const [addEklePart, setAddEklePart] = useState(null);
@@ -218,11 +220,40 @@ export default function Parts({ user }) {
     setKullanErr("");
     setEkleForm({ miktar: "1", fiyat: "", aciklama: "" });
     setEkleErr("");
+    setEditForm({
+      name: p.name, device_model: p.device_model || "", part_type: p.part_type || "",
+      min_quantity: String(p.min_quantity ?? 2),
+      purchase_price: p.purchase_price ? String(p.purchase_price) : "",
+      sale_price: p.sale_price ? String(p.sale_price) : "",
+    });
+    setEditErr("");
+    // Önceki incelenen parçanın geçmişi burada tutulmasın — panel her yeni
+    // parça için sıfırdan başlasın, yoksa "Geçmiş" boş gelmediği için tekrar
+    // çekilmiyor ve önceki parçanın hareketleri yanlışlıkla gösteriliyordu.
+    setHareketler([]);
     if (tab === "gecmis") {
       setHareketLoading(true);
       try { setHareketler(await api.partHareketler(p.id)); }
       finally { setHareketLoading(false); }
     }
+  }
+
+  async function submitEdit(e) {
+    e.preventDefault(); setEditErr("");
+    if (!editForm.name.trim()) { setEditErr("Parça adı gerekli"); return; }
+    try {
+      await api.updatePart(selectedPart.id, {
+        name: editForm.name,
+        device_model: editForm.device_model || null,
+        part_type: editForm.part_type || null,
+        quantity: selectedPart.quantity, // değiştirilmiyor — backend gönderilmezse 0'a sıfırlıyor
+        min_quantity: parseInt(editForm.min_quantity) || 0,
+        purchase_price: editForm.purchase_price ? parseFloat(editForm.purchase_price) : 0,
+        sale_price: editForm.sale_price ? parseFloat(editForm.sale_price) : 0,
+      });
+      setSelectedPart(null);
+      api.parts(q ? { q } : {}).then(setParts);
+    } catch (e) { setEditErr(e.message); }
   }
 
   async function submitKullan(e) {
@@ -331,12 +362,12 @@ export default function Parts({ user }) {
           quantity: parseInt(addForm.quantity) || 0,
           min_quantity: parseInt(addForm.min_quantity) || 2,
           purchase_price: addForm.purchase_price ? parseFloat(addForm.purchase_price) : 0,
-          sale_price: 0,
+          sale_price: addForm.sale_price ? parseFloat(addForm.sale_price) : 0,
           toptanci_id: toptanciId,
         });
       }
       setShowAddForm(false);
-      setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", toptanci: "", toptanci_id: null });
+      setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null });
       setAddDolarMode(false);
       setAddDolarMiktar("");
       setAddEklePart(null);
@@ -479,7 +510,7 @@ export default function Parts({ user }) {
                       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                         <button type="submit" className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}><Plus size={13} strokeWidth={2.4} /> Stok Ekle</button>
                         <button type="button" className="btn btn-ghost btn-sm"
-                          onClick={() => { setShowAddForm(false); setAddEklePart(null); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", toptanci: "", toptanci_id: null }); setAddDolarMode(false); setAddDolarMiktar(""); }}>
+                          onClick={() => { setShowAddForm(false); setAddEklePart(null); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null }); setAddDolarMode(false); setAddDolarMiktar(""); }}>
                           İptal
                         </button>
                       </div>
@@ -607,11 +638,17 @@ export default function Parts({ user }) {
                             <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>Yeni toptancı olarak eklenecek</div>
                           )}
                         </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Satış (₺)</label>
+                          <input className="form-input" type="number" step="0.01" value={addForm.sale_price}
+                            onChange={e => setAddForm(f => ({ ...f, sale_price: e.target.value }))}
+                            placeholder="Opsiyonel" />
+                        </div>
                       </div>
                       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                         <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
                         <button type="button" className="btn btn-ghost btn-sm"
-                          onClick={() => { setShowAddForm(false); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", toptanci: "", toptanci_id: null }); setAddDolarMode(false); setAddDolarMiktar(""); }}>
+                          onClick={() => { setShowAddForm(false); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", sale_price: "", toptanci: "", toptanci_id: null }); setAddDolarMode(false); setAddDolarMiktar(""); }}>
                           İptal
                         </button>
                       </div>
@@ -669,7 +706,14 @@ export default function Parts({ user }) {
                     </div>
                     <div className="list-item-body" style={{ cursor: "pointer" }} onClick={() => openPanel(p, "ekle")}>
                       <div className="list-item-title">{p.name}</div>
-                      <div className="list-item-sub">{p.device_model} · {p.part_type}{p.purchase_price && !priceHidden ? ` · ${p.purchase_price.toLocaleString("tr-TR")}₺` : p.purchase_price && priceHidden ? " · ••••₺" : ""}{p.toptanci_adi ? ` · ${p.toptanci_adi}` : ""}</div>
+                      <div className="list-item-sub">
+                        {p.device_model} · {p.part_type}
+                        {(p.purchase_price || p.sale_price) && (
+                          priceHidden ? " · Alış: •••₺ · Satış: •••₺" :
+                          ` · Alış: ${(p.purchase_price || 0).toLocaleString("tr-TR")}₺ · Satış: ${p.sale_price ? p.sale_price.toLocaleString("tr-TR") + "₺" : "—"}`
+                        )}
+                        {p.toptanci_adi ? ` · ${p.toptanci_adi}` : ""}
+                      </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ textAlign: "right" }}>
@@ -706,11 +750,15 @@ export default function Parts({ user }) {
                         {[
                           { key: "ekle", label: "Stok Ekle", clr: "var(--success)" },
                           { key: "dus", label: "Stok Düş", clr: "var(--danger)" },
+                          { key: "duzenle", label: "Düzenle", clr: "var(--purple)" },
                           { key: "gecmis", label: "Geçmiş", clr: "var(--accent)" },
                         ].map(s => (
                           <button key={s.key} onClick={() => {
                             setPanelTab(s.key);
-                            if (s.key === "gecmis" && (!hareketler.length || selectedPart?.id !== p.id)) {
+                            if (s.key === "gecmis") {
+                              // Her sekme değişiminde tazele — önceki parçadan kalan
+                              // hareketler "boş değil" diye tekrar çekilmeyip yanlışlıkla
+                              // gösterilmesin.
                               setHareketLoading(true);
                               api.partHareketler(p.id).then(setHareketler).finally(() => setHareketLoading(false));
                             }
@@ -871,6 +919,45 @@ export default function Parts({ user }) {
                           </form>
                           )}
                         </>
+                      )}
+
+                      {/* Düzenle — isim, model, tür, min stok, alış/satış fiyatı */}
+                      {panelTab === "duzenle" && (
+                        <form onSubmit={submitEdit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {editErr && <div style={{ color: "var(--red)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {editErr}</div>}
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Parça Adı *</label>
+                            <input className="form-input" required value={editForm.name}
+                              onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                          </div>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Cihaz Modeli</label>
+                            <input className="form-input" value={editForm.device_model}
+                              onChange={e => setEditForm(f => ({ ...f, device_model: e.target.value }))} />
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label">Min. Stok</label>
+                              <input className="form-input" type="number" min="0" value={editForm.min_quantity}
+                                onChange={e => setEditForm(f => ({ ...f, min_quantity: e.target.value }))} />
+                            </div>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label">Alış Fiyatı (₺)</label>
+                              <input className="form-input" type="number" step="0.01" value={editForm.purchase_price}
+                                onChange={e => setEditForm(f => ({ ...f, purchase_price: e.target.value }))} />
+                            </div>
+                          </div>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Satış Fiyatı (₺)</label>
+                            <input className="form-input" type="number" step="0.01" value={editForm.sale_price}
+                              onChange={e => setEditForm(f => ({ ...f, sale_price: e.target.value }))}
+                              placeholder="Müşteriye satılacak fiyat" />
+                          </div>
+                          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                            <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedPart(null)}>İptal</button>
+                          </div>
+                        </form>
                       )}
 
                       {/* Geçmiş listesi */}
