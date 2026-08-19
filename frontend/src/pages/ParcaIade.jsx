@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import {
   Clock, Truck, CheckCircle2, CircleX, TriangleAlert, Banknote, Package,
-  Ban, Pencil, Trash2, User, Repeat,
+  Ban, Pencil, Trash2, User, Repeat, RefreshCw,
 } from "lucide-react";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 
@@ -43,7 +43,29 @@ export default function ParcaIade({ user }) {
   const [degisimArama, setDegisimArama] = useState("");
   const [degisimOneriler, setDegisimOneriler] = useState([]);
   const [showDegisimOner, setShowDegisimOner] = useState(false);
-  const dolarKuru = parseFloat(localStorage.getItem("son_dolar_kuru") || "0");
+  const [degisimDolarMode, setDegisimDolarMode] = useState(false);
+  const [degisimDolarMiktar, setDegisimDolarMiktar] = useState("");
+  const [dollarRate, setDollarRate] = useState(() => {
+    const cached = parseFloat(localStorage.getItem("son_dolar_kuru") || "");
+    return cached > 0 ? cached : null;
+  });
+  const [kurLoading, setKurLoading] = useState(false);
+  const dolarKuru = dollarRate || 0;
+
+  async function fetchDollarRate() {
+    setKurLoading(true);
+    try {
+      const r = await fetch("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json");
+      const data = await r.json();
+      const rate = Math.round(data.usd.try * 100) / 100;
+      setDollarRate(rate);
+      localStorage.setItem("son_dolar_kuru", String(rate));
+    } catch (e) {
+      setErr("Dolar kuru alınamadı");
+    } finally {
+      setKurLoading(false);
+    }
+  }
 
   useEffect(() => {
     load().then(() => {
@@ -163,6 +185,7 @@ export default function ParcaIade({ user }) {
   }
 
   function openDegisimModal(item) {
+    setErr("");
     setDegisimModal(item);
     setDegisimForm({
       alinan_part_id: null, alinan_parca_adi: "", alinan_device_model: "", alinan_part_type: "",
@@ -170,6 +193,8 @@ export default function ParcaIade({ user }) {
     });
     setDegisimArama("");
     setShowDegisimOner(false);
+    setDegisimDolarMode(false);
+    setDegisimDolarMiktar("");
   }
 
   function handleDegisimArama(val) {
@@ -204,6 +229,10 @@ export default function ParcaIade({ user }) {
 
   async function submitDegisim() {
     if (!degisimModal) return;
+    if (degisimDolarMode && degisimDolarMiktar && !degisimForm.alinan_fiyat) {
+      setErr("Kur alınmadan dolar tutarı TL'ye çevrilemedi — önce \"Kur al\"a basın");
+      return;
+    }
     const farkVar = Math.abs(degisimFark) > 0.009;
     await api.updateParcaIadeDurum(degisimModal.id, "parca_degisimi", {
       alinan_part_id: degisimForm.alinan_part_id,
@@ -406,6 +435,7 @@ export default function ParcaIade({ user }) {
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
               <Repeat size={16} strokeWidth={2} /> Parça Değişimi
             </div>
+            {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "0 0 8px", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
             <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 4 }}>
               {degisimModal.parca} — {degisimModal.toptanci_adi || "Toptancı belirtilmedi"}
             </div>
@@ -461,9 +491,40 @@ export default function ParcaIade({ user }) {
                   onChange={e => setDegisimForm(f => ({ ...f, alinan_miktar: e.target.value }))} />
               </div>
               <div className="form-group">
-                <label className="form-label">Gelen Parça Fiyatı (₺)</label>
-                <input className="form-input" type="number" min="0" step="0.01" value={degisimForm.alinan_fiyat}
-                  onChange={e => setDegisimForm(f => ({ ...f, alinan_fiyat: e.target.value }))} placeholder="0" />
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <span className="form-label" style={{ margin: 0 }}>
+                    {degisimDolarMode ? "Dolar ($)" : "Gelen Parça Fiyatı (₺)"}
+                  </span>
+                  <button type="button"
+                    onClick={() => { setDegisimDolarMode(m => !m); setDegisimDolarMiktar(""); setDegisimForm(f => ({ ...f, alinan_fiyat: "" })); }}
+                    style={{ marginLeft: "auto", fontSize: 10, padding: "2px 7px", borderRadius: 10, border: "none",
+                      background: degisimDolarMode ? "var(--accent)" : "var(--bg2)", color: degisimDolarMode ? "#fff" : "var(--hint)",
+                      cursor: "pointer", fontWeight: 700 }}>
+                    $
+                  </button>
+                </div>
+                {degisimDolarMode ? (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <input className="form-input" type="number" step="0.01"
+                      value={degisimDolarMiktar} placeholder="0.00"
+                      onChange={e => {
+                        setDegisimDolarMiktar(e.target.value);
+                        const tl = dollarRate ? String(Math.round(parseFloat(e.target.value || 0) * dollarRate)) : "";
+                        setDegisimForm(f => ({ ...f, alinan_fiyat: tl }));
+                      }} />
+                    {dollarRate && <span style={{ fontSize: 11, color: "var(--hint)", alignSelf: "center", whiteSpace: "nowrap" }}>≈{degisimForm.alinan_fiyat}₺</span>}
+                  </div>
+                ) : (
+                  <input className="form-input" type="number" min="0" step="0.01" value={degisimForm.alinan_fiyat}
+                    onChange={e => setDegisimForm(f => ({ ...f, alinan_fiyat: e.target.value }))} placeholder="0" />
+                )}
+                {degisimDolarMode && !dollarRate && (
+                  <button type="button" onClick={fetchDollarRate} disabled={kurLoading}
+                    style={{ marginTop: 4, fontSize: 11, padding: "3px 10px", borderRadius: 10,
+                      border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--hint)" }}>
+                    {kurLoading ? "..." : <><RefreshCw size={11} strokeWidth={2} /> Kur al</>}
+                  </button>
+                )}
               </div>
             </div>
 
