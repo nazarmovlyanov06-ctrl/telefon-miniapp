@@ -146,23 +146,52 @@ function DurumSecPencere({ repair, onClose, onDegisti }) {
   );
 }
 
-function hazirMesaji(customerName, model, dukkanAdi) {
-  const selam = customerName ? `Merhaba ${customerName},` : "Merhaba,";
-  const satirlar = [
-    selam, "",
-    `${model || "Cihazınız"} tamiri tamamlandı, teslime hazır! ✅`, "",
-    "Bizi tercih ettiğiniz için teşekkür ederiz. 🙏",
-  ];
+function _selamla(customerName) { return customerName ? `Merhaba ${customerName},` : "Merhaba,"; }
+function _imza(satirlar, dukkanAdi) {
   if (dukkanAdi) { satirlar.push(""); satirlar.push(dukkanAdi); }
   return satirlar.join("\n");
 }
 
-function openWA(phone, model, customerName, dukkanAdi) {
+function hazirMesaji(customerName, model, faultDesc, dukkanAdi) {
+  const anaCumle = model && faultDesc
+    ? `${model} cihazınızdaki "${faultDesc}" sorunu giderildi, tamiri tamamlandı! ✅`
+    : `${model || "Cihazınızın"} tamiri tamamlandı! ✅`;
+  return _imza([
+    _selamla(customerName), "",
+    anaCumle,
+    "Müsait olduğunuzda servisimizden teslim alabilirsiniz.", "",
+    "Bizi tercih ettiğiniz için teşekkür ederiz. 🙏",
+  ], dukkanAdi);
+}
+
+function teslimMesaji(customerName, model, dukkanAdi) {
+  return _imza([
+    _selamla(customerName), "",
+    `${model || "Cihazınız"} tarafınıza teslim edilmiştir. 📦`, "",
+    "Bizi tercih ettiğiniz için teşekkür ederiz, güvenle kullanın! 🙏",
+  ], dukkanAdi);
+}
+
+function iptalMesaji(customerName, model, dukkanAdi) {
+  const cihazIfadesi = model ? `${model} cihazınızın` : "Cihazınızın";
+  return _imza([
+    _selamla(customerName), "",
+    `${cihazIfadesi} tamir talebi iptal edilmiştir.`, "",
+    "Herhangi bir sorunuz olursa bize ulaşabilirsiniz.",
+  ], dukkanAdi);
+}
+
+function durumMesaji(status, customerName, model, faultDesc, dukkanAdi) {
+  if (status === "hazir") return hazirMesaji(customerName, model, faultDesc, dukkanAdi);
+  if (status === "teslim") return teslimMesaji(customerName, model, dukkanAdi);
+  return iptalMesaji(customerName, model, dukkanAdi);
+}
+
+function openWA(phone, mesaj) {
   const raw = (phone || "").replace(/\D/g, "");
   if (!raw) { alert("Müşteri telefon numarası kayıtlı değil"); return; }
   const num = raw.startsWith("90") ? raw : raw.startsWith("0") ? "9" + raw : "90" + raw;
-  const text = encodeURIComponent(hazirMesaji(customerName, model, dukkanAdi));
-  window.open(`https://wa.me/${num}?text=${text}`, "_blank");
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(mesaj)}`, "_blank");
 }
 
 export default function Repairs({ user }) {
@@ -284,9 +313,9 @@ export default function Repairs({ user }) {
                     <span className={`badge badge-${r.status}`} onClick={e => { e.stopPropagation(); setDurumSecim(r); }}
                       style={{ cursor: "pointer" }}>{STATUS_LABEL[r.status]}</span>
                     <ServisGun gun={gun} status={r.status} />
-                    {r.status === "hazir" && (
+                    {["hazir", "teslim", "iptal"].includes(r.status) && (
                       <button
-                        onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model, r.customer_name, user?.dukkan_adi); }}
+                        onClick={e => { e.stopPropagation(); openWA(r.customer_phone, durumMesaji(r.status, r.customer_name, r.device_model, r.fault_desc, user?.dukkan_adi)); }}
                         style={{
                           background: "#25D366", color: "#fff", border: "none",
                           borderRadius: 8, padding: "4px 8px", fontSize: 12,
@@ -331,9 +360,9 @@ export default function Repairs({ user }) {
                       </td>
                       <td>{r.created_at ? new Date(r.created_at).toLocaleDateString("tr-TR") : "—"}</td>
                       <td>
-                        {r.status === "hazir" && (
+                        {["hazir", "teslim", "iptal"].includes(r.status) && (
                           <button
-                            onClick={e => { e.stopPropagation(); openWA(r.customer_phone, r.device_model, r.customer_name, user?.dukkan_adi); }}
+                            onClick={e => { e.stopPropagation(); openWA(r.customer_phone, durumMesaji(r.status, r.customer_name, r.device_model, r.fault_desc, user?.dukkan_adi)); }}
                             style={{
                               background: "#25D366", color: "#fff", border: "none",
                               borderRadius: 8, padding: "4px 8px", fontSize: 12,

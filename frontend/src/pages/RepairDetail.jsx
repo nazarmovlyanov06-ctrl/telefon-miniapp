@@ -79,15 +79,39 @@ const DATE_ICONS = {
 
 function fmt(n) { return (n || 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 }); }
 
-function hazirMesaji(customerName, model, dukkanAdi) {
-  const selam = customerName ? `Merhaba ${customerName},` : "Merhaba,";
-  const satirlar = [
-    selam, "",
-    `${model || "Cihazınız"} tamiri tamamlandı, teslime hazır! ✅`, "",
-    "Bizi tercih ettiğiniz için teşekkür ederiz. 🙏",
-  ];
+function _selamla(customerName) { return customerName ? `Merhaba ${customerName},` : "Merhaba,"; }
+function _imza(satirlar, dukkanAdi) {
   if (dukkanAdi) { satirlar.push(""); satirlar.push(dukkanAdi); }
   return satirlar.join("\n");
+}
+
+function hazirMesaji(customerName, model, faultDesc, dukkanAdi) {
+  const anaCumle = model && faultDesc
+    ? `${model} cihazınızdaki "${faultDesc}" sorunu giderildi, tamiri tamamlandı! ✅`
+    : `${model || "Cihazınızın"} tamiri tamamlandı! ✅`;
+  return _imza([
+    _selamla(customerName), "",
+    anaCumle,
+    "Müsait olduğunuzda servisimizden teslim alabilirsiniz.", "",
+    "Bizi tercih ettiğiniz için teşekkür ederiz. 🙏",
+  ], dukkanAdi);
+}
+
+function teslimMesaji(customerName, model, dukkanAdi) {
+  return _imza([
+    _selamla(customerName), "",
+    `${model || "Cihazınız"} tarafınıza teslim edilmiştir. 📦`, "",
+    "Bizi tercih ettiğiniz için teşekkür ederiz, güvenle kullanın! 🙏",
+  ], dukkanAdi);
+}
+
+function iptalMesaji(customerName, model, dukkanAdi) {
+  const cihazIfadesi = model ? `${model} cihazınızın` : "Cihazınızın";
+  return _imza([
+    _selamla(customerName), "",
+    `${cihazIfadesi} tamir talebi iptal edilmiştir.`, "",
+    "Herhangi bir sorunuz olursa bize ulaşabilirsiniz.",
+  ], dukkanAdi);
 }
 
 function fmtDate(d) {
@@ -482,6 +506,7 @@ export default function RepairDetail({ user }) {
 
   const isHazir = repair.status === "hazir";
   const isTeslim = repair.status === "teslim";
+  const isIptal = repair.status === "iptal";
   // asyncpg jsonb kolonunu ham JSON metni olarak döndürür, parse gerekiyor.
   let durumDetay = null;
   if (repair.durum_detay) {
@@ -1083,15 +1108,16 @@ export default function RepairDetail({ user }) {
 
           {/* Aksiyonlar */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-            {(isHazir || isTeslim) && repair.customer_phone && (
+            {(isHazir || isTeslim || isIptal) && repair.customer_phone && (
               <button className="btn btn-ghost btn-sm"
                 style={{ background: "#25D366", color: "#fff", border: "none", display: "flex", alignItems: "center", gap: 6 }}
                 onClick={() => openWhatsApp(
-                  isHazir
-                    ? hazirMesaji(repair.customer_name, repair.device_model, user?.dukkan_adi)
-                    : `Merhaba ${repair.customer_name || ""},\n\nTamiriniz (#${repair.repair_no}) ile ilgili bilgi almak ister misiniz?`
+                  isHazir ? hazirMesaji(repair.customer_name, repair.device_model, repair.fault_desc, user?.dukkan_adi)
+                    : isTeslim ? teslimMesaji(repair.customer_name, repair.device_model, user?.dukkan_adi)
+                    : iptalMesaji(repair.customer_name, repair.device_model, user?.dukkan_adi)
                 )}>
-                <MessageCircle size={13} strokeWidth={2} /> WhatsApp{isHazir ? " - Hazır" : ""}
+                <MessageCircle size={13} strokeWidth={2} />
+                WhatsApp{isHazir ? " - Hazır" : isTeslim ? " - Teslim" : " - İptal"}
               </button>
             )}
             <button className="btn btn-ghost btn-sm" onClick={() => setFisModal(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
