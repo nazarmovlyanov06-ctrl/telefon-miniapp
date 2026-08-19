@@ -88,7 +88,15 @@ function DurumSecPencere({ repair, onClose, onDegisti }) {
       onDegisti(repair.id, status);
       onClose();
     } catch (e) {
-      alert(e.message || "Durum değiştirilemedi");
+      const mesaj = e.message || "Durum değiştirilemedi";
+      // "Tamirde"ye geçiş cihaz muayenesi onaylanmadan yapılamaz — bu sadece
+      // tamirin detayından yapılabildiği için listeden dead-end alert yerine
+      // oraya yönlendiriyoruz.
+      if (/muayene/i.test(mesaj) && confirm(mesaj + "\n\nTamirin detayına gidip tamamlamak ister misiniz?")) {
+        navigate(`/repairs/${repair.id}`);
+        return;
+      }
+      alert(mesaj);
       setSaving(false);
     }
   }

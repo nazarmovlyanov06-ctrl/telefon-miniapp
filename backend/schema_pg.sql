@@ -95,12 +95,24 @@ CREATE TABLE IF NOT EXISTS repairs (
     son_guncelleyen_id INTEGER REFERENCES kullanicilar(id),
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now(),
-    -- "Tamire Al"dan önce onaylanması zorunlu kontrol listesi — bekliyor
-    -- durumundan çıkınca kilitlenir (bkz. repairs.py DURUM_SIRASI).
+    -- Eski (kullanılmayan) kontrol listesi — "Tamire Al"dan önce zorunlu
+    -- tutulması mantıksızdı ("eski parça verildi" tamir olmadan mümkün değil,
+    -- "ön ödeme" her zaman alınmıyor). Kolonlar geriye dönük uyumluluk için
+    -- duruyor, artık hiçbir yerde okunmuyor/yazılmıyor — yerini aşağıdaki
+    -- teslim alma muayenesi aldı.
     on_odeme INTEGER DEFAULT 0,
     musteri_onayi INTEGER DEFAULT 0,
     eski_parca INTEGER DEFAULT 0,
     veri_yedegi INTEGER DEFAULT 0,
+    -- Cihaz teslim alma muayenesi — "Tamire Al"dan önce onaylanması zorunlu,
+    -- bekliyor durumundan çıkınca kilitlenir (bkz. repairs.py DURUM_SIRASI).
+    -- Gelen aksesuarlar + hangi fonksiyonların çalışıp çalışmadığı + cihaz
+    -- açılmıyorsa test edilemediği notu.
+    intake_kapali BOOLEAN DEFAULT false,
+    intake_notu TEXT,
+    intake_fonksiyonlar JSONB,
+    intake_aksesuarlar JSONB,
+    intake_onaylandi BOOLEAN DEFAULT false,
     -- Duruma özel ek bilgi: iptalde iade edilen kalemler + kime iade
     -- edildiği, teslimde kime teslim edildiği (JSON, esnek yapı).
     durum_detay JSONB,

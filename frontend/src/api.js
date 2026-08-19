@@ -136,7 +136,8 @@ export const api = {
   createRepair: (data) => post("/repairs/", data),
   updateRepair: (id, data) => put(`/repairs/${id}`, data),
   updateRepairStatus: (id, status, extra = {}) => patch(`/repairs/${id}/status`, { status, ...extra }),
-  updateRepairKontrol: (id, alan, deger) => patch(`/repairs/${id}/kontrol`, { alan, deger }),
+  updateRepairIntake: (id, data) => patch(`/repairs/${id}/intake`, data),
+  onaylaRepairIntake: (id) => post(`/repairs/${id}/intake/onayla`, {}),
   deleteRepair: (id) => del(`/repairs/${id}`),
 
   // Musteriler

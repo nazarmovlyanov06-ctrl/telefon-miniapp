@@ -4,9 +4,9 @@ import { api, fotoUrl } from "../api";
 import { PatternPreview } from "../components/PatternLock";
 import {
   Pencil, Home, CheckCircle2, Receipt, Copy, Check, MessageCircle,
-  Trash2, Lock, Eye, EyeOff, SquareCheck, Calendar, ClipboardList,
+  Trash2, Lock, Eye, EyeOff, Calendar, ClipboardList,
   Wrench, Camera, User, X, CircleX, Search, FileClock, Package, QrCode,
-  TriangleAlert, UserCheck, RotateCcw,
+  TriangleAlert, UserCheck, RotateCcw, PowerOff,
 } from "lucide-react";
 
 const STATUSES = [
@@ -31,11 +31,22 @@ const DURUM_SIRASI = {
   iptal: [],
 };
 
-const KONTROL_ALANLARI = [
-  { key: "on_odeme", label: "Ön ödeme alındı" },
-  { key: "musteri_onayi", label: "Müşteri onayı alındı" },
-  { key: "eski_parca", label: "Eski parça müşteriye verildi" },
-  { key: "veri_yedegi", label: "Veri yedeği alındı" },
+// Cihaz teslim alma muayenesi — eski "kontrol listesi" (ön ödeme/müşteri
+// onayı/eski parça verildi) tamir öncesi mantıksızdı ("henüz tamire
+// girmemiş parçayı nasıl versin"). Yerine cihazın GELİŞ durumunu belgeleyen
+// bu form geldi: gelen aksesuarlar + hangi fonksiyonlar çalışıyor/çalışmıyor
+// + cihaz açılmıyorsa test edilemediği notu.
+const FONKSIYON_LISTESI = [
+  "Ekran", "Dokunmatik", "Kamera", "Ön Kamera", "Hoparlör",
+  "Mikrofon", "Şarj", "Wifi / Bluetooth", "Sinyal / Şebeke", "Tuşlar",
+];
+const AKSESUAR_LISTESI = [
+  { key: "kilif", label: "Kılıf" },
+  { key: "sarj_aleti", label: "Şarj Aleti / Kablo" },
+  { key: "kutu", label: "Kutu" },
+  { key: "hafiza_karti", label: "Hafıza Kartı" },
+  { key: "sim_kart", label: "SIM Kart" },
+  { key: "kulaklik", label: "Kulaklık" },
 ];
 
 const IADE_KALEMLERI = [
@@ -94,9 +105,12 @@ export default function RepairDetail({ user }) {
   const [iptalSaving, setIptalSaving] = useState(false);
   const [iptalHata, setIptalHata] = useState("");
 
-  // Kontrol listesi tamamlanmadan "Tamirde"ye geçilemez — uyarı için
+  // Muayene onaylanmadan "Tamirde"ye geçilemez — uyarı için
   const [kontrolUyari, setKontrolUyari] = useState(false);
   const kontrolRef = useRef(null);
+  // Cihaz teslim alma muayenesi
+  const [intake, setIntake] = useState({ kapali: false, notu: "", fonksiyonlar: {}, aksesuarlar: {} });
+  const [intakeSaving, setIntakeSaving] = useState(false);
 
   // Parçalar
   const [parcalar, setParcalar] = useState([]);
@@ -154,6 +168,11 @@ export default function RepairDetail({ user }) {
         warranty_days: r.warranty_days || "",
       });
       if (r.final_price) setTeslimForm(f => ({ ...f, final_price: r.final_price, payment_type: r.payment_type || "nakit" }));
+      // asyncpg jsonb kolonlarını ham JSON metni olarak döndürür, parse gerekiyor.
+      let fonksiyonlar = {}, aksesuarlar = {};
+      try { fonksiyonlar = r.intake_fonksiyonlar ? JSON.parse(r.intake_fonksiyonlar) : {}; } catch { /* eski/boş veri */ }
+      try { aksesuarlar = r.intake_aksesuarlar ? JSON.parse(r.intake_aksesuarlar) : {}; } catch { /* eski/boş veri */ }
+      setIntake({ kapali: !!r.intake_kapali, notu: r.intake_notu || "", fonksiyonlar, aksesuarlar });
     }).finally(() => setLoading(false));
     api.vitrinAyarlarim().then(r => setDukkanSlug(r.slug)).catch(() => {});
   }, [id]);
@@ -173,14 +192,11 @@ export default function RepairDetail({ user }) {
       setIptalModal(true);
       return;
     }
-    if (onceki === "bekliyor" && status === "tamirde") {
-      const tamamMi = KONTROL_ALANLARI.every(k => repair[k.key]);
-      if (!tamamMi) {
-        setKontrolUyari(true);
-        kontrolRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        setTimeout(() => setKontrolUyari(false), 1800);
-        return;
-      }
+    if (onceki === "bekliyor" && status === "tamirde" && !repair.intake_onaylandi) {
+      setKontrolUyari(true);
+      kontrolRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => setKontrolUyari(false), 1800);
+      return;
     }
 
     setSaving(true);
@@ -231,12 +247,37 @@ export default function RepairDetail({ user }) {
     } finally { setSaving(false); }
   }
 
-  async function kontrolToggle(alan) {
-    const yeni = repair[alan] ? 0 : 1;
+  async function intakeGuncelle(partial) {
+    const yeni = { ...intake, ...partial };
+    setIntake(yeni);
+    setIntakeSaving(true);
     try {
-      await api.updateRepairKontrol(id, alan, yeni);
-      setRepair(r => ({ ...r, [alan]: yeni }));
-    } catch (e) { alert(e.message || "Güncellenemedi"); }
+      await api.updateRepairIntake(id, partial);
+    } catch (e) {
+      alert(e.message || "Güncellenemedi");
+      setIntake(intake); // başarısızsa eski haline geri al
+    } finally { setIntakeSaving(false); }
+  }
+
+  function fonksiyonAyarla(ad, deger) {
+    const guncelDeger = intake.fonksiyonlar[ad] === deger ? null : deger; // aynı değere tekrar basınca temizle
+    const fonksiyonlar = { ...intake.fonksiyonlar, [ad]: guncelDeger };
+    intakeGuncelle({ fonksiyonlar });
+  }
+
+  function aksesuarToggle(anahtar) {
+    const aksesuarlar = { ...intake.aksesuarlar, [anahtar]: !intake.aksesuarlar[anahtar] };
+    intakeGuncelle({ aksesuarlar });
+  }
+
+  async function intakeOnayla() {
+    setIntakeSaving(true);
+    try {
+      await api.onaylaRepairIntake(id);
+      setRepair(r => ({ ...r, intake_onaylandi: true }));
+    } catch (e) {
+      alert(e.message || "Onaylanamadı");
+    } finally { setIntakeSaving(false); }
   }
 
   function teslimAlanAyniKisi() {
@@ -851,51 +892,130 @@ export default function RepairDetail({ user }) {
             </>}
           </div>
 
-          {/* Kontrol Listesi — sadece "Bekliyor" durumundayken değiştirilebilir;
-              "Tamirde"ye geçmeden önce tamamlanması zorunlu, geçtikten sonra
-              kilitlenir (tekrar değiştirilemez). */}
+          {/* Cihaz Teslim Alma Muayenesi — sadece "Bekliyor" durumunda ve
+              onaylanmadan önce değiştirilebilir; "Tamirde"ye geçmeden önce
+              onaylanması zorunlu, onaylanınca kilitlenir. */}
           <div ref={kontrolRef} tabIndex={-1}
             className={"card" + (kontrolUyari ? " alan-hata" : "")}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4, color: "var(--hint)", display: "flex", alignItems: "center", gap: 7 }}>
-              <SquareCheck size={14} strokeWidth={2} /> KONTROL LİSTESİ
-              {repair.status !== "bekliyor" && (
-                <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: "var(--hint)", display: "flex", alignItems: "center", gap: 4 }}>
-                  <Lock size={11} strokeWidth={2} /> Kilitli
+              <ClipboardList size={14} strokeWidth={2} /> CİHAZ MUAYENESİ
+              {repair.intake_onaylandi && (
+                <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: "var(--green)", display: "flex", alignItems: "center", gap: 4 }}>
+                  <Lock size={11} strokeWidth={2} /> Onaylandı
                 </span>
               )}
             </div>
-            {repair.status === "bekliyor" && (
-              <div style={{ fontSize: 11.5, color: "var(--hint)", marginBottom: 8 }}>
-                "Tamirde"ye geçmeden önce tamamlanmalı.
+            {!repair.intake_onaylandi && repair.status === "bekliyor" && (
+              <div style={{ fontSize: 11.5, color: "var(--hint)", marginBottom: 10 }}>
+                Cihazın geliş durumunu kaydedip onaylayın — "Tamirde"ye geçmeden önce zorunlu.
               </div>
             )}
             {kontrolUyari && (
-              <div style={{ fontSize: 12.5, color: "var(--danger)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                <TriangleAlert size={13} strokeWidth={2} /> Tamire almadan önce kontrol listesini tamamlayın
+              <div style={{ fontSize: 12.5, color: "var(--danger)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                <TriangleAlert size={13} strokeWidth={2} /> Tamire almadan önce cihaz muayenesini tamamlayıp onaylayın
               </div>
             )}
-            {KONTROL_ALANLARI.map(item => {
-              const kilitli = repair.status !== "bekliyor";
+
+            {(() => {
+              const kilitli = repair.intake_onaylandi || repair.status !== "bekliyor";
               return (
-                <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", opacity: kilitli ? 0.75 : 1 }}>
-                  <div
-                    onClick={() => !kilitli && kontrolToggle(item.key)}
+                <div style={{ opacity: kilitli ? 0.8 : 1 }}>
+                  <div onClick={() => !kilitli && intakeGuncelle({ kapali: !intake.kapali })}
                     style={{
-                      width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "9px 11px", borderRadius: 10, marginBottom: 10,
+                      border: `1.5px solid ${intake.kapali ? "var(--orange)" : "var(--divider)"}`,
+                      background: intake.kapali ? "rgba(246,162,74,0.08)" : "transparent",
                       cursor: kilitli ? "default" : "pointer",
-                      border: `2px solid ${repair[item.key] ? "var(--blue)" : "var(--divider)"}`,
-                      background: repair[item.key] ? "var(--blue)" : "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "#191b20",
                     }}>
-                    {repair[item.key] ? <Check size={14} strokeWidth={3} /> : null}
+                    <span style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, color: intake.kapali ? "var(--orange)" : "var(--text)" }}>
+                      <PowerOff size={14} strokeWidth={2} /> Cihaz açılmıyor / test edilemiyor
+                    </span>
+                    <div style={{
+                      width: 40, height: 23, borderRadius: 12, flexShrink: 0,
+                      background: intake.kapali ? "var(--orange)" : "var(--border)",
+                      position: "relative", transition: "background 0.2s",
+                    }}>
+                      <div style={{
+                        position: "absolute", top: 2.5, left: intake.kapali ? 19 : 2.5,
+                        width: 18, height: 18, borderRadius: "50%", background: "#fff",
+                        transition: "left 0.2s",
+                      }} />
+                    </div>
                   </div>
-                  <span style={{ fontSize: 13, color: repair[item.key] ? "var(--text)" : "var(--hint)" }}>
-                    {item.label}
-                  </span>
+
+                  {!intake.kapali && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--hint)", marginBottom: 6 }}>FONKSİYONLAR</div>
+                      {FONKSIYON_LISTESI.map(ad => {
+                        const durum = intake.fonksiyonlar[ad];
+                        return (
+                          <div key={ad} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0" }}>
+                            <span style={{ fontSize: 13, color: "var(--text)" }}>{ad}</span>
+                            <div style={{ display: "flex", gap: 5 }}>
+                              <button type="button" disabled={kilitli} onClick={() => fonksiyonAyarla(ad, "calisiyor")}
+                                style={{
+                                  width: 28, height: 28, borderRadius: 8, border: "none", cursor: kilitli ? "default" : "pointer",
+                                  background: durum === "calisiyor" ? "var(--green)" : "var(--bg2)",
+                                  color: durum === "calisiyor" ? "#191b20" : "var(--hint)",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                }}>
+                                <Check size={14} strokeWidth={2.6} />
+                              </button>
+                              <button type="button" disabled={kilitli} onClick={() => fonksiyonAyarla(ad, "calismiyor")}
+                                style={{
+                                  width: 28, height: 28, borderRadius: 8, border: "none", cursor: kilitli ? "default" : "pointer",
+                                  background: durum === "calismiyor" ? "var(--danger)" : "var(--bg2)",
+                                  color: durum === "calismiyor" ? "#191b20" : "var(--hint)",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                }}>
+                                <X size={14} strokeWidth={2.6} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--hint)", marginBottom: 6 }}>GELEN AKSESUARLAR</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {AKSESUAR_LISTESI.map(a => {
+                        const secili = !!intake.aksesuarlar[a.key];
+                        return (
+                          <button key={a.key} type="button" disabled={kilitli} onClick={() => aksesuarToggle(a.key)}
+                            style={{
+                              padding: "5px 11px", borderRadius: 20, fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+                              cursor: kilitli ? "default" : "pointer",
+                              border: `1px solid ${secili ? "var(--blue)" : "var(--divider)"}`,
+                              background: secili ? "rgba(94,168,255,0.12)" : "transparent",
+                              color: secili ? "var(--blue)" : "var(--hint)",
+                            }}>
+                            {a.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: kilitli ? 0 : 10 }}>
+                    <label className="form-label">Not</label>
+                    <input className="form-input" placeholder="Ör. arka kapak çatlak, ekranda çizik var..."
+                      value={intake.notu} disabled={kilitli}
+                      onChange={e => setIntake(i => ({ ...i, notu: e.target.value }))}
+                      onBlur={() => !kilitli && intakeGuncelle({ notu: intake.notu })} />
+                  </div>
+
+                  {!kilitli && (
+                    <button type="button" className="btn btn-primary btn-sm" onClick={intakeOnayla} disabled={intakeSaving}
+                      style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                      <CheckCircle2 size={14} strokeWidth={2} /> {intakeSaving ? "..." : "Muayeneyi Onayla"}
+                    </button>
+                  )}
                 </div>
               );
-            })}
+            })()}
           </div>
 
           {/* Tarihler */}
