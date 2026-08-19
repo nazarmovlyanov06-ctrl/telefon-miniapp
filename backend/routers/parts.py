@@ -15,16 +15,20 @@ async def list_parts(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    where = ["dukkan_id = $1"]
+    where = ["p.dukkan_id = $1"]
     params = [dukkan_id]
     if q:
         params += [f"%{q}%", f"%{q}%"]
-        where.append(f"(name ILIKE ${len(params)-1} OR device_model ILIKE ${len(params)})")
+        where.append(f"(p.name ILIKE ${len(params)-1} OR p.device_model ILIKE ${len(params)})")
     if low_stock:
-        where.append("quantity <= min_quantity")
+        where.append("p.quantity <= p.min_quantity")
     where_sql = "WHERE " + " AND ".join(where)
     rows = await db.fetch(
-        f"SELECT * FROM parts {where_sql} ORDER BY created_at DESC LIMIT 100", *params
+        f"""SELECT p.*, t.ad AS toptanci_adi FROM parts p
+            LEFT JOIN toptancilar t ON t.id = p.toptanci_id
+            {where_sql}
+            ORDER BY p.created_at DESC LIMIT 100""",
+        *params,
     )
     return [dict(r) for r in rows]
 
@@ -38,8 +42,8 @@ async def create_part(
 ):
     row = await db.fetchrow(
         """INSERT INTO parts (dukkan_id, name, device_model, part_type, quantity, min_quantity,
-           purchase_price, sale_price, created_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id""",
+           purchase_price, sale_price, toptanci_id, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id""",
         dukkan_id,
         body["name"],
         body.get("device_model"),
@@ -48,6 +52,7 @@ async def create_part(
         body.get("min_quantity", 2),
         body.get("purchase_price"),
         body.get("sale_price"),
+        body.get("toptanci_id"),
         user["id"],
     )
     return {"id": row["id"]}
@@ -108,16 +113,19 @@ async def stok_ekle(
     if miktar < 1:
         raise HTTPException(400, "Geçersiz miktar")
     fiyat = body.get("fiyat")
+    toptanci_id = body.get("toptanci_id")
     async with db.transaction():
         if fiyat:
             await db.execute(
-                "UPDATE parts SET quantity = quantity + $1, purchase_price = $2 WHERE id = $3 AND dukkan_id = $4",
-                miktar, float(fiyat), part_id, dukkan_id,
+                """UPDATE parts SET quantity = quantity + $1, purchase_price = $2,
+                   toptanci_id = COALESCE($3, toptanci_id) WHERE id = $4 AND dukkan_id = $5""",
+                miktar, float(fiyat), toptanci_id, part_id, dukkan_id,
             )
         else:
             await db.execute(
-                "UPDATE parts SET quantity = quantity + $1 WHERE id = $2 AND dukkan_id = $3",
-                miktar, part_id, dukkan_id,
+                """UPDATE parts SET quantity = quantity + $1,
+                   toptanci_id = COALESCE($2, toptanci_id) WHERE id = $3 AND dukkan_id = $4""",
+                miktar, toptanci_id, part_id, dukkan_id,
             )
         await db.execute(
             """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by)

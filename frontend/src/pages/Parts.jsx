@@ -73,8 +73,12 @@ export default function Parts({ user }) {
 
   // Stok ekle formu
   const [showAddForm, setShowAddForm] = useState(false);
-  const [addForm, setAddForm] = useState({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" });
+  const [addForm, setAddForm] = useState({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", toptanci: "", toptanci_id: null });
   const [addErr, setAddErr] = useState("");
+  const [addDolarMode, setAddDolarMode] = useState(false);
+  const [addDolarMiktar, setAddDolarMiktar] = useState("");
+  const [addTopOner, setAddTopOner] = useState([]);
+  const [showAddTopOner, setShowAddTopOner] = useState(false);
 
   // Stok düş / ekle panel
   const [selectedPart, setSelectedPart] = useState(null);
@@ -288,15 +292,36 @@ export default function Parts({ user }) {
     } catch (e) { setErr(e.message); }
   }
 
+  function handleAddTop(val) {
+    setAddForm(f => ({ ...f, toptanci: val, toptanci_id: null }));
+    if (val.length >= 1) {
+      const found = toptancilar.filter(t => t.ad.toLowerCase().includes(val.toLowerCase())).slice(0, 5);
+      setAddTopOner(found); setShowAddTopOner(found.length > 0);
+    } else { setShowAddTopOner(false); }
+  }
+
+  async function resolveToptanciId() {
+    const ad = addForm.toptanci.trim();
+    if (!ad) return null;
+    if (addForm.toptanci_id) return addForm.toptanci_id;
+    const mevcut = toptancilar.find(t => t.ad.toLowerCase() === ad.toLowerCase());
+    if (mevcut) return mevcut.id;
+    const yeni = await api.createToptanci({ ad });
+    api.toptanciList().then(setToptancilar);
+    return yeni.id;
+  }
+
   async function submitAddPart(e) {
     e.preventDefault(); setAddErr("");
     try {
       const combinedModel = [addBrand, addForm.device_model].filter(Boolean).join(" ").trim();
+      const toptanciId = await resolveToptanciId();
       if (addEklePart) {
         await api.stokEkle(addEklePart.id, {
           miktar: parseInt(addForm.quantity) || 1,
           fiyat: addForm.purchase_price ? parseFloat(addForm.purchase_price) : null,
           aciklama: null,
+          toptanci_id: toptanciId,
         });
       } else {
         await api.createPart({
@@ -307,10 +332,13 @@ export default function Parts({ user }) {
           min_quantity: parseInt(addForm.min_quantity) || 2,
           purchase_price: addForm.purchase_price ? parseFloat(addForm.purchase_price) : 0,
           sale_price: 0,
+          toptanci_id: toptanciId,
         });
       }
       setShowAddForm(false);
-      setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" });
+      setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", toptanci: "", toptanci_id: null });
+      setAddDolarMode(false);
+      setAddDolarMiktar("");
       setAddEklePart(null);
       setAddBrand("");
       api.parts(q ? { q } : {}).then(setParts);
@@ -391,16 +419,67 @@ export default function Parts({ user }) {
                             onChange={e => setAddForm(f => ({ ...f, quantity: e.target.value }))} />
                         </div>
                         <div className="form-group" style={{ margin: 0 }}>
-                          <label className="form-label">Alış Fiyatı (₺)</label>
-                          <input className="form-input" type="number" step="0.01" value={addForm.purchase_price}
-                            onChange={e => setAddForm(f => ({ ...f, purchase_price: e.target.value }))}
-                            placeholder="Opsiyonel" />
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            <span className="form-label" style={{ margin: 0 }}>
+                              {addDolarMode ? "Dolar ($)" : "Alış Fiyatı (₺)"}
+                            </span>
+                            <button type="button"
+                              onClick={() => { setAddDolarMode(m => !m); setAddDolarMiktar(""); setAddForm(f => ({ ...f, purchase_price: "" })); }}
+                              style={{ marginLeft: "auto", fontSize: 10, padding: "2px 7px", borderRadius: 10, border: "none",
+                                background: addDolarMode ? "var(--accent)" : "var(--bg2)", color: addDolarMode ? "#fff" : "var(--hint)",
+                                cursor: "pointer", fontWeight: 700 }}>
+                              $
+                            </button>
+                          </div>
+                          {addDolarMode ? (
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <input className="form-input" type="number" step="0.01"
+                                value={addDolarMiktar} placeholder="0.00"
+                                onChange={e => {
+                                  setAddDolarMiktar(e.target.value);
+                                  const tl = dollarRate ? String(Math.round(parseFloat(e.target.value || 0) * dollarRate)) : "";
+                                  setAddForm(f => ({ ...f, purchase_price: tl }));
+                                }} />
+                              {dollarRate && <span style={{ fontSize: 11, color: "var(--hint)", alignSelf: "center", whiteSpace: "nowrap" }}>≈{addForm.purchase_price}₺</span>}
+                            </div>
+                          ) : (
+                            <input className="form-input" type="number" step="0.01" value={addForm.purchase_price}
+                              onChange={e => setAddForm(f => ({ ...f, purchase_price: e.target.value }))}
+                              placeholder="Opsiyonel" />
+                          )}
+                          {addDolarMode && !dollarRate && (
+                            <button type="button" onClick={fetchDollarRate} disabled={kurLoading}
+                              style={{ marginTop: 4, fontSize: 11, padding: "3px 10px", borderRadius: 10,
+                                border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--hint)" }}>
+                              {kurLoading ? "..." : <><RefreshCw size={11} strokeWidth={2} /> Kur al</>}
+                            </button>
+                          )}
                         </div>
+                      </div>
+                      <div className="form-group" style={{ marginTop: 8, position: "relative" }}>
+                        <label className="form-label">Toptancı</label>
+                        <input className="form-input" value={addForm.toptanci}
+                          onChange={e => handleAddTop(e.target.value)}
+                          onBlur={() => setTimeout(() => setShowAddTopOner(false), 150)}
+                          placeholder="Hangi toptancıdan alındı..." autoComplete="off" />
+                        {showAddTopOner && (
+                          <div className="ac-dropdown">
+                            {addTopOner.map(t => (
+                              <div key={t.id} onMouseDown={() => { setAddForm(f => ({ ...f, toptanci: t.ad, toptanci_id: t.id })); setShowAddTopOner(false); }}
+                                style={{ padding: "8px 12px", cursor: "pointer", borderBottom: "1px solid var(--border)", fontSize: 13 }}>
+                                {t.ad}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {addForm.toptanci && !toptancilar.find(t => t.ad.toLowerCase() === addForm.toptanci.trim().toLowerCase()) && (
+                          <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>Listede yok — kaydedince yeni toptancı olarak eklenecek</div>
+                        )}
                       </div>
                       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                         <button type="submit" className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}><Plus size={13} strokeWidth={2.4} /> Stok Ekle</button>
                         <button type="button" className="btn btn-ghost btn-sm"
-                          onClick={() => { setShowAddForm(false); setAddEklePart(null); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" }); }}>
+                          onClick={() => { setShowAddForm(false); setAddEklePart(null); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", toptanci: "", toptanci_id: null }); setAddDolarMode(false); setAddDolarMiktar(""); }}>
                           İptal
                         </button>
                       </div>
@@ -460,7 +539,7 @@ export default function Parts({ user }) {
                           customTypes={parcaTurleri} onAddCustom={turEkle}
                           onRemoveCustom={turSil} />
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
                         <div className="form-group" style={{ margin: 0 }}>
                           <label className="form-label">Adet</label>
                           <input className="form-input" type="number" min="0" value={addForm.quantity}
@@ -472,16 +551,67 @@ export default function Parts({ user }) {
                             onChange={e => setAddForm(f => ({ ...f, min_quantity: e.target.value }))} />
                         </div>
                         <div className="form-group" style={{ margin: 0 }}>
-                          <label className="form-label">Alış (₺)</label>
-                          <input className="form-input" type="number" value={addForm.purchase_price}
-                            onChange={e => setAddForm(f => ({ ...f, purchase_price: e.target.value }))}
-                            placeholder="0" />
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            <span className="form-label" style={{ margin: 0 }}>
+                              {addDolarMode ? "Dolar ($)" : "Alış (₺)"}
+                            </span>
+                            <button type="button"
+                              onClick={() => { setAddDolarMode(m => !m); setAddDolarMiktar(""); setAddForm(f => ({ ...f, purchase_price: "" })); }}
+                              style={{ marginLeft: "auto", fontSize: 10, padding: "2px 7px", borderRadius: 10, border: "none",
+                                background: addDolarMode ? "var(--accent)" : "var(--bg2)", color: addDolarMode ? "#fff" : "var(--hint)",
+                                cursor: "pointer", fontWeight: 700 }}>
+                              $
+                            </button>
+                          </div>
+                          {addDolarMode ? (
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <input className="form-input" type="number" step="0.01"
+                                value={addDolarMiktar} placeholder="0.00"
+                                onChange={e => {
+                                  setAddDolarMiktar(e.target.value);
+                                  const tl = dollarRate ? String(Math.round(parseFloat(e.target.value || 0) * dollarRate)) : "";
+                                  setAddForm(f => ({ ...f, purchase_price: tl }));
+                                }} />
+                              {dollarRate && <span style={{ fontSize: 11, color: "var(--hint)", alignSelf: "center", whiteSpace: "nowrap" }}>≈{addForm.purchase_price}₺</span>}
+                            </div>
+                          ) : (
+                            <input className="form-input" type="number" value={addForm.purchase_price}
+                              onChange={e => setAddForm(f => ({ ...f, purchase_price: e.target.value }))}
+                              placeholder="0" />
+                          )}
+                          {addDolarMode && !dollarRate && (
+                            <button type="button" onClick={fetchDollarRate} disabled={kurLoading}
+                              style={{ marginTop: 4, fontSize: 11, padding: "3px 10px", borderRadius: 10,
+                                border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--hint)" }}>
+                              {kurLoading ? "..." : <><RefreshCw size={11} strokeWidth={2} /> Kur al</>}
+                            </button>
+                          )}
+                        </div>
+                        <div className="form-group" style={{ margin: 0, position: "relative" }}>
+                          <label className="form-label">Toptancı</label>
+                          <input className="form-input" value={addForm.toptanci}
+                            onChange={e => handleAddTop(e.target.value)}
+                            onBlur={() => setTimeout(() => setShowAddTopOner(false), 150)}
+                            placeholder="Hangi toptancıdan..." autoComplete="off" />
+                          {showAddTopOner && (
+                            <div className="ac-dropdown">
+                              {addTopOner.map(t => (
+                                <div key={t.id} onMouseDown={() => { setAddForm(f => ({ ...f, toptanci: t.ad, toptanci_id: t.id })); setShowAddTopOner(false); }}
+                                  style={{ padding: "8px 12px", cursor: "pointer", borderBottom: "1px solid var(--border)", fontSize: 13 }}>
+                                  {t.ad}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {addForm.toptanci && !toptancilar.find(t => t.ad.toLowerCase() === addForm.toptanci.trim().toLowerCase()) && (
+                            <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>Yeni toptancı olarak eklenecek</div>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                         <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
                         <button type="button" className="btn btn-ghost btn-sm"
-                          onClick={() => { setShowAddForm(false); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "" }); }}>
+                          onClick={() => { setShowAddForm(false); setAddForm({ name: "", device_model: "", part_type: "", quantity: "1", min_quantity: "2", purchase_price: "", toptanci: "", toptanci_id: null }); setAddDolarMode(false); setAddDolarMiktar(""); }}>
                           İptal
                         </button>
                       </div>
@@ -539,7 +669,7 @@ export default function Parts({ user }) {
                     </div>
                     <div className="list-item-body" style={{ cursor: "pointer" }} onClick={() => openPanel(p, "ekle")}>
                       <div className="list-item-title">{p.name}</div>
-                      <div className="list-item-sub">{p.device_model} · {p.part_type}{p.purchase_price && !priceHidden ? ` · ${p.purchase_price.toLocaleString("tr-TR")}₺` : p.purchase_price && priceHidden ? " · ••••₺" : ""}</div>
+                      <div className="list-item-sub">{p.device_model} · {p.part_type}{p.purchase_price && !priceHidden ? ` · ${p.purchase_price.toLocaleString("tr-TR")}₺` : p.purchase_price && priceHidden ? " · ••••₺" : ""}{p.toptanci_adi ? ` · ${p.toptanci_adi}` : ""}</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ textAlign: "right" }}>

@@ -161,6 +161,11 @@ CREATE TABLE IF NOT EXISTS toptancilar (
     created_at TIMESTAMP DEFAULT now()
 );
 
+-- parts.toptanci_id burada ekleniyor (yukarıda değil) çünkü toptancilar
+-- tablosu parts'tan SONRA tanımlı — inline REFERENCES tabloyu henüz var
+-- olmayan bir tabloya bağlayamaz.
+ALTER TABLE parts ADD COLUMN IF NOT EXISTS toptanci_id INTEGER REFERENCES toptancilar(id);
+
 CREATE TABLE IF NOT EXISTS part_orders (
     id SERIAL PRIMARY KEY,
     dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
