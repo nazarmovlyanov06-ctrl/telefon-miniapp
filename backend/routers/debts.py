@@ -10,7 +10,10 @@ from datetime import date
 # kalan tutar burada 'alacak' olarak bekliyor — bu yüzden ileride tahsil
 # edilince aynı gelir kaynağına (2el_satis/sifir_satis) sayılmalı, "manuel"
 # oluşturulan alacaklar ise kaynak dökümünde "Diğer"e düşer.
-_ALACAK_KAYNAK = {"2el_taksit": "2el_satis", "sifir_taksit": "sifir_satis"}
+_ALACAK_KAYNAK = {
+    "2el_taksit": "2el_satis", "sifir_taksit": "sifir_satis",
+    "tamir_taksit": "tamir", "tamir_borc": "tamir",
+}
 
 router = APIRouter(prefix="/debts", tags=["debts"])
 

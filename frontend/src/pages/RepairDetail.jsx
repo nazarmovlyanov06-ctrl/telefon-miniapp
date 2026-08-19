@@ -131,6 +131,7 @@ export default function RepairDetail({ user }) {
   const [teslimModal, setTeslimModal] = useState(false);
   const [teslimForm, setTeslimForm] = useState({
     final_price: "", payment_type: "nakit", kasa_yazilsin: true,
+    pesinat: "", taksit_sayi: "1",
     teslim_alan_ad: "", teslim_alan_tel: "",
   });
 
@@ -373,6 +374,8 @@ export default function RepairDetail({ user }) {
         ...form, status: "teslim", final_price: final,
         payment_type: teslimForm.payment_type,
         kasa_yazilsin: teslimForm.kasa_yazilsin && final > 0,
+        pesinat: teslimForm.payment_type === "taksit" ? (parseFloat(teslimForm.pesinat) || 0) : undefined,
+        taksit_sayi: teslimForm.payment_type === "taksit" ? (parseInt(teslimForm.taksit_sayi) || 1) : undefined,
         teslim_alan_ad: teslimForm.teslim_alan_ad || repair.customer_name || null,
         teslim_alan_tel: teslimForm.teslim_alan_tel || repair.customer_phone || null,
       }));
@@ -625,7 +628,26 @@ export default function RepairDetail({ user }) {
                 <option value="borc">Borç</option>
               </select>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            {teslimForm.payment_type === "taksit" && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div className="form-group">
+                  <label className="form-label">Şimdi Alınan (₺)</label>
+                  <input className="form-input" type="number" value={teslimForm.pesinat}
+                    onChange={e => setTeslimForm(f => ({ ...f, pesinat: e.target.value }))} placeholder="0" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Taksit Sayısı</label>
+                  <input className="form-input" type="number" min="1" value={teslimForm.taksit_sayi}
+                    onChange={e => setTeslimForm(f => ({ ...f, taksit_sayi: e.target.value }))} />
+                </div>
+              </div>
+            )}
+            {teslimForm.payment_type === "borc" && (
+              <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, color: "var(--danger)", marginBottom: 4 }}>
+                Ödeme alınmadı — tüm tutar Borçlar sayfasına "alacak" olarak eklenecek, kasaya hiçbir şey yazılmayacak.
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, marginTop: teslimForm.payment_type === "taksit" ? 4 : 8 }}>
               <input type="checkbox" id="kasaYazilsin"
                 checked={teslimForm.kasa_yazilsin}
                 onChange={e => setTeslimForm(f => ({ ...f, kasa_yazilsin: e.target.checked }))} />

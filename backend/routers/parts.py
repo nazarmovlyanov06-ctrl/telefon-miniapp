@@ -66,29 +66,45 @@ async def create_part(
         dukkan_id, row["id"], body.get("quantity", 0), date.today().isoformat(), user["id"],
         body.get("toptanci_id"), body.get("purchase_price"),
     )
-    await _kasa_parca_gideri_yaz(
-        db, dukkan_id, body.get("purchase_price"), body.get("quantity", 0),
+    await _parca_odeme_isle(
+        db, dukkan_id, body.get("odeme_yontemi"), body.get("purchase_price"), body.get("quantity", 0),
         f"Parça alımı: {body['name']} x{body.get('quantity', 0)}",
+        body.get("toptanci_id"), user["id"],
     )
     return {"id": row["id"]}
 
 
-async def _kasa_parca_gideri_yaz(db, dukkan_id, birim_fiyat, miktar, aciklama):
-    """Parça alımı (yeni parça / stok girişi / sipariş alındı) kasadan para
-    çıkışı sayılır — daha önce hiç kasa_hareketleri'ne yazılmıyordu, bu yüzden
-    Kasa'daki Toplam Gider parça alımlarını hiç yansıtmıyordu. Ödeme yöntemi
-    bu formlarda seçilmediği için nakit varsayılıyor (parça iade/manuel
-    düzeltme akışlarındaki aynı varsayılanla tutarlı)."""
+async def _parca_odeme_isle(db, dukkan_id, odeme_yontemi, birim_fiyat, miktar, aciklama, toptanci_id, user_id):
+    """Parça alımının (yeni parça / stok girişi / sipariş alındı) ödemesini
+    işler — daha önce hiç kasa_hareketleri'ne veya Borçlar'a yazılmıyordu,
+    bu yüzden Kasa'daki Toplam Gider parça alımlarını hiç yansıtmıyordu.
+    Nakit/kart ise kasaya gider yazılır; borç ise toptancıya olan borç
+    Borçlar sayfasına 'dükkan borcu' olarak eklenir, kasaya HİÇ yazılmaz.
+    Ödeme yöntemi belirtilmemiş eski çağrılarda nakit varsayılır."""
     if not birim_fiyat or not miktar:
         return
     tutar = float(birim_fiyat) * int(miktar)
     if tutar <= 0:
         return
-    await db.execute(
-        """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
-           VALUES ($1, $2, 'cikis', 'nakit', $3, $4, 'parca_alim')""",
-        dukkan_id, date.today().isoformat(), tutar, aciklama,
-    )
+    odeme = odeme_yontemi or "nakit"
+    if odeme == "borc":
+        toptanci_adi = "Toptancı"
+        if toptanci_id:
+            t = await db.fetchrow("SELECT ad FROM toptancilar WHERE id=$1 AND dukkan_id=$2", toptanci_id, dukkan_id)
+            if t:
+                toptanci_adi = t["ad"]
+        await db.execute(
+            """INSERT INTO debts (dukkan_id, alacakli_adi, borc_turu, source_type, amount, total_amount,
+               payment_type, notes, created_by)
+               VALUES ($1, $2, 'dukkan_borcu', 'parca_alim', $3, $3, 'borc', $4, $5)""",
+            dukkan_id, toptanci_adi, tutar, aciklama, user_id,
+        )
+    else:
+        await db.execute(
+            """INSERT INTO kasa_hareketleri (dukkan_id, tarih, tur, odeme_yontemi, tutar, aciklama, kaynak)
+               VALUES ($1, $2, 'cikis', $3, $4, $5, 'parca_alim')""",
+            dukkan_id, date.today().isoformat(), odeme, tutar, aciklama,
+        )
 
 
 async def _toptanci_alis_kaydet(db, dukkan_id, toptanci_id, urun, miktar, birim_fiyat):
@@ -189,7 +205,10 @@ async def stok_ekle(
             toptanci_id, float(fiyat) if fiyat else None,
         )
         await _toptanci_alis_kaydet(db, dukkan_id, toptanci_id, part["name"], miktar, fiyat)
-        await _kasa_parca_gideri_yaz(db, dukkan_id, fiyat, miktar, f"Stok girişi: {part['name']} x{miktar}")
+        await _parca_odeme_isle(
+            db, dukkan_id, body.get("odeme_yontemi"), fiyat, miktar,
+            f"Stok girişi: {part['name']} x{miktar}", toptanci_id, user["id"],
+        )
     return {"ok": True}
 
 
