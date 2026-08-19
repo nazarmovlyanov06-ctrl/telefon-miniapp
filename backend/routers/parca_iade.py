@@ -2,6 +2,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 from database import get_db
 from auth import get_current_user, get_dukkan_id
+from odeme_yardimci import kaydet_odeme
 from datetime import date
 
 router = APIRouter(prefix="/parca-iade", tags=["parca-iade"])
@@ -10,7 +11,7 @@ router = APIRouter(prefix="/parca-iade", tags=["parca-iade"])
 # gerçek akışta hiç var olmayan durum değerleri yazmıştı. Bu değerler
 # frontend'in bildiği hiçbir duruma denk gelmediği için o kayıtların üzerinde
 # HİÇ buton çıkmıyordu, sonsuza dek "bekleyen" sayılıp ilerletilemiyordu.
-GECERLI_DURUMLAR = {"bekliyor", "gönderildi", "para_iade_alindi", "reddedildi"}
+GECERLI_DURUMLAR = {"bekliyor", "gönderildi", "para_iade_alindi", "reddedildi", "parca_degisimi"}
 
 
 @router.get("/")
@@ -227,5 +228,48 @@ async def update_durum(
                 "DELETE FROM debts WHERE dukkan_id=$1 AND source_type='parca_iade' AND source_id=$2 AND paid_amount=0",
                 dukkan_id, iade_id,
             )
+        elif yeni_durum == "parca_degisimi":
+            # Toptancı nakit iade yerine aynı/başka bir parça gönderdi — para
+            # gelmeyecek, orijinal 'alacak' borcu parça ile kapanmış sayılır.
+            await db.execute(
+                "DELETE FROM debts WHERE dukkan_id=$1 AND source_type='parca_iade' AND source_id=$2 AND paid_amount=0",
+                dukkan_id, iade_id,
+            )
+            alinan_part_id = body.get("alinan_part_id")
+            alinan_miktar = int(body.get("alinan_miktar") or iade["miktar"])
+            if alinan_part_id:
+                p = await db.fetchrow("SELECT name FROM parts WHERE id=$1 AND dukkan_id=$2", alinan_part_id, dukkan_id)
+                if p:
+                    await db.execute(
+                        "UPDATE parts SET quantity = quantity + $1 WHERE id=$2 AND dukkan_id=$3",
+                        alinan_miktar, alinan_part_id, dukkan_id,
+                    )
+                    await db.execute(
+                        """INSERT INTO stok_hareketleri (dukkan_id, part_id, hareket, miktar, sebep, aciklama, tarih, created_by)
+                           VALUES ($1, $2, 'giris', $3, 'degisim', $4, $5, $6)""",
+                        dukkan_id, alinan_part_id, alinan_miktar,
+                        f"Parça değişimi karşılığı — orijinal: {iade.get('parca')}",
+                        date.today().isoformat(), user["id"],
+                    )
+            # Fiyat farkı varsa (değişim parçası daha pahalı/ucuz) o fark
+            # ayrıca ödenir/tahsil edilir — nakit/kart/borç karışık olabilir.
+            fark = float(body.get("fark_tutari") or 0)
+            fark_yonu = body.get("fark_yonu")
+            if fark > 0 and fark_yonu in ("biz_oderiz", "toptanci_oder"):
+                toptanci_adi = None
+                if iade.get("toptanci_id"):
+                    tr = await db.fetchrow("SELECT ad FROM toptancilar WHERE id=$1 AND dukkan_id=$2", iade["toptanci_id"], dukkan_id)
+                    toptanci_adi = tr["ad"] if tr else None
+                aciklama = f"Parça değişim farkı: {iade.get('parca')}"
+                if fark_yonu == "biz_oderiz":
+                    await kaydet_odeme(
+                        db, dukkan_id, body.get("odemeler"), fark, "gider", "parca_degisim_farki", aciklama, user["id"],
+                        alacakli_adi=toptanci_adi, taksit_sayi=body.get("taksit_sayi") or 1,
+                    )
+                else:
+                    await kaydet_odeme(
+                        db, dukkan_id, body.get("odemeler"), fark, "gelir", "parca_degisim_farki", aciklama, user["id"],
+                        alacakli_adi=toptanci_adi or iade.get("parca"), taksit_sayi=body.get("taksit_sayi") or 1,
+                    )
 
     return {"ok": True}

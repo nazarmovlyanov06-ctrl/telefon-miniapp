@@ -3,16 +3,18 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import {
   Clock, Truck, CheckCircle2, CircleX, TriangleAlert, Banknote, Package,
-  Ban, Pencil, Trash2, User,
+  Ban, Pencil, Trash2, User, Repeat,
 } from "lucide-react";
+import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 
 const DURUM_META = {
   bekliyor: { label: "Bekliyor", icon: Clock, bg: "rgba(246,162,74,0.15)", color: "var(--orange)" },
   gönderildi: { label: "Gönderildi", icon: Truck, bg: "rgba(94,168,255,0.15)", color: "var(--blue)" },
   para_iade_alindi: { label: "Para Alındı", icon: CheckCircle2, bg: "rgba(74,222,128,0.15)", color: "var(--green)" },
   reddedildi: { label: "Reddedildi", icon: Ban, bg: "rgba(239,68,68,0.15)", color: "var(--red)" },
+  parca_degisimi: { label: "Parça Değişimi", icon: Repeat, bg: "rgba(94,168,255,0.15)", color: "var(--blue)" },
 };
-const SONUCLANAN_DURUMLAR = ["para_iade_alindi", "reddedildi"];
+const SONUCLANAN_DURUMLAR = ["para_iade_alindi", "reddedildi", "parca_degisimi"];
 
 export default function ParcaIade({ user }) {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export default function ParcaIade({ user }) {
   const [list, setList] = useState([]);
   const [toptancilar, setToptancilar] = useState([]);
   const [parcalar, setParcalar] = useState([]);
+  const [tumParcalar, setTumParcalar] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [err, setErr] = useState("");
@@ -32,6 +35,8 @@ export default function ParcaIade({ user }) {
   const [paraModal, setParaModal] = useState(null);
   const [alinanTutar, setAlinanTutar] = useState("");
   const [odemeYontemi, setOdemeYontemi] = useState("nakit");
+  const [degisimModal, setDegisimModal] = useState(null);
+  const [degisimForm, setDegisimForm] = useState({ alinan_part_id: "", alinan_miktar: "1", fark_tutari: "", fark_yonu: "yok", odemeler: null, taksit_sayi: "1" });
   const dolarKuru = parseFloat(localStorage.getItem("son_dolar_kuru") || "0");
 
   useEffect(() => {
@@ -56,6 +61,7 @@ export default function ParcaIade({ user }) {
       ]);
       setList(l); setToptancilar(t);
       setParcalar(p.filter ? p.filter(x => x.quantity > 0) : (p || []));
+      setTumParcalar(p || []);
     } finally { setLoading(false); }
     return true;
   }
@@ -142,9 +148,32 @@ export default function ParcaIade({ user }) {
 
   async function submitParaAlindi() {
     if (!paraModal) return;
-    await api.updateParcaIadeDurum(paraModal.id, "para_iade_alindi", alinanTutar ? parseFloat(alinanTutar) : 0, odemeYontemi);
+    await api.updateParcaIadeDurum(paraModal.id, "para_iade_alindi", {
+      alinan_tutar: alinanTutar ? parseFloat(alinanTutar) : 0, odeme_yontemi: odemeYontemi,
+    });
     setParaModal(null);
     setAlinanTutar("");
+    load();
+  }
+
+  function openDegisimModal(item) {
+    setDegisimModal(item);
+    setDegisimForm({ alinan_part_id: "", alinan_miktar: String(item.miktar || 1), fark_tutari: "", fark_yonu: "yok", odemeler: null, taksit_sayi: "1" });
+  }
+
+  async function submitDegisim() {
+    if (!degisimModal) return;
+    const fark = parseFloat(degisimForm.fark_tutari) || 0;
+    const farkVar = fark > 0 && degisimForm.fark_yonu !== "yok";
+    await api.updateParcaIadeDurum(degisimModal.id, "parca_degisimi", {
+      alinan_part_id: degisimForm.alinan_part_id ? parseInt(degisimForm.alinan_part_id) : null,
+      alinan_miktar: parseInt(degisimForm.alinan_miktar) || 1,
+      fark_tutari: fark,
+      fark_yonu: farkVar ? degisimForm.fark_yonu : null,
+      odemeler: farkVar ? (degisimForm.odemeler || varsayilanOdemeSatirlari(fark)).filter(o => parseFloat(o.tutar) > 0) : [],
+      taksit_sayi: parseInt(degisimForm.taksit_sayi) || 1,
+    });
+    setDegisimModal(null);
     load();
   }
 
@@ -153,8 +182,12 @@ export default function ParcaIade({ user }) {
       const item = list.find(i => i.id === id);
       if (item) { openParaModal(item); return; }
     }
+    if (durum === "parca_degisimi") {
+      const item = list.find(i => i.id === id);
+      if (item) { openDegisimModal(item); return; }
+    }
     if (durum === "reddedildi" && !confirm("Toptancı iadeyi reddetti mi? Bu paraya bağlıysa açılmış borç kaydı silinecek.")) return;
-    await api.updateParcaIadeDurum(id, durum, 0);
+    await api.updateParcaIadeDurum(id, durum, {});
     load();
   }
 
@@ -324,6 +357,84 @@ export default function ParcaIade({ user }) {
         </div>
       )}
 
+      {/* Parça Değişimi Modalı */}
+      {degisimModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div className="card" style={{ width: "100%", maxWidth: 380, maxHeight: "88vh", overflowY: "auto" }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+              <Repeat size={16} strokeWidth={2} /> Parça Değişimi
+            </div>
+            <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 12 }}>
+              {degisimModal.parca} — {degisimModal.toptanci_adi || "Toptancı belirtilmedi"}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Yerine Gelen Parça (opsiyonel)</label>
+              <select className="form-select" value={degisimForm.alinan_part_id}
+                onChange={e => setDegisimForm(f => ({ ...f, alinan_part_id: e.target.value }))}>
+                <option value="">Stok bağlanmasın</option>
+                {tumParcalar.map(p => <option key={p.id} value={p.id}>{p.name}{p.device_model ? ` (${p.device_model})` : ""} — {p.quantity} adet</option>)}
+              </select>
+              {degisimForm.alinan_part_id && (
+                <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>Seçilen parçanın stoğuna miktar eklenecek</div>
+              )}
+            </div>
+            {degisimForm.alinan_part_id && (
+              <div className="form-group">
+                <label className="form-label">Gelen Miktar</label>
+                <input className="form-input" type="number" min="1" value={degisimForm.alinan_miktar}
+                  onChange={e => setDegisimForm(f => ({ ...f, alinan_miktar: e.target.value }))} />
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Fiyat Farkı Var mı?</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                {[
+                  { v: "yok", l: "Fark Yok" },
+                  { v: "biz_oderiz", l: "Biz Öderiz" },
+                  { v: "toptanci_oder", l: "Toptancı Öder" },
+                ].map(o => (
+                  <button key={o.v} type="button" onClick={() => setDegisimForm(f => ({ ...f, fark_yonu: o.v }))}
+                    style={{
+                      padding: "7px 4px", borderRadius: 8, border: "1.5px solid",
+                      borderColor: degisimForm.fark_yonu === o.v ? "var(--accent)" : "var(--border)",
+                      background: degisimForm.fark_yonu === o.v ? "rgba(99,102,241,0.12)" : "var(--bg2)",
+                      color: degisimForm.fark_yonu === o.v ? "var(--accent)" : "var(--text)",
+                      fontWeight: 700, fontSize: 11.5, cursor: "pointer",
+                    }}>{o.l}</button>
+                ))}
+              </div>
+            </div>
+
+            {degisimForm.fark_yonu !== "yok" && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Fark Tutarı (₺)</label>
+                  <input className="form-input" type="number" min="0" step="0.01"
+                    value={degisimForm.fark_tutari}
+                    onChange={e => setDegisimForm(f => ({ ...f, fark_tutari: e.target.value }))}
+                    placeholder="0" />
+                </div>
+                {parseFloat(degisimForm.fark_tutari) > 0 && (
+                  <OdemeBolustur toplam={parseFloat(degisimForm.fark_tutari) || 0}
+                    yon={degisimForm.fark_yonu === "biz_oderiz" ? "gider" : "gelir"}
+                    value={degisimForm.odemeler} onChange={v => setDegisimForm(f => ({ ...f, odemeler: v }))}
+                    taksitSayi={degisimForm.taksit_sayi} onTaksitSayiChange={v => setDegisimForm(f => ({ ...f, taksit_sayi: v }))} />
+                )}
+              </>
+            )}
+
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button className="btn btn-primary" onClick={submitDegisim} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                <CheckCircle2 size={15} strokeWidth={2} /> Onayla
+              </button>
+              <button className="btn btn-ghost" onClick={() => setDegisimModal(null)}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {list.length === 0 ? (
         <div className="empty">
           <div className="empty-icon" style={{ display: "flex", justifyContent: "center" }}><Package size={40} stroke="var(--dim)" strokeWidth={1.5} /></div>
@@ -378,6 +489,9 @@ export default function ParcaIade({ user }) {
                     <>
                       <button className="btn btn-primary btn-sm" onClick={() => updateDurum(i.id, "para_iade_alindi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <Banknote size={13} strokeWidth={2} /> Para Alındı
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "parca_degisimi")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Repeat size={13} strokeWidth={2} /> Parça Değişimi
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={() => updateDurum(i.id, "reddedildi")}
                         style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--red)" }}>

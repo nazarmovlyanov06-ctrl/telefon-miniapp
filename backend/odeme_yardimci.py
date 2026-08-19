@@ -44,14 +44,14 @@ async def kaydet_odeme(
         return
     taksit_sayi = max(int(taksit_sayi or 1), 1)
     if yon == "gelir":
-        if not customer_id:
-            return  # müşterisiz satışta kalan tutar takip edilemez, borç yazılamaz
+        if not customer_id and not alacakli_adi:
+            return  # kime borçlandığı bilinmiyorsa kalan tutar takip edilemez
         await db.execute(
             """INSERT INTO debts
-               (dukkan_id, customer_id, borc_turu, source_type, amount, total_amount,
+               (dukkan_id, customer_id, alacakli_adi, borc_turu, source_type, amount, total_amount,
                 payment_type, installment_count, notes, created_by, gider_id)
-               VALUES ($1, $2, 'alacak', $3, $4, $4, $5, $6, $7, $8, $9)""",
-            dukkan_id, customer_id, kaynak if kaynak in BILINEN_GELIR_KAYNAK else "manuel",
+               VALUES ($1, $2, $3, 'alacak', $4, $5, $5, $6, $7, $8, $9, $10)""",
+            dukkan_id, customer_id, alacakli_adi, kaynak if kaynak in BILINEN_GELIR_KAYNAK else "manuel",
             kalan, "taksit" if taksit_sayi > 1 else "borc", taksit_sayi, aciklama, user_id, gider_id,
         )
     else:
