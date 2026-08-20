@@ -258,6 +258,31 @@ async def genel_stats(
         for r in toptanci_red_rows
     ]
 
+    # En çok satan aksesuarlar + toplam kâr — önceden aksesuar satışlarının
+    # hiçbir özeti yoktu, hangi ürün en çok satıyor hiç görünmüyordu. Kâr,
+    # ürünün GÜNCEL alış fiyatı üzerinden tahmini hesaplanır (satış anındaki
+    # tarihsel alış fiyatı ayrıca saklanmıyor) — kesin muhasebe değil, kaba
+    # bir gösterge.
+    aksesuar_top_rows = await db.fetch(
+        """SELECT a.ad, SUM(s.miktar) as adet, SUM(s.toplam) as ciro,
+                  SUM(s.miktar * a.alis_fiyati) as maliyet
+           FROM aksesuar_satislar s JOIN aksesuarlar a ON a.id = s.aksesuar_id
+           WHERE s.dukkan_id=$1
+           GROUP BY a.id, a.ad
+           ORDER BY ciro DESC LIMIT 8""",
+        dukkan_id,
+    )
+    aksesuar_top = [
+        {"ad": r["ad"], "adet": r["adet"], "ciro": float(r["ciro"]), "kar": float(r["ciro"] - r["maliyet"])}
+        for r in aksesuar_top_rows
+    ]
+    aksesuar_kar_toplam = await db.fetchval(
+        """SELECT COALESCE(SUM(s.toplam - s.miktar * a.alis_fiyati), 0)
+           FROM aksesuar_satislar s JOIN aksesuarlar a ON a.id = s.aksesuar_id
+           WHERE s.dukkan_id=$1""",
+        dukkan_id,
+    ) or 0
+
     async def scalar(sql, *params):
         return await db.fetchval(sql, *params) or 0
 
@@ -268,6 +293,8 @@ async def genel_stats(
         "musteri_top": musteri_top,
         "tamir_durum": tamir_durum,
         "toptanci_red": toptanci_red,
+        "aksesuar_top": aksesuar_top,
+        "aksesuar_kar_toplam": aksesuar_kar_toplam,
         "sayilar": {
             "musteri": await scalar("SELECT COUNT(*) FROM customers WHERE dukkan_id=$1", dukkan_id),
             "tamir_toplam": await scalar("SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1", dukkan_id),

@@ -4,6 +4,7 @@ import { api } from "../api";
 import {
   Tag, CircleX, TriangleAlert, Trash2, Search, Filter, X, Pencil,
   Headphones, ArrowDownCircle, ArrowUpCircle, RefreshCw, Phone, Package,
+  Truck, PackagePlus,
 } from "lucide-react";
 import UrunGorsel from "../components/UrunGorsel";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
@@ -45,7 +46,7 @@ function tarihFmt(iso) {
 }
 
 /* ── Ürün Detay Modalı — karta tıklayınca açılır, stok geçmişi + aksiyonlar ── */
-function UrunDetayModal({ item, onClose, onSat, onDuzenle, onSil, canDelete }) {
+function UrunDetayModal({ item, onClose, onSat, onDuzenle, onSil, onStokEkle, canDelete }) {
   const [hareketler, setHareketler] = useState(null);
 
   useEffect(() => {
@@ -64,6 +65,11 @@ function UrunDetayModal({ item, onClose, onSat, onDuzenle, onSil, canDelete }) {
           <div style={{ fontWeight: 700, fontSize: 15, color: item.stok <= (item.min_stok ?? 5) ? "var(--danger)" : "var(--text)" }}>
             {item.stok} adet stokta
           </div>
+          {item.toptanci_adi && (
+            <div style={{ fontSize: 11.5, color: "var(--hint)", display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+              <Truck size={11} strokeWidth={2} /> {item.toptanci_adi}
+            </div>
+          )}
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
@@ -81,8 +87,13 @@ function UrunDetayModal({ item, onClose, onSat, onDuzenle, onSil, canDelete }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         {item.stok > 0 && <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onSat(item)}>Sat</button>}
+        <button className="btn btn-ghost btn-sm" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }} onClick={() => onStokEkle(item)}>
+          <PackagePlus size={13} strokeWidth={2} /> Stok Ekle
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <button className="btn btn-ghost btn-sm" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }} onClick={() => onDuzenle(item)}>
           <Pencil size={13} strokeWidth={2} /> Düzenle
         </button>
@@ -124,13 +135,16 @@ export default function Aksesuar({ user }) {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [kategoriler, setKategoriler] = useState(DEFAULT_CATS);
+  const [toptancilar, setToptancilar] = useState([]);
   const [aktifKat, setAktifKat] = useState("Tümü");
   const [urunArama, setUrunArama] = useState("");
   const [showKatYonet, setShowKatYonet] = useState(false);
   const [yeniKat, setYeniKat] = useState("");
   const [formModal, setFormModal] = useState(null); // null | { mode }
-  const [form, setForm] = useState({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer" });
+  const [form, setForm] = useState({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer", toptanci_id: "", min_stok: "5" });
   const [detayItem, setDetayItem] = useState(null);
+  const [stokEkleItem, setStokEkleItem] = useState(null);
+  const [stokEkleData, setStokEkleData] = useState({ miktar: "1", alis_fiyati: "", toptanci_id: "" });
   const [satForm, setSatForm] = useState(null);
   const [satData, setSatData] = useState({ miktar: "1", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
   const [err, setErr] = useState("");
@@ -147,7 +161,7 @@ export default function Aksesuar({ user }) {
   const [showSatisFiltre, setShowSatisFiltre] = useState(false);
   const [satisDetay, setSatisDetay] = useState(null);
 
-  useEffect(() => { load(); kategorileriYukle(); }, []);
+  useEffect(() => { load(); kategorileriYukle(); api.toptanciList().then(setToptancilar).catch(() => {}); }, []);
   useEffect(() => { if (tab === "gecmis") satisYukle(); }, [tab]);
 
   const ilkSatisYuklemeRef = useRef(true);
@@ -202,7 +216,7 @@ export default function Aksesuar({ user }) {
   }
 
   function yeniUrunAc() {
-    setForm({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer" });
+    setForm({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer", toptanci_id: "", min_stok: "5" });
     setErr("");
     setFormModal({ mode: "yeni" });
   }
@@ -211,6 +225,7 @@ export default function Aksesuar({ user }) {
     setForm({
       ad: item.ad, stok: String(item.stok), alis_fiyati: String(item.alis_fiyati),
       satis_fiyati: String(item.satis_fiyati), kategori: item.kategori || "Diğer",
+      toptanci_id: item.toptanci_id ? String(item.toptanci_id) : "", min_stok: String(item.min_stok ?? 5),
     });
     setErr("");
     setDetayItem(null);
@@ -222,6 +237,7 @@ export default function Aksesuar({ user }) {
     const payload = {
       ad: form.ad, stok: parseInt(form.stok), alis_fiyati: parseFloat(form.alis_fiyati),
       satis_fiyati: parseFloat(form.satis_fiyati), kategori: form.kategori,
+      toptanci_id: form.toptanci_id ? parseInt(form.toptanci_id) : null, min_stok: parseInt(form.min_stok) || 5,
     };
     try {
       if (formModal.mode === "duzenle") await api.updateAksesuar(formModal.id, payload);
@@ -231,6 +247,26 @@ export default function Aksesuar({ user }) {
         api.aksesuarKategoriEkle(form.kategori).catch(() => {});
       }
       setFormModal(null);
+      load();
+    } catch (e) { setErr(e.message); }
+  }
+
+  function stokEkleAc(item) {
+    setDetayItem(null);
+    setStokEkleData({ miktar: "1", alis_fiyati: String(item.alis_fiyati), toptanci_id: item.toptanci_id ? String(item.toptanci_id) : "" });
+    setErr("");
+    setStokEkleItem(item);
+  }
+
+  async function submitStokEkle(e) {
+    e.preventDefault(); setErr("");
+    try {
+      await api.aksesuarStokEkle(stokEkleItem.id, {
+        miktar: parseInt(stokEkleData.miktar),
+        alis_fiyati: stokEkleData.alis_fiyati ? parseFloat(stokEkleData.alis_fiyati) : null,
+        toptanci_id: stokEkleData.toptanci_id ? parseInt(stokEkleData.toptanci_id) : null,
+      });
+      setStokEkleItem(null);
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -353,7 +389,7 @@ export default function Aksesuar({ user }) {
               {filteredList.map(a => (
                 <div key={a.id} className="card" style={{ cursor: "pointer", padding: "10px 8px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}
                   onClick={() => setDetayItem(a)}>
-                  {a.stok <= 5 && (
+                  {a.stok <= (a.min_stok ?? 5) && (
                     <div style={{
                       alignSelf: "flex-end", marginBottom: -4, display: "flex", alignItems: "center",
                       color: "var(--danger)", background: "rgba(239,68,68,0.14)",
@@ -371,7 +407,7 @@ export default function Aksesuar({ user }) {
                     {a.satis_fiyati}₺
                   </span>
                   <div style={{ marginTop: 7, paddingTop: 6, borderTop: "1px solid var(--divider)", width: "100%" }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: a.stok <= 5 ? "var(--danger)" : "var(--text)" }}>{a.stok}</div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: a.stok <= (a.min_stok ?? 5) ? "var(--danger)" : "var(--text)" }}>{a.stok}</div>
                     <div style={{ fontSize: 9, color: "var(--hint)" }}>adet</div>
                   </div>
                 </div>
@@ -483,6 +519,18 @@ export default function Aksesuar({ user }) {
                 <input className="form-input" type="number" required value={form.satis_fiyati} onChange={e => setForm({ ...form, satis_fiyati: e.target.value })} />
               </div>
             </div>
+            <div className="form-group">
+              <label className="form-label">Toptancı (opsiyonel)</label>
+              <select className="form-select" value={form.toptanci_id} onChange={e => setForm({ ...form, toptanci_id: e.target.value })}>
+                <option value="">Seç (opsiyonel)</option>
+                {toptancilar.map(t => <option key={t.id} value={t.id}>{t.ad}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Düşük Stok Eşiği</label>
+              <input className="form-input" type="number" min="0" value={form.min_stok} onChange={e => setForm({ ...form, min_stok: e.target.value })} placeholder="5" />
+              <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>Stok bu sayının altına/eşitine düşünce "Düşük" uyarısı gösterilir</div>
+            </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button type="submit" className="btn btn-primary">{formModal.mode === "duzenle" ? "Güncelle" : "Kaydet"}</button>
               <button type="button" className="btn btn-ghost" onClick={() => setFormModal(null)}>İptal</button>
@@ -494,9 +542,40 @@ export default function Aksesuar({ user }) {
       {/* Ürün Detay Modalı */}
       {detayItem && (
         <UrunDetayModal item={detayItem} onClose={() => setDetayItem(null)}
-          onSat={satAc} onDuzenle={duzenleAc}
+          onSat={satAc} onDuzenle={duzenleAc} onStokEkle={stokEkleAc}
           onSil={item => { setDetayItem(null); setDeleteId(item.id); }}
           canDelete={user?.rol === "patron"} />
+      )}
+
+      {/* Stok Ekle Modalı — toptancıdan yeni parti geldiğinde hızlı giriş */}
+      {stokEkleItem && (
+        <AltPencere onClose={() => setStokEkleItem(null)}>
+          <PencereBaslik onClose={() => setStokEkleItem(null)}>Stok Ekle: {stokEkleItem.ad}</PencereBaslik>
+          <form onSubmit={submitStokEkle}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
+            <div className="form-group">
+              <label className="form-label">Gelen Adet *</label>
+              <input className="form-input" type="number" min="1" required value={stokEkleData.miktar}
+                onChange={e => setStokEkleData({ ...stokEkleData, miktar: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Toptancı</label>
+              <select className="form-select" value={stokEkleData.toptanci_id} onChange={e => setStokEkleData({ ...stokEkleData, toptanci_id: e.target.value })}>
+                <option value="">Seç (opsiyonel)</option>
+                {toptancilar.map(t => <option key={t.id} value={t.id}>{t.ad}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Yeni Alış Fiyatı (₺) — değiştiyse güncelle</label>
+              <input className="form-input" type="number" value={stokEkleData.alis_fiyati}
+                onChange={e => setStokEkleData({ ...stokEkleData, alis_fiyati: e.target.value })} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="submit" className="btn btn-primary">Ekle</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setStokEkleItem(null)}>İptal</button>
+            </div>
+          </form>
+        </AltPencere>
       )}
 
       {/* Satış Formu */}

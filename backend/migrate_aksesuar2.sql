@@ -1,0 +1,2 @@
+ALTER TABLE aksesuarlar ADD COLUMN IF NOT EXISTS toptanci_id INTEGER REFERENCES toptancilar(id);
+ALTER TABLE aksesuarlar ADD COLUMN IF NOT EXISTS min_stok INTEGER DEFAULT 5;

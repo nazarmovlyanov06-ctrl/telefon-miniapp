@@ -237,6 +237,40 @@ export default function Stats() {
         </>
       )}
 
+      {/* En çok satan aksesuarlar + toplam kâr — önceden aksesuar satışlarının
+          hiçbir özeti yoktu */}
+      {data.aksesuar_top?.length > 0 && (
+        <>
+          <div className="section-title">En Çok Satan Aksesuarlar</div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="card-row">
+              <span style={{ color: "var(--hint)" }}>Toplam Aksesuar Kârı (tahmini)</span>
+              <span style={{ fontWeight: 700, color: "var(--success)" }}>₺{Math.round(data.aksesuar_kar_toplam || 0).toLocaleString("tr-TR")}</span>
+            </div>
+          </div>
+          <div className="card">
+            {data.aksesuar_top.map((a, i) => (
+              <div key={i} style={{ marginBottom: i < data.aksesuar_top.length - 1 ? 12 : 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 13 }}>
+                  <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Headphones size={12} stroke="var(--accent)" strokeWidth={2} /> {a.ad}
+                  </span>
+                  <span style={{ color: "var(--hint)", fontWeight: 700, flexShrink: 0 }}>{a.adet} adet · ₺{Math.round(a.ciro).toLocaleString("tr-TR")}</span>
+                </div>
+                <div style={{ height: 6, background: "var(--bg2)", borderRadius: 4 }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${(a.ciro / data.aksesuar_top[0].ciro) * 100}%`,
+                    background: "var(--accent)",
+                    borderRadius: 4,
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       {/* En çok harcayan müşteriler */}
       {data.musteri_top.length > 0 && (
         <>

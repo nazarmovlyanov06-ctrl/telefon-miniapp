@@ -35,7 +35,12 @@ async def list_aksesuar(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    rows = await db.fetch("SELECT * FROM aksesuarlar WHERE dukkan_id = $1 ORDER BY ad ASC", dukkan_id)
+    rows = await db.fetch(
+        """SELECT a.*, t.ad as toptanci_adi FROM aksesuarlar a
+           LEFT JOIN toptancilar t ON t.id = a.toptanci_id
+           WHERE a.dukkan_id = $1 ORDER BY a.ad ASC""",
+        dukkan_id,
+    )
     return [dict(r) for r in rows]
 
 
@@ -141,9 +146,10 @@ async def create_aksesuar(
     stok = int(body.get("stok", 0))
     async with db.transaction():
         row = await db.fetchrow(
-            "INSERT INTO aksesuarlar (dukkan_id, ad, stok, alis_fiyati, satis_fiyati, kategori) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+            """INSERT INTO aksesuarlar (dukkan_id, ad, stok, alis_fiyati, satis_fiyati, kategori, toptanci_id, min_stok)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id""",
             dukkan_id, body["ad"], stok, float(body["alis_fiyati"]), float(body["satis_fiyati"]),
-            body.get("kategori", "Diğer"),
+            body.get("kategori", "Diğer"), body.get("toptanci_id"), int(body.get("min_stok") or 5),
         )
         if stok > 0:
             await _hareket_ekle(db, dukkan_id, row["id"], "giris", stok, user["id"], "ilk_stok")
@@ -164,13 +170,47 @@ async def update_aksesuar(
     yeni_stok = int(body.get("stok", 0))
     async with db.transaction():
         await db.execute(
-            "UPDATE aksesuarlar SET ad=$1, stok=$2, alis_fiyati=$3, satis_fiyati=$4, kategori=$5 WHERE id=$6 AND dukkan_id=$7",
+            """UPDATE aksesuarlar SET ad=$1, stok=$2, alis_fiyati=$3, satis_fiyati=$4, kategori=$5,
+               toptanci_id=$6, min_stok=$7 WHERE id=$8 AND dukkan_id=$9""",
             body.get("ad"), yeni_stok, float(body.get("alis_fiyati", 0)),
-            float(body.get("satis_fiyati", 0)), body.get("kategori", "Diğer"), aksesuar_id, dukkan_id,
+            float(body.get("satis_fiyati", 0)), body.get("kategori", "Diğer"),
+            body.get("toptanci_id"), int(body.get("min_stok") or 5), aksesuar_id, dukkan_id,
         )
         fark = yeni_stok - eski["stok"]
         if fark != 0:
             await _hareket_ekle(db, dukkan_id, aksesuar_id, "duzeltme", fark, user["id"], "manuel_duzenleme")
+    return {"ok": True}
+
+
+@router.post("/{aksesuar_id}/stok-ekle")
+async def stok_ekle(
+    aksesuar_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    # Toptancıdan yeni parti geldiğinde hızlı stok girişi — istenirse aynı anda
+    # alış fiyatı/toptancı bilgisini de günceller (fiyat değişmiş olabilir).
+    aks = await db.fetchrow("SELECT * FROM aksesuarlar WHERE id=$1 AND dukkan_id=$2", aksesuar_id, dukkan_id)
+    if not aks:
+        raise HTTPException(404, "Aksesuar bulunamadı")
+    miktar = int(body.get("miktar", 0))
+    if miktar <= 0:
+        raise HTTPException(400, "Adet sıfırdan büyük olmalı")
+    yeni_alis = body.get("alis_fiyati")
+    yeni_toptanci = body.get("toptanci_id")
+    async with db.transaction():
+        if yeni_alis is not None or yeni_toptanci is not None:
+            await db.execute(
+                "UPDATE aksesuarlar SET stok = stok + $1, alis_fiyati = COALESCE($2, alis_fiyati), toptanci_id = COALESCE($3, toptanci_id) WHERE id=$4 AND dukkan_id=$5",
+                miktar, float(yeni_alis) if yeni_alis is not None else None, yeni_toptanci, aksesuar_id, dukkan_id,
+            )
+        else:
+            await db.execute(
+                "UPDATE aksesuarlar SET stok = stok + $1 WHERE id=$2 AND dukkan_id=$3", miktar, aksesuar_id, dukkan_id
+            )
+        await _hareket_ekle(db, dukkan_id, aksesuar_id, "giris", miktar, user["id"], "toptanci_alim")
     return {"ok": True}
 
 

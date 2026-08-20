@@ -405,7 +405,9 @@ CREATE TABLE IF NOT EXISTS aksesuarlar (
     alis_fiyati REAL NOT NULL,
     satis_fiyati REAL NOT NULL,
     kategori TEXT DEFAULT 'Diğer',
-    gorsel_url TEXT
+    gorsel_url TEXT,
+    toptanci_id INTEGER REFERENCES toptancilar(id),
+    min_stok INTEGER DEFAULT 5
 );
 
 CREATE TABLE IF NOT EXISTS aksesuar_satislar (
