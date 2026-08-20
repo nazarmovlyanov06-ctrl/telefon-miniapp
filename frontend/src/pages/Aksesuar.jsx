@@ -160,43 +160,55 @@ function EtiketYazdirModal({ item, onClose, ayarlar }) {
   );
 }
 
-/* ── Toplu Etiket Yazdır — birden fazla farklı ürün seçip hepsini art arda
-   sayfalar halinde yazdırır ── */
-function TopluEtiketModal({ liste, secililer, onSecimDegis, onClose, ayarlar }) {
-  const secilenUrunler = liste.filter(a => secililer.has(a.id));
+/* ── Toplu Etiket Yazdır — birden fazla farklı ürün seçip her birinden
+   istenen adette (ör. bu üründen 10, diğerinden 2) etiket yazdırır ── */
+function TopluEtiketModal({ liste, miktarlar, onToggle, onMiktarDegis, onClose, ayarlar }) {
+  const seciliIdler = Object.keys(miktarlar).map(Number);
+  const toplamEtiket = Object.values(miktarlar).reduce((s, m) => s + m, 0);
   function yazdir() {
     etiketSayfaBoyutuAyarla(ayarlar);
     window.print();
   }
   return (
     <AltPencere onClose={onClose} maxWidth={420}>
-      <PencereBaslik onClose={onClose}>Toplu Etiket Yazdır ({secililer.size})</PencereBaslik>
-      <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 10 }}>Etiketi basılacak ürünleri seç.</div>
-      <div style={{ maxHeight: "40vh", overflowY: "auto", marginBottom: 12 }}>
-        {liste.map(a => (
-          <label key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: "1px solid var(--divider)", cursor: "pointer" }}>
-            <input type="checkbox" checked={secililer.has(a.id)} onChange={() => onSecimDegis(a.id)} style={{ width: 16, height: 16, flexShrink: 0 }} />
-            <div style={{
-              width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-              background: a.gorsel_url ? `url(${fotoUrl(a.gorsel_url)}) center/cover` : "var(--bg2)",
-            }} />
-            <div style={{ flex: 1, fontSize: 13 }}>{a.ad}</div>
-            <div style={{ fontSize: 12, color: "var(--hint)" }}>{a.satis_fiyati}₺</div>
-          </label>
-        ))}
+      <PencereBaslik onClose={onClose}>Toplu Etiket Yazdır ({seciliIdler.length} ürün)</PencereBaslik>
+      <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 10 }}>Etiketi basılacak ürünleri ve her birinden kaç adet basılacağını seç.</div>
+      <div style={{ maxHeight: "42vh", overflowY: "auto", marginBottom: 12 }}>
+        {liste.map(a => {
+          const secili = a.id in miktarlar;
+          return (
+            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: "1px solid var(--divider)" }}>
+              <input type="checkbox" checked={secili} onChange={() => onToggle(a.id)} style={{ width: 16, height: 16, flexShrink: 0, cursor: "pointer" }} />
+              <div style={{
+                width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                background: a.gorsel_url ? `url(${fotoUrl(a.gorsel_url)}) center/cover` : "var(--bg2)",
+              }} />
+              <div style={{ flex: 1, fontSize: 13, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.ad}</div>
+              {secili && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ padding: "2px 8px" }} onClick={() => onMiktarDegis(a.id, -1)}>−</button>
+                  <span style={{ minWidth: 18, textAlign: "center", fontWeight: 700, fontSize: 13 }}>{miktarlar[a.id]}</span>
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ padding: "2px 8px" }} onClick={() => onMiktarDegis(a.id, 1)}>+</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {secilenUrunler.length > 0 && (
+      {seciliIdler.length > 0 && (
         <div className="etiket-yazdirma-alani">
-          {secilenUrunler.map(a => <EtiketIcerik key={a.id} item={a} ayarlar={ayarlar} />)}
+          {liste.filter(a => a.id in miktarlar).map(a =>
+            Array.from({ length: miktarlar[a.id] }, (_, i) => <EtiketIcerik key={`${a.id}-${i}`} item={a} ayarlar={ayarlar} />)
+          )}
         </div>
       )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-        <button className="btn btn-primary" disabled={secilenUrunler.length === 0}
+        <button className="btn btn-primary" disabled={toplamEtiket === 0}
           style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
           onClick={yazdir}>
-          <Printer size={14} strokeWidth={2} /> {secilenUrunler.length} Etiket Yazdır
+          <Printer size={14} strokeWidth={2} /> {toplamEtiket} Etiket Yazdır
         </button>
         <button className="btn btn-ghost" onClick={onClose}>Kapat</button>
       </div>
@@ -228,7 +240,7 @@ export default function Aksesuar({ user }) {
   const [tarayici, setTarayici] = useState(null); // null | "form" | "sepet" | "ara"
   const [barkotSatisHata, setBarkotSatisHata] = useState("");
   const [topluEtiketAcik, setTopluEtiketAcik] = useState(false);
-  const [etiketSecililer, setEtiketSecililer] = useState(() => new Set());
+  const [etiketMiktarlar, setEtiketMiktarlar] = useState({}); // { [aksesuar_id]: adet }
   const [etiketAyarlari, setEtiketAyarlari] = useState(ETIKET_AYAR_VARSAYILAN);
   // Barkotla Sat — art arda farklı ürün okutup tek satışta kapatma sepeti
   const [sepet, setSepet] = useState([]); // [{ aksesuar, miktar }]
@@ -448,11 +460,17 @@ export default function Aksesuar({ user }) {
   }
 
   function etiketSecimToggle(id) {
-    setEtiketSecililer(s => {
-      const yeni = new Set(s);
-      if (yeni.has(id)) yeni.delete(id); else yeni.add(id);
-      return yeni;
+    setEtiketMiktarlar(m => {
+      if (id in m) {
+        const { [id]: _cikar, ...kalan } = m;
+        return kalan;
+      }
+      return { ...m, [id]: 1 };
     });
+  }
+
+  function etiketMiktarDegistir(id, delta) {
+    setEtiketMiktarlar(m => ({ ...m, [id]: Math.max(1, (m[id] || 1) + delta) }));
   }
 
   async function submitSat(e) {
@@ -495,11 +513,11 @@ export default function Aksesuar({ user }) {
     <div className="page">
       <div className="card-row" style={{ marginBottom: 10 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
-        <h1 className="page-title" style={{ margin: 0 }}>Aksesuar</h1>
+        <h1 className="page-title" style={{ margin: 0, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Aksesuar</h1>
         {tab === "urunler" && (
-          <div style={{ display: "flex", gap: 6 }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowKatYonet(!showKatYonet)} style={{ display: "flex", alignItems: "center", gap: 6 }}><Tag size={14} strokeWidth={2} /> Kategoriler</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => { setEtiketSecililer(new Set()); setTopluEtiketAcik(true); }} style={{ display: "flex", alignItems: "center", gap: 6 }}><Printer size={14} strokeWidth={2} /> Etiket</button>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowKatYonet(!showKatYonet)} title="Kategoriler" style={{ display: "flex", alignItems: "center", padding: "8px 10px" }}><Tag size={15} strokeWidth={2} /></button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setEtiketMiktarlar({}); setTopluEtiketAcik(true); }} title="Etiket Yazdır" style={{ display: "flex", alignItems: "center", padding: "8px 10px" }}><Printer size={15} strokeWidth={2} /></button>
             <button className="btn btn-primary btn-sm" onClick={yeniUrunAc}>+ Ekle</button>
           </div>
         )}
@@ -775,7 +793,7 @@ export default function Aksesuar({ user }) {
 
       {/* Toplu Etiket Yazdır Modalı */}
       {topluEtiketAcik && (
-        <TopluEtiketModal liste={list} secililer={etiketSecililer} onSecimDegis={etiketSecimToggle} onClose={() => setTopluEtiketAcik(false)} ayarlar={etiketAyarlari} />
+        <TopluEtiketModal liste={list} miktarlar={etiketMiktarlar} onToggle={etiketSecimToggle} onMiktarDegis={etiketMiktarDegistir} onClose={() => setTopluEtiketAcik(false)} ayarlar={etiketAyarlari} />
       )}
 
       {/* Sepet — Barkotla Sat ile art arda okutulan farklı ürünlerin listesi */}
