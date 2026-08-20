@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import JsBarcode from "jsbarcode";
 import { api, fotoUrl } from "../api";
 import {
   Tag, CircleX, TriangleAlert, Trash2, Search, Filter, X, Pencil,
@@ -10,26 +9,9 @@ import {
 import UrunGorsel from "../components/UrunGorsel";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 import BarcodeScanner from "../components/BarcodeScanner";
+import { EtiketIcerik, etiketSayfaBoyutuAyarla, ETIKET_AYAR_VARSAYILAN } from "../components/UrunEtiketi";
 
 const DEFAULT_CATS = ["Şarj Aleti", "Kılıf", "Kırılmaz Cam", "Kulaklık", "Powerbank", "Diğer"];
-
-// Ürünün kendi barkodu yoksa (üretici barkodu girilmemişse) id'den türetilen
-// bir kod basılır — ayrıca saklanmaz, hem yazdırırken hem ararken aynı
-// formülle (AKS + 6 haneli id) üretilip/çözülür.
-function barkotDegeri(item) {
-  return item.barkot || `AKS${String(item.id).padStart(6, "0")}`;
-}
-
-function BarkotSVG({ value }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!ref.current || !value) return;
-    try {
-      JsBarcode(ref.current, value, { format: "CODE128", width: 1.6, height: 42, fontSize: 12, margin: 4 });
-    } catch { /* barkot kütüphanesinin desteklemediği bir karakter varsa boş bırak */ }
-  }, [value]);
-  return <svg ref={ref} />;
-}
 
 const HAREKET_META = {
   giris: { label: "Stok girişi", color: "var(--success)", icon: ArrowDownCircle },
@@ -153,32 +135,23 @@ function UrunDetayModal({ item, onClose, onSat, onDuzenle, onSil, onStokEkle, on
 }
 
 /* ── Etiket Yazdır Modalı — barkot+fiyat etiketi, window.print() ile ────── */
-function EtiketIcerik({ item }) {
-  const kod = barkotDegeri(item);
-  return (
-    <div className="etiket-tek">
-      <div style={{ background: "#fff", color: "#000", borderRadius: 10, padding: 14, textAlign: "center", border: "1px solid var(--divider)" }}>
-        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.ad}</div>
-        <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>{item.satis_fiyati}₺</div>
-        <BarkotSVG value={kod} />
-      </div>
-    </div>
-  );
-}
-
-function EtiketYazdirModal({ item, onClose }) {
+function EtiketYazdirModal({ item, onClose, ayarlar }) {
+  function yazdir() {
+    etiketSayfaBoyutuAyarla(ayarlar);
+    window.print();
+  }
   return (
     <AltPencere onClose={onClose} maxWidth={340}>
       <PencereBaslik onClose={onClose}>Etiket Yazdır</PencereBaslik>
       <div className="etiket-yazdirma-alani">
-        <EtiketIcerik item={item} />
+        <EtiketIcerik item={item} ayarlar={ayarlar} />
       </div>
       <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 10 }}>
-        "Yazdır"a basınca tarayıcının yazdırma penceresi açılır — orada yazıcınızı ve kağıt/etiket boyutunu seçebilirsiniz.
+        "Yazdır"a basınca tarayıcının yazdırma penceresi açılır — orada yazıcınızı seçebilirsiniz. Etiket boyutu/logosu Ayarlar → Etiket Ayarları'ndan değiştirilebilir.
         {!item.barkot && " Bu ürüne özel barkot girilmediği için otomatik üretilen kod kullanıldı."}
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button className="btn btn-primary" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} onClick={() => window.print()}>
+        <button className="btn btn-primary" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} onClick={yazdir}>
           <Printer size={14} strokeWidth={2} /> Yazdır
         </button>
         <button className="btn btn-ghost" onClick={onClose}>Kapat</button>
@@ -189,8 +162,12 @@ function EtiketYazdirModal({ item, onClose }) {
 
 /* ── Toplu Etiket Yazdır — birden fazla farklı ürün seçip hepsini art arda
    sayfalar halinde yazdırır ── */
-function TopluEtiketModal({ liste, secililer, onSecimDegis, onClose }) {
+function TopluEtiketModal({ liste, secililer, onSecimDegis, onClose, ayarlar }) {
   const secilenUrunler = liste.filter(a => secililer.has(a.id));
+  function yazdir() {
+    etiketSayfaBoyutuAyarla(ayarlar);
+    window.print();
+  }
   return (
     <AltPencere onClose={onClose} maxWidth={420}>
       <PencereBaslik onClose={onClose}>Toplu Etiket Yazdır ({secililer.size})</PencereBaslik>
@@ -211,14 +188,14 @@ function TopluEtiketModal({ liste, secililer, onSecimDegis, onClose }) {
 
       {secilenUrunler.length > 0 && (
         <div className="etiket-yazdirma-alani">
-          {secilenUrunler.map(a => <EtiketIcerik key={a.id} item={a} />)}
+          {secilenUrunler.map(a => <EtiketIcerik key={a.id} item={a} ayarlar={ayarlar} />)}
         </div>
       )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <button className="btn btn-primary" disabled={secilenUrunler.length === 0}
           style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-          onClick={() => window.print()}>
+          onClick={yazdir}>
           <Printer size={14} strokeWidth={2} /> {secilenUrunler.length} Etiket Yazdır
         </button>
         <button className="btn btn-ghost" onClick={onClose}>Kapat</button>
@@ -252,6 +229,7 @@ export default function Aksesuar({ user }) {
   const [barkotSatisHata, setBarkotSatisHata] = useState("");
   const [topluEtiketAcik, setTopluEtiketAcik] = useState(false);
   const [etiketSecililer, setEtiketSecililer] = useState(() => new Set());
+  const [etiketAyarlari, setEtiketAyarlari] = useState(ETIKET_AYAR_VARSAYILAN);
   // Barkotla Sat — art arda farklı ürün okutup tek satışta kapatma sepeti
   const [sepet, setSepet] = useState([]); // [{ aksesuar, miktar }]
   const [sepetGoster, setSepetGoster] = useState(false);
@@ -269,7 +247,11 @@ export default function Aksesuar({ user }) {
   const [showSatisFiltre, setShowSatisFiltre] = useState(false);
   const [satisDetay, setSatisDetay] = useState(null);
 
-  useEffect(() => { load(); kategorileriYukle(); api.toptanciList().then(setToptancilar).catch(() => {}); }, []);
+  useEffect(() => {
+    load(); kategorileriYukle();
+    api.toptanciList().then(setToptancilar).catch(() => {});
+    api.etiketAyarlari().then(setEtiketAyarlari).catch(() => {});
+  }, []);
   useEffect(() => { if (tab === "gecmis") satisYukle(); }, [tab]);
 
   const ilkSatisYuklemeRef = useRef(true);
@@ -784,7 +766,7 @@ export default function Aksesuar({ user }) {
       )}
 
       {/* Etiket Yazdır Modalı */}
-      {yazdirItem && <EtiketYazdirModal item={yazdirItem} onClose={() => setYazdirItem(null)} />}
+      {yazdirItem && <EtiketYazdirModal item={yazdirItem} onClose={() => setYazdirItem(null)} ayarlar={etiketAyarlari} />}
 
       {/* Barkod Tarayıcı — forma barkot girmek, ürün aramak veya sepete eklemek için */}
       {tarayici && (
@@ -793,7 +775,7 @@ export default function Aksesuar({ user }) {
 
       {/* Toplu Etiket Yazdır Modalı */}
       {topluEtiketAcik && (
-        <TopluEtiketModal liste={list} secililer={etiketSecililer} onSecimDegis={etiketSecimToggle} onClose={() => setTopluEtiketAcik(false)} />
+        <TopluEtiketModal liste={list} secililer={etiketSecililer} onSecimDegis={etiketSecimToggle} onClose={() => setTopluEtiketAcik(false)} ayarlar={etiketAyarlari} />
       )}
 
       {/* Sepet — Barkotla Sat ile art arda okutulan farklı ürünlerin listesi */}

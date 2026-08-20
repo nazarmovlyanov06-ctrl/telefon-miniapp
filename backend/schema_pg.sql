@@ -21,6 +21,10 @@ CREATE TABLE IF NOT EXISTS dukkanlar (
     logo_url TEXT,
     kapak_url TEXT,
     son_hatirlatma_tarihi DATE,
+    etiket_genislik_mm REAL DEFAULT 40,
+    etiket_yukseklik_mm REAL DEFAULT 30,
+    etiket_logo_goster BOOLEAN DEFAULT false,
+    etiket_kategori_goster BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT now()
 );
 

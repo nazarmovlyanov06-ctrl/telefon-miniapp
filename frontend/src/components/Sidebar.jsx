@@ -6,7 +6,7 @@ import {
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
   Banknote, BarChart3, ScanLine, Settings, LogOut, Store, CalendarClock,
-  Star, Repeat, MessageCircle,
+  Star, Repeat, MessageCircle, Printer,
 } from "lucide-react";
 import { api, setToken } from "../api";
 
@@ -53,6 +53,7 @@ const ARACLAR = [
   { path: "/stats", icon: BarChart3, label: "İstatistik" },
   { path: "/ai", icon: Sparkles, label: "Yardımcı" },
   { path: "/imei", icon: ScanLine, label: "IMEI" },
+  { path: "/etiket-ayarlari", icon: Printer, label: "Etiket Ayarları" },
   { path: "/settings", icon: Settings, label: "Ayarlar" },
 ];
 

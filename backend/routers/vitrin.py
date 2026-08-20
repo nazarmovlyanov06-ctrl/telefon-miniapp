@@ -69,6 +69,40 @@ async def ayarlari_guncelle(
     return {"ok": True}
 
 
+@router.get("/etiket-ayarlari")
+async def etiket_ayarlari_getir(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    row = await db.fetchrow(
+        """SELECT etiket_genislik_mm, etiket_yukseklik_mm, etiket_logo_goster,
+                  etiket_kategori_goster, logo_url FROM dukkanlar WHERE id=$1""",
+        dukkan_id,
+    )
+    return dict(row)
+
+
+@router.put("/etiket-ayarlari")
+async def etiket_ayarlari_guncelle(
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    _patron: dict = Depends(require_patron),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    genislik = float(body.get("etiket_genislik_mm") or 40)
+    yukseklik = float(body.get("etiket_yukseklik_mm") or 30)
+    if not (10 <= genislik <= 200) or not (10 <= yukseklik <= 200):
+        raise HTTPException(400, "Etiket boyutu 10-200mm aralığında olmalı")
+    await db.execute(
+        """UPDATE dukkanlar SET etiket_genislik_mm=$1, etiket_yukseklik_mm=$2,
+           etiket_logo_goster=$3, etiket_kategori_goster=$4 WHERE id=$5""",
+        genislik, yukseklik, bool(body.get("etiket_logo_goster", False)),
+        bool(body.get("etiket_kategori_goster", True)), dukkan_id,
+    )
+    return {"ok": True}
+
+
 @router.get("/randevu-talepleri")
 async def randevu_talepleri(
     dukkan_id: int = Depends(get_dukkan_id),

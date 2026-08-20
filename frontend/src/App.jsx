@@ -65,6 +65,7 @@ import RandevuTalepleri from "./pages/RandevuTalepleri";
 import VitrinDegerlendirme from "./pages/VitrinDegerlendirme";
 import VitrinTakas from "./pages/VitrinTakas";
 import MusteriMesajlari from "./pages/MusteriMesajlari";
+import EtiketAyarlari from "./pages/EtiketAyarlari";
 import "./index.css";
 
 // Kenar kaydırma (sol kenardan sağa → geri) + geri butonu
@@ -200,6 +201,7 @@ function AppRoutes({ user }) {
         <Route path="/vitrin-degerlendirme" element={<VitrinDegerlendirme />} />
         <Route path="/vitrin-takas" element={<VitrinTakas />} />
         <Route path="/musteri-mesajlari" element={<MusteriMesajlari />} />
+        <Route path="/etiket-ayarlari" element={<EtiketAyarlari user={user} />} />
       </Routes>
       <BottomNav user={user} bildirimSayisi={bildirimSayisi} />
     </NavShell>
