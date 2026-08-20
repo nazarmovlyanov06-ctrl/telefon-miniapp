@@ -5,6 +5,7 @@ import {
   User, Pencil, CircleX, Phone, FileText, Calendar,
   Wrench, Banknote, CalendarCheck, CreditCard, Smartphone, Package,
   FileClock, CheckCircle2, Home, X, ArrowRight, KeyRound, Copy, Check, MessageCircle,
+  Headphones,
 } from "lucide-react";
 
 const STATUS_LABEL = {
@@ -19,6 +20,7 @@ const TUR_LABEL = {
   "2el_satim": { icon: Smartphone, label: "2.El Aldı", color: "var(--green)" },
   sifir_alim: { icon: Package, label: "Sıfır Sattı", color: "var(--purple)" },
   sifir_satim: { icon: Package, label: "Sıfır Aldı", color: "var(--green)" },
+  aksesuar_satis: { icon: Headphones, label: "Aksesuar Aldı", color: "var(--green)" },
 };
 
 const DATE_ICONS = { acildi: FileClock, tamirde: Wrench, hazir: CheckCircle2, teslim: Home };

@@ -282,6 +282,15 @@ export const api = {
   updateAksesuar: (id, data) => put(`/aksesuarlar/${id}`, data),
   deleteAksesuar: (id) => del(`/aksesuarlar/${id}`),
   satAksesuar: (id, data) => post(`/aksesuarlar/${id}/sat`, data),
+  aksesuarKategorileri: () => get("/aksesuarlar/kategoriler"),
+  aksesuarKategoriEkle: (ad) => post("/aksesuarlar/kategoriler", { ad }),
+  aksesuarKategoriSil: (ad) => del(`/aksesuarlar/kategoriler?ad=${encodeURIComponent(ad)}`),
+  aksesuarHareketler: (id) => get(`/aksesuarlar/${id}/hareketler`),
+  aksesuarSatisGecmisi: (params = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v)));
+    const s = q.toString();
+    return get(`/aksesuarlar/satislar${s ? "?" + s : ""}`);
+  },
 
   // Hedef
   hedefBuAy: () => get("/hedef/bu-ay"),

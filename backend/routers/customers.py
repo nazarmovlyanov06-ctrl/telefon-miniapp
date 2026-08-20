@@ -311,6 +311,34 @@ async def customer_gecmis(
             },
         })
 
+    # Aksesuar satışları — customer_id bağlantısı DB'de vardı ama personel
+    # tarafındaki bu geçmiş sayfası hiç sorgulamıyordu, müşteri portalında
+    # ("Satın Aldıklarım") görünse de personel burada göremiyordu.
+    if phone:
+        rows = await db.fetch(
+            """SELECT s.*, a.ad as urun_adi FROM aksesuar_satislar s
+               LEFT JOIN aksesuarlar a ON a.id = s.aksesuar_id
+               WHERE s.dukkan_id = $1 AND (s.customer_id = $2 OR LOWER(s.musteri_adi) = LOWER($3)
+                     OR (s.musteri_telefon IS NOT NULL AND s.musteri_telefon != '' AND s.musteri_telefon = $4))""",
+            dukkan_id, customer_id, name, phone,
+        )
+    else:
+        rows = await db.fetch(
+            """SELECT s.*, a.ad as urun_adi FROM aksesuar_satislar s
+               LEFT JOIN aksesuarlar a ON a.id = s.aksesuar_id
+               WHERE s.dukkan_id = $1 AND (s.customer_id = $2 OR LOWER(s.musteri_adi) = LOWER($3))""",
+            dukkan_id, customer_id, name,
+        )
+    for c in rows:
+        c = dict(c)
+        events.append({
+            "tur": "aksesuar_satis", "ikon": "🎧",
+            "baslik": c.get("urun_adi") or "Aksesuar",
+            "alt": f"Aksesuar · {c['miktar']} adet",
+            "tutar": c.get("toplam"),
+            "tarih": c.get("tarih") or c.get("created_at"),
+        })
+
     events.sort(key=lambda x: x.get("tarih") or "", reverse=True)
     return events
 
