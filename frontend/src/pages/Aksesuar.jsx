@@ -341,33 +341,48 @@ export default function Aksesuar({ user }) {
             ))}
           </div>
 
-          {/* Ürün Listesi — kartlar tıklanabilir, detay penceresi açar */}
+          {/* Ürün Izgarası — Stok sayfasındaki kart tarzı: büyük görsel, renkli
+              fiyat rozetleri, öne çıkan stok sayısı. Kartlar tıklanabilir,
+              detay penceresi açar. */}
           {filteredList.length === 0 ? (
             <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>
               {urunArama ? "Aramayla eşleşen ürün yok" : aktifKat === "Tümü" ? "Aksesuar eklenmedi" : `${aktifKat} kategorisinde ürün yok`}
             </div>
-          ) : filteredList.map(a => (
-            <div key={a.id} className="card" style={{ cursor: "pointer" }} onClick={() => setDetayItem(a)}>
-              <div className="card-row">
-                <div>
-                  <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, marginBottom: 2 }}>{a.kategori || "Diğer"}</div>
-                  <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-                    <div onClick={e => e.stopPropagation()}>
-                      <UrunGorsel url={a.gorsel_url} yukle={f => api.aksesuarGorselYukle(a.id, f)} boyut={38} />
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 10 }}>
+              {filteredList.map(a => (
+                <div key={a.id} className="card" style={{ cursor: "pointer", padding: 14, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}
+                  onClick={() => setDetayItem(a)}>
+                  {a.stok <= 5 && (
+                    <div style={{
+                      alignSelf: "flex-end", marginBottom: -6, display: "flex", alignItems: "center", gap: 3,
+                      fontSize: 10, fontWeight: 700, color: "var(--danger)", background: "rgba(239,68,68,0.12)",
+                      padding: "2px 6px", borderRadius: 6,
+                    }}>
+                      <TriangleAlert size={10} strokeWidth={2.4} /> Düşük
                     </div>
-                    {a.ad}
+                  )}
+                  <div style={{ margin: "6px 0 8px" }}>
+                    <UrunGorsel url={a.gorsel_url} yukle={f => api.aksesuarGorselYukle(a.id, f)} boyut={60} />
                   </div>
-                  <div style={{ fontSize: 13, color: "var(--hint)" }}>
-                    Alış: {a.alis_fiyati} ₺ · Satış: {a.satis_fiyati} ₺
+                  <div style={{ fontSize: 10.5, color: "var(--accent)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3 }}>{a.kategori || "Diğer"}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginTop: 3, lineHeight: 1.25, minHeight: 33 }}>{a.ad}</div>
+                  <div style={{ display: "flex", gap: 5, marginTop: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 6, background: "rgba(94,168,255,0.14)", color: "var(--blue)" }}>
+                      Alış {a.alis_fiyati}₺
+                    </span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 6, background: "rgba(74,222,128,0.14)", color: "var(--success)" }}>
+                      Satış {a.satis_fiyati}₺
+                    </span>
+                  </div>
+                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--divider)", width: "100%" }}>
+                    <div style={{ fontWeight: 700, fontSize: 19, color: a.stok <= 5 ? "var(--danger)" : "var(--text)" }}>{a.stok}</div>
+                    <div style={{ fontSize: 10, color: "var(--hint)" }}>adet stokta</div>
                   </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 700, color: a.stok <= 5 ? "var(--danger)" : "var(--text)" }}>{a.stok} adet</div>
-                  {a.stok <= 5 && <div style={{ fontSize: 11, color: "var(--danger)", display: "flex", alignItems: "center", gap: 3, justifyContent: "flex-end" }}><TriangleAlert size={11} strokeWidth={2} /> Düşük</div>}
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
+          )}
         </>
       ) : (
         <>
