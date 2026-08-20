@@ -30,6 +30,27 @@ async def _hareket_ekle(db, dukkan_id, aksesuar_id, tur, miktar, user_id, refera
     )
 
 
+async def _musteri_bul_veya_olustur(db, dukkan_id, musteri_adi, musteri_telefon):
+    if not musteri_adi:
+        return None
+    if musteri_telefon:
+        row = await db.fetchrow(
+            "SELECT id FROM customers WHERE dukkan_id=$1 AND (name = $2 OR phone = $3)",
+            dukkan_id, musteri_adi, musteri_telefon,
+        )
+    else:
+        row = await db.fetchrow(
+            "SELECT id FROM customers WHERE dukkan_id=$1 AND name = $2", dukkan_id, musteri_adi
+        )
+    if row:
+        return row["id"]
+    ins = await db.fetchrow(
+        "INSERT INTO customers (dukkan_id, name, phone) VALUES ($1, $2, $3) RETURNING id",
+        dukkan_id, musteri_adi, musteri_telefon or None,
+    )
+    return ins["id"]
+
+
 @router.get("/")
 async def list_aksesuar(
     dukkan_id: int = Depends(get_dukkan_id),
@@ -290,27 +311,7 @@ async def sat_aksesuar(
         await db.execute(
             "UPDATE aksesuarlar SET stok = stok - $1 WHERE id = $2 AND dukkan_id = $3", miktar, aksesuar_id, dukkan_id
         )
-
-        customer_id = None
-        if musteri_adi:
-            if musteri_telefon:
-                row2 = await db.fetchrow(
-                    "SELECT id FROM customers WHERE dukkan_id=$1 AND (name = $2 OR phone = $3)",
-                    dukkan_id, musteri_adi, musteri_telefon,
-                )
-            else:
-                row2 = await db.fetchrow(
-                    "SELECT id FROM customers WHERE dukkan_id=$1 AND name = $2", dukkan_id, musteri_adi
-                )
-            if row2:
-                customer_id = row2["id"]
-            else:
-                ins = await db.fetchrow(
-                    "INSERT INTO customers (dukkan_id, name, phone) VALUES ($1, $2, $3) RETURNING id",
-                    dukkan_id, musteri_adi, musteri_telefon or None,
-                )
-                customer_id = ins["id"]
-
+        customer_id = await _musteri_bul_veya_olustur(db, dukkan_id, musteri_adi, musteri_telefon)
         row = await db.fetchrow(
             """INSERT INTO aksesuar_satislar (dukkan_id, aksesuar_id, miktar, toplam, musteri_adi, musteri_telefon, tarih, customer_id)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id""",
@@ -323,6 +324,59 @@ async def sat_aksesuar(
             customer_id=customer_id, taksit_sayi=body.get("taksit_sayi") or 1, tarih=tarih,
         )
     return {"id": row["id"], "toplam": toplam}
+
+
+@router.post("/toplu-sat")
+async def toplu_sat(
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    # Barkotla art arda taranan farklı ürünleri TEK müşteriye TEK satış olarak
+    # kapatır — önceden her ürün ayrı ayrı satılmak zorundaydı, bu da aynı
+    # müşteriye yapılan tek alışverişi kasada/borçta parça parça gösterirdi.
+    kalemler = body.get("kalemler") or []
+    if not kalemler:
+        raise HTTPException(400, "Sepet boş")
+    tarih = body.get("tarih", date.today().isoformat())
+    musteri_adi = body.get("musteri_adi") or ""
+    musteri_telefon = body.get("musteri_telefon") or ""
+
+    async with db.transaction():
+        customer_id = await _musteri_bul_veya_olustur(db, dukkan_id, musteri_adi, musteri_telefon)
+        toplam_tutar = 0.0
+        aciklamalar = []
+        for kalem in kalemler:
+            aksesuar_id = int(kalem["aksesuar_id"])
+            miktar = int(kalem.get("miktar", 1))
+            if miktar <= 0:
+                raise HTTPException(400, "Adet sıfırdan büyük olmalı")
+            aks = await db.fetchrow("SELECT * FROM aksesuarlar WHERE id=$1 AND dukkan_id=$2", aksesuar_id, dukkan_id)
+            if not aks:
+                raise HTTPException(404, "Sepetteki bir ürün bulunamadı")
+            if aks["stok"] < miktar:
+                raise HTTPException(400, f"{aks['ad']} için yetersiz stok")
+            satir_tutar = round(miktar * aks["satis_fiyati"], 2)
+            toplam_tutar += satir_tutar
+            await db.execute(
+                "UPDATE aksesuarlar SET stok = stok - $1 WHERE id=$2 AND dukkan_id=$3", miktar, aksesuar_id, dukkan_id
+            )
+            satis_row = await db.fetchrow(
+                """INSERT INTO aksesuar_satislar (dukkan_id, aksesuar_id, miktar, toplam, musteri_adi, musteri_telefon, tarih, customer_id)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id""",
+                dukkan_id, aksesuar_id, miktar, satir_tutar, musteri_adi or None, musteri_telefon or None, tarih, customer_id,
+            )
+            await _hareket_ekle(db, dukkan_id, aksesuar_id, "cikis", -miktar, user["id"], "satis", satis_row["id"])
+            aciklamalar.append(f"{aks['ad']} x{miktar}")
+
+        toplam_tutar = round(toplam_tutar, 2)
+        await kaydet_odeme(
+            db, dukkan_id, body.get("odemeler"), toplam_tutar, "gelir", "aksesuar",
+            "Aksesuar (toplu): " + ", ".join(aciklamalar), user["id"],
+            customer_id=customer_id, taksit_sayi=body.get("taksit_sayi") or 1, tarih=tarih,
+        )
+    return {"ok": True, "toplam": toplam_tutar, "urun_cesidi": len(kalemler)}
 
 
 @router.post("/{kayit_id}/gorsel")

@@ -288,6 +288,7 @@ export const api = {
   aksesuarHareketler: (id) => get(`/aksesuarlar/${id}/hareketler`),
   aksesuarStokEkle: (id, data) => post(`/aksesuarlar/${id}/stok-ekle`, data),
   aksesuarBarkotAra: (kod) => get(`/aksesuarlar/barkot/${encodeURIComponent(kod)}`),
+  aksesuarTopluSat: (data) => post("/aksesuarlar/toplu-sat", data),
   aksesuarSatisGecmisi: (params = {}) => {
     const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v)));
     const s = q.toString();

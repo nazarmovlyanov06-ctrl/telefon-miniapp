@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import JsBarcode from "jsbarcode";
-import { api } from "../api";
+import { api, fotoUrl } from "../api";
 import {
   Tag, CircleX, TriangleAlert, Trash2, Search, Filter, X, Pencil,
   Headphones, ArrowDownCircle, ArrowUpCircle, RefreshCw, Phone, Package,
@@ -153,15 +153,25 @@ function UrunDetayModal({ item, onClose, onSat, onDuzenle, onSil, onStokEkle, on
 }
 
 /* ── Etiket Yazdır Modalı — barkot+fiyat etiketi, window.print() ile ────── */
-function EtiketYazdirModal({ item, onClose }) {
+function EtiketIcerik({ item }) {
   const kod = barkotDegeri(item);
   return (
-    <AltPencere onClose={onClose} maxWidth={340}>
-      <PencereBaslik onClose={onClose}>Etiket Yazdır</PencereBaslik>
-      <div className="etiket-print-alan" style={{ background: "#fff", color: "#000", borderRadius: 10, padding: 14, textAlign: "center", border: "1px solid var(--divider)" }}>
+    <div className="etiket-tek">
+      <div style={{ background: "#fff", color: "#000", borderRadius: 10, padding: 14, textAlign: "center", border: "1px solid var(--divider)" }}>
         <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.ad}</div>
         <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>{item.satis_fiyati}₺</div>
         <BarkotSVG value={kod} />
+      </div>
+    </div>
+  );
+}
+
+function EtiketYazdirModal({ item, onClose }) {
+  return (
+    <AltPencere onClose={onClose} maxWidth={340}>
+      <PencereBaslik onClose={onClose}>Etiket Yazdır</PencereBaslik>
+      <div className="etiket-yazdirma-alani">
+        <EtiketIcerik item={item} />
       </div>
       <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 10 }}>
         "Yazdır"a basınca tarayıcının yazdırma penceresi açılır — orada yazıcınızı ve kağıt/etiket boyutunu seçebilirsiniz.
@@ -170,6 +180,46 @@ function EtiketYazdirModal({ item, onClose }) {
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button className="btn btn-primary" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} onClick={() => window.print()}>
           <Printer size={14} strokeWidth={2} /> Yazdır
+        </button>
+        <button className="btn btn-ghost" onClick={onClose}>Kapat</button>
+      </div>
+    </AltPencere>
+  );
+}
+
+/* ── Toplu Etiket Yazdır — birden fazla farklı ürün seçip hepsini art arda
+   sayfalar halinde yazdırır ── */
+function TopluEtiketModal({ liste, secililer, onSecimDegis, onClose }) {
+  const secilenUrunler = liste.filter(a => secililer.has(a.id));
+  return (
+    <AltPencere onClose={onClose} maxWidth={420}>
+      <PencereBaslik onClose={onClose}>Toplu Etiket Yazdır ({secililer.size})</PencereBaslik>
+      <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 10 }}>Etiketi basılacak ürünleri seç.</div>
+      <div style={{ maxHeight: "40vh", overflowY: "auto", marginBottom: 12 }}>
+        {liste.map(a => (
+          <label key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: "1px solid var(--divider)", cursor: "pointer" }}>
+            <input type="checkbox" checked={secililer.has(a.id)} onChange={() => onSecimDegis(a.id)} style={{ width: 16, height: 16, flexShrink: 0 }} />
+            <div style={{
+              width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+              background: a.gorsel_url ? `url(${fotoUrl(a.gorsel_url)}) center/cover` : "var(--bg2)",
+            }} />
+            <div style={{ flex: 1, fontSize: 13 }}>{a.ad}</div>
+            <div style={{ fontSize: 12, color: "var(--hint)" }}>{a.satis_fiyati}₺</div>
+          </label>
+        ))}
+      </div>
+
+      {secilenUrunler.length > 0 && (
+        <div className="etiket-yazdirma-alani">
+          {secilenUrunler.map(a => <EtiketIcerik key={a.id} item={a} />)}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <button className="btn btn-primary" disabled={secilenUrunler.length === 0}
+          style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+          onClick={() => window.print()}>
+          <Printer size={14} strokeWidth={2} /> {secilenUrunler.length} Etiket Yazdır
         </button>
         <button className="btn btn-ghost" onClick={onClose}>Kapat</button>
       </div>
@@ -198,8 +248,15 @@ export default function Aksesuar({ user }) {
   const [err, setErr] = useState("");
   const [deleteId, setDeleteId] = useState(null);
   const [yazdirItem, setYazdirItem] = useState(null);
-  const [tarayici, setTarayici] = useState(null); // null | "form" | "satis"
+  const [tarayici, setTarayici] = useState(null); // null | "form" | "sepet" | "ara"
   const [barkotSatisHata, setBarkotSatisHata] = useState("");
+  const [topluEtiketAcik, setTopluEtiketAcik] = useState(false);
+  const [etiketSecililer, setEtiketSecililer] = useState(() => new Set());
+  // Barkotla Sat — art arda farklı ürün okutup tek satışta kapatma sepeti
+  const [sepet, setSepet] = useState([]); // [{ aksesuar, miktar }]
+  const [sepetGoster, setSepetGoster] = useState(false);
+  const [sepetOdemeAcik, setSepetOdemeAcik] = useState(false);
+  const [sepetOdemeData, setSepetOdemeData] = useState({ musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
 
   // Satış Geçmişi sekmesi
   const [satislar, setSatislar] = useState([]);
@@ -332,19 +389,88 @@ export default function Aksesuar({ user }) {
   }
 
   async function barkotTarandi(kod) {
+    const mod = tarayici;
     setTarayici(null);
-    if (tarayici === "form") {
+    if (mod === "form") {
       setForm(f => ({ ...f, barkot: kod }));
       return;
     }
-    // "satis" modu — taranan barkoda ait ürünü bul, doğrudan Sat penceresini aç.
+    if (mod === "ara") {
+      // Ürün adını hatırlamayıp barkodundan bulmak için — arama kutusuna
+      // yazmak yerine direkt o ürünün detayı açılır.
+      setBarkotSatisHata("");
+      try {
+        const urun = await api.aksesuarBarkotAra(kod);
+        setDetayItem(urun);
+      } catch (e) {
+        setBarkotSatisHata(e.message);
+      }
+      return;
+    }
+    // "sepet" modu — art arda okutulan farklı ürünler tek sepette birikir,
+    // aynı ürün tekrar okutulursa adedi artar. Önceden her ürün ayrı ayrı
+    // satılmak zorundaydı, 10 çeşit ürün alan bir müşteri için 10 ayrı satış
+    // kaydı açılıyordu.
     setBarkotSatisHata("");
     try {
       const urun = await api.aksesuarBarkotAra(kod);
-      satAc(urun);
+      setSepet(s => {
+        const mevcut = s.find(k => k.aksesuar.id === urun.id);
+        if (mevcut) return s.map(k => k.aksesuar.id === urun.id ? { ...k, miktar: k.miktar + 1 } : k);
+        return [...s, { aksesuar: urun, miktar: 1 }];
+      });
+      setSepetGoster(true);
     } catch (e) {
       setBarkotSatisHata(e.message);
+      setSepetGoster(true);
     }
+  }
+
+  function sepetMiktarDegistir(id, delta) {
+    setSepet(s => s.map(k => k.aksesuar.id === id ? { ...k, miktar: Math.max(1, k.miktar + delta) } : k).filter(k => k.miktar > 0));
+  }
+  function sepettenSil(id) {
+    setSepet(s => s.filter(k => k.aksesuar.id !== id));
+  }
+  function sepetiTemizle() {
+    setSepet([]);
+    setSepetGoster(false);
+    setSepetOdemeAcik(false);
+  }
+  const sepetToplam = sepet.reduce((t, k) => t + k.miktar * (k.aksesuar.satis_fiyati || 0), 0);
+
+  function sepetOdemeAc() {
+    setSepetOdemeData({ musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
+    setErr("");
+    setSepetOdemeAcik(true);
+  }
+
+  async function submitSepetOdeme(e) {
+    e.preventDefault(); setErr("");
+    const odemeler = (sepetOdemeData.odemeler || varsayilanOdemeSatirlari(sepetToplam)).filter(o => parseFloat(o.tutar) > 0);
+    const alinan = odemeler.reduce((s, o) => s + (parseFloat(o.tutar) || 0), 0);
+    if (sepetToplam - alinan > 0.009 && !sepetOdemeData.musteri_adi.trim()) {
+      setErr("Kalan tutar borç olarak yazılacaksa müşteri adı girilmeli");
+      return;
+    }
+    try {
+      await api.aksesuarTopluSat({
+        kalemler: sepet.map(k => ({ aksesuar_id: k.aksesuar.id, miktar: k.miktar })),
+        musteri_adi: sepetOdemeData.musteri_adi, musteri_telefon: sepetOdemeData.musteri_telefon,
+        tarih: today(), odemeler, taksit_sayi: parseInt(sepetOdemeData.taksit_sayi) || 1,
+      });
+      sepetiTemizle();
+      load();
+      if (tab === "gecmis") satisYukle();
+    } catch (e) { setErr(e.message); }
+  }
+
+  function etiketSecimToggle(id) {
+    setEtiketSecililer(s => {
+      const yeni = new Set(s);
+      if (yeni.has(id)) yeni.delete(id); else yeni.add(id);
+      return yeni;
+    });
   }
 
   async function submitSat(e) {
@@ -391,6 +517,7 @@ export default function Aksesuar({ user }) {
         {tab === "urunler" && (
           <div style={{ display: "flex", gap: 6 }}>
             <button className="btn btn-ghost btn-sm" onClick={() => setShowKatYonet(!showKatYonet)} style={{ display: "flex", alignItems: "center", gap: 6 }}><Tag size={14} strokeWidth={2} /> Kategoriler</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setEtiketSecililer(new Set()); setTopluEtiketAcik(true); }} style={{ display: "flex", alignItems: "center", gap: 6 }}><Printer size={14} strokeWidth={2} /> Etiket</button>
             <button className="btn btn-primary btn-sm" onClick={yeniUrunAc}>+ Ekle</button>
           </div>
         )}
@@ -423,19 +550,35 @@ export default function Aksesuar({ user }) {
             </div>
           )}
 
-          {/* Arama + Barkotla Sat */}
+          {/* Arama (isimle veya barkotla) + Barkotla Sat + Sepet göstergesi */}
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <div className="form-group" style={{ position: "relative", marginBottom: 0, flex: 1 }}>
-              <input className="form-input" style={{ paddingLeft: 36 }} value={urunArama}
+              <input className="form-input" style={{ paddingLeft: 36, paddingRight: 40 }} value={urunArama}
                 onChange={e => setUrunArama(e.target.value)} placeholder="Ürün adı ara..." />
               <Search size={15} strokeWidth={2} stroke="var(--hint)"
                 style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+              <button type="button" title="Barkodla ürün bul"
+                onClick={() => { setBarkotSatisHata(""); setTarayici("ara"); }}
+                style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--hint)", padding: 6, display: "flex" }}>
+                <Camera size={16} strokeWidth={2} />
+              </button>
             </div>
             <button type="button" className="btn btn-primary btn-sm" style={{ whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}
-              onClick={() => { setBarkotSatisHata(""); setTarayici("satis"); }}>
+              onClick={() => { setBarkotSatisHata(""); setTarayici("sepet"); }}>
               <ScanLine size={15} strokeWidth={2} /> Barkotla Sat
             </button>
           </div>
+          {sepet.length > 0 && (
+            <div className="card" style={{ marginBottom: 10, cursor: "pointer", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)" }}
+              onClick={() => setSepetGoster(true)}>
+              <div className="card-row">
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, fontSize: 13 }}>
+                  <ScanLine size={15} strokeWidth={2} stroke="var(--success)" /> Sepette {sepet.length} çeşit ürün
+                </span>
+                <span style={{ fontWeight: 700, color: "var(--success)" }}>{sepetToplam.toLocaleString("tr-TR")} ₺</span>
+              </div>
+            </div>
+          )}
           {barkotSatisHata && (
             <div style={{ color: "var(--danger)", fontSize: 12.5, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
               <CircleX size={13} strokeWidth={2} /> {barkotSatisHata}
@@ -643,9 +786,92 @@ export default function Aksesuar({ user }) {
       {/* Etiket Yazdır Modalı */}
       {yazdirItem && <EtiketYazdirModal item={yazdirItem} onClose={() => setYazdirItem(null)} />}
 
-      {/* Barkod Tarayıcı — forma barkot girmek veya barkotla satış için */}
+      {/* Barkod Tarayıcı — forma barkot girmek, ürün aramak veya sepete eklemek için */}
       {tarayici && (
         <BarcodeScanner mod="barkot" onScan={barkotTarandi} onClose={() => setTarayici(null)} />
+      )}
+
+      {/* Toplu Etiket Yazdır Modalı */}
+      {topluEtiketAcik && (
+        <TopluEtiketModal liste={list} secililer={etiketSecililer} onSecimDegis={etiketSecimToggle} onClose={() => setTopluEtiketAcik(false)} />
+      )}
+
+      {/* Sepet — Barkotla Sat ile art arda okutulan farklı ürünlerin listesi */}
+      {sepetGoster && !sepetOdemeAcik && (
+        <AltPencere onClose={() => setSepetGoster(false)}>
+          <PencereBaslik onClose={() => setSepetGoster(false)}>Sepet ({sepet.length} çeşit)</PencereBaslik>
+          {barkotSatisHata && (
+            <div style={{ color: "var(--danger)", fontSize: 12.5, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <CircleX size={13} strokeWidth={2} /> {barkotSatisHata}
+            </div>
+          )}
+          {sepet.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--hint)", textAlign: "center", padding: "16px 0" }}>Sepet boş — "Barkot Tara"ya basıp ürünleri okutun</div>
+          ) : sepet.map(k => (
+            <div key={k.aksesuar.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--divider)" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{k.aksesuar.ad}</div>
+                <div style={{ fontSize: 11.5, color: "var(--hint)" }}>{k.aksesuar.satis_fiyati}₺ / adet</div>
+              </div>
+              <button type="button" className="btn btn-ghost btn-sm" style={{ padding: "2px 8px" }} onClick={() => sepetMiktarDegistir(k.aksesuar.id, -1)}>−</button>
+              <span style={{ minWidth: 20, textAlign: "center", fontWeight: 700 }}>{k.miktar}</span>
+              <button type="button" className="btn btn-ghost btn-sm" style={{ padding: "2px 8px" }} onClick={() => sepetMiktarDegistir(k.aksesuar.id, 1)}>+</button>
+              <span style={{ fontWeight: 700, minWidth: 60, textAlign: "right" }}>{(k.miktar * k.aksesuar.satis_fiyati).toLocaleString("tr-TR")}₺</span>
+              <button type="button" className="btn btn-ghost btn-sm" style={{ color: "var(--danger)", padding: "2px 6px" }} onClick={() => sepettenSil(k.aksesuar.id)}>
+                <Trash2 size={13} strokeWidth={2} />
+              </button>
+            </div>
+          ))}
+          <div className="card-row" style={{ marginTop: 10, marginBottom: 12 }}>
+            <span style={{ color: "var(--hint)" }}>Toplam</span>
+            <span style={{ fontWeight: 700, fontSize: 17, color: "var(--success)" }}>{sepetToplam.toLocaleString("tr-TR")} ₺</span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="btn btn-ghost btn-sm" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+              onClick={() => { setBarkotSatisHata(""); setTarayici("sepet"); }}>
+              <ScanLine size={14} strokeWidth={2} /> Barkot Tara
+            </button>
+            <button type="button" className="btn btn-primary btn-sm" style={{ flex: 1 }} disabled={sepet.length === 0} onClick={sepetOdemeAc}>
+              Satışı Tamamla
+            </button>
+          </div>
+          {sepet.length > 0 && (
+            <button type="button" className="btn btn-ghost btn-sm" style={{ width: "100%", marginTop: 8, color: "var(--danger)" }} onClick={sepetiTemizle}>
+              Sepeti Boşalt
+            </button>
+          )}
+        </AltPencere>
+      )}
+
+      {/* Sepet Ödeme — tüm sepet için tek müşteri, tek ödeme bölüşümü */}
+      {sepetOdemeAcik && (
+        <AltPencere onClose={() => setSepetOdemeAcik(false)}>
+          <PencereBaslik onClose={() => setSepetOdemeAcik(false)}>Satışı Tamamla</PencereBaslik>
+          <form onSubmit={submitSepetOdeme}>
+            {err && <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 0", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
+            <div style={{ fontSize: 12.5, color: "var(--hint)", marginBottom: 10 }}>
+              {sepet.map(k => `${k.aksesuar.ad} x${k.miktar}`).join(", ")}
+            </div>
+            <div className="form-group">
+              <label className="form-label">Müşteri Adı (opsiyonel)</label>
+              <input className="form-input" value={sepetOdemeData.musteri_adi} onChange={e => setSepetOdemeData({ ...sepetOdemeData, musteri_adi: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Müşteri Telefonu (opsiyonel)</label>
+              <input className="form-input" type="tel" value={sepetOdemeData.musteri_telefon} onChange={e => setSepetOdemeData({ ...sepetOdemeData, musteri_telefon: e.target.value })} />
+            </div>
+            <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8 }}>
+              Toplam: {sepetToplam.toLocaleString("tr-TR")} ₺
+            </div>
+            <OdemeBolustur toplam={sepetToplam} yon="gelir"
+              value={sepetOdemeData.odemeler} onChange={v => setSepetOdemeData(f => ({ ...f, odemeler: v }))}
+              taksitSayi={sepetOdemeData.taksit_sayi} onTaksitSayiChange={v => setSepetOdemeData(f => ({ ...f, taksit_sayi: v }))} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="submit" className="btn btn-primary">Satışı Kaydet</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setSepetOdemeAcik(false)}>Geri</button>
+            </div>
+          </form>
+        </AltPencere>
       )}
 
       {/* Stok Ekle Modalı — toptancıdan yeni parti geldiğinde hızlı giriş */}
