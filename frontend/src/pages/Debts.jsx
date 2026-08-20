@@ -33,6 +33,11 @@ export default function Debts({ user }) {
   const [maxTutar, setMaxTutar] = useState("");
   const [tarihBaslangic, setTarihBaslangic] = useState("");
   const [tarihBitis, setTarihBitis] = useState("");
+  const [highlightId, setHighlightId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const h = params.get("highlight");
+    return h ? parseInt(h) : null;
+  });
   const [form, setForm] = useState({
     customer_id: null, customer_name_display: "",
     alacakli_adi: "",
@@ -102,6 +107,23 @@ export default function Debts({ user }) {
   }
 
   const activeList = tab === "alacak" ? alacaklar : tab === "dukkan_borcu" ? dukkanBorclari : gecmis;
+
+  // Bildirim zilinden "vadesi geldi" tıklanınca genel listeye düşüp tekrar
+  // aramak zorunda kalınmasın diye — ilgili kayıt otomatik açılır, kaydırılır
+  // ve birkaç saniye vurgulanır.
+  useEffect(() => {
+    if (!highlightId || activeList.length === 0) return;
+    const match = activeList.find(d => d.id === highlightId);
+    if (!match) return;
+    setExpandedId(highlightId);
+    if (!odemeler[highlightId]) loadOdemeler(highlightId);
+    const kaydirmaT = setTimeout(() => {
+      document.getElementById(`debt-row-${highlightId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+    const temizleT = setTimeout(() => setHighlightId(null), 3500);
+    return () => { clearTimeout(kaydirmaT); clearTimeout(temizleT); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeList, highlightId]);
 
   function handleMusteriChange(val) {
     setForm(f => ({ ...f, customer_name_display: val, customer_id: null }));
@@ -448,7 +470,10 @@ export default function Debts({ user }) {
         </div>
       ) : (
         activeList.map((d) => (
-          <div key={d.id} className="card" style={{ marginBottom: 8 }}>
+          <div key={d.id} id={`debt-row-${d.id}`} className="card" style={{
+            marginBottom: 8, transition: "box-shadow 0.3s, background 0.3s",
+            ...(highlightId === d.id ? { boxShadow: "0 0 0 2px var(--accent)", background: "rgba(99,102,241,0.08)" } : {}),
+          }}>
             <div className="card-row" onClick={() => toggleExpand(d.id)} style={{ cursor: "pointer" }}>
               <div>
                 <div style={{ fontWeight: 600 }}>{d.customer_name}</div>

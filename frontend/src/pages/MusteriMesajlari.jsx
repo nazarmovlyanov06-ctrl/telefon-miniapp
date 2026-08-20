@@ -18,10 +18,23 @@ export default function MusteriMesajlari() {
   const sonRef = useRef(null);
 
   function listeYukle() {
-    api.vitrinMusteriMesajlari().then(setKonusmalar).finally(() => setLoading(false));
+    return api.vitrinMusteriMesajlari().then(setKonusmalar).finally(() => setLoading(false));
   }
-  useEffect(listeYukle, []);
+  useEffect(() => { listeYukle(); }, []);
   useEffect(() => { sonRef.current?.scrollIntoView({ behavior: "smooth" }); }, [mesajlar]);
+
+  // Bildirim zilinden tıklanınca genel listeye düşüp tekrar aramak yerine
+  // doğrudan o müşterinin konuşması açılır.
+  const [acilanCustomerId] = useState(() => {
+    const c = new URLSearchParams(window.location.search).get("customer_id");
+    return c ? parseInt(c) : null;
+  });
+  useEffect(() => {
+    if (!acilanCustomerId || secili) return;
+    const match = konusmalar.find(k => k.customer_id === acilanCustomerId);
+    if (match) ac(match);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [konusmalar]);
 
   function ac(k) {
     setSecili(k);

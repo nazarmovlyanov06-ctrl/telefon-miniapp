@@ -570,11 +570,14 @@ function BildirimPanelModal({ onClose, onOkundu }) {
 
   function tikla(b) {
     onClose();
-    if (b.ilgili_tip === "debt") navigate("/debts");
+    // Sadece ilgili listeye değil, doğrudan o kayda (kaydırılmış+vurgulanmış
+    // ya da açılmış) gidiyor — önceden genel listeye düşüp tekrar aramak
+    // gerekiyordu.
+    if (b.ilgili_tip === "debt") navigate(`/debts?tab=alacak&highlight=${b.ilgili_id}`);
     else if (b.ilgili_tip === "repair") navigate(`/repairs/${b.ilgili_id}`);
-    else if (b.tur === "randevu_talebi") navigate("/randevu-talepleri");
-    else if (b.tur === "takas_teklifi") navigate("/vitrin-takas");
-    else if (b.tur === "musteri_mesaji") navigate("/musteri-mesajlari");
+    else if (b.tur === "randevu_talebi") navigate(`/randevu-talepleri?highlight=${b.ilgili_id}`);
+    else if (b.tur === "takas_teklifi") navigate(`/vitrin-takas?highlight=${b.ilgili_id}`);
+    else if (b.tur === "musteri_mesaji") navigate(`/musteri-mesajlari?customer_id=${b.ilgili_id}`);
   }
 
   return (
