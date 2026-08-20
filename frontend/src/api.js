@@ -180,12 +180,16 @@ export const api = {
   imeiBtk: (imei) => get(`/imei/btk/${imei}`),
 
   // Borc
-  debts: (tur, q) => {
-    const params = new URLSearchParams(Object.fromEntries(Object.entries({ tur, q }).filter(([, v]) => v)));
-    const s = params.toString();
+  debts: (params = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v)));
+    const s = q.toString();
     return get(`/debts/${s ? "?" + s : ""}`);
   },
-  debtsGecmis: (q) => get(`/debts/gecmis${q ? "?q=" + encodeURIComponent(q) : ""}`),
+  debtsGecmis: (params = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v)));
+    const s = q.toString();
+    return get(`/debts/gecmis${s ? "?" + s : ""}`);
+  },
   createDebt: (data) => post("/debts/", data),
   updateDebt: (id, data) => put(`/debts/${id}`, data),
   deleteDebt: (id) => del(`/debts/${id}`),

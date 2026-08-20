@@ -15,16 +15,53 @@ from odeme_yardimci import BILINEN_GELIR_KAYNAK
 
 router = APIRouter(prefix="/debts", tags=["debts"])
 
+# "Eski borçlar" / "yüksek borçlar" gibi sorulara cevap verilemiyordu — liste
+# hep tek bir sırada (vadeye göre) geliyordu, tutar/tarih aralığına göre daraltma
+# da yoktu. Whitelist'ten seçilir, doğrudan f-string'e kullanıcı girdisi girmez.
+_SIRALAMA_AKTIF = {
+    "vade": "d.due_date ASC NULLS LAST, d.created_at DESC",
+    "eski": "d.created_at ASC",
+    "yeni": "d.created_at DESC",
+    "tutar_yuksek": "d.total_amount DESC",
+    "tutar_dusuk": "d.total_amount ASC",
+}
+_SIRALAMA_GECMIS = {
+    "eski": "d.created_at ASC",
+    "yeni": "d.created_at DESC",
+    "tutar_yuksek": "d.total_amount DESC",
+    "tutar_dusuk": "d.total_amount ASC",
+}
+
 
 def _patron_kontrol(user):
     if user["rol"] != "patron":
         raise HTTPException(403, "Sadece patron")
 
 
+def _tutar_tarih_filtresi(where, params, min_tutar, max_tutar, tarih_baslangic, tarih_bitis):
+    if min_tutar is not None:
+        params.append(min_tutar)
+        where.append(f"d.total_amount >= ${len(params)}")
+    if max_tutar is not None:
+        params.append(max_tutar)
+        where.append(f"d.total_amount <= ${len(params)}")
+    if tarih_baslangic is not None:
+        params.append(tarih_baslangic)
+        where.append(f"d.created_at >= ${len(params)}")
+    if tarih_bitis is not None:
+        params.append(tarih_bitis)
+        where.append(f"d.created_at < ${len(params)} + interval '1 day'")
+
+
 @router.get("/")
 async def list_debts(
     tur: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
+    min_tutar: Optional[float] = Query(None),
+    max_tutar: Optional[float] = Query(None),
+    tarih_baslangic: Optional[date] = Query(None),
+    tarih_bitis: Optional[date] = Query(None),
+    sirala: Optional[str] = Query(None),
     dukkan_id: int = Depends(get_dukkan_id),
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
@@ -38,7 +75,9 @@ async def list_debts(
         params.append(f"%{q}%")
         idx = len(params)
         where.append(f"(c.name ILIKE ${idx} OR d.alacakli_adi ILIKE ${idx} OR d.notes ILIKE ${idx})")
+    _tutar_tarih_filtresi(where, params, min_tutar, max_tutar, tarih_baslangic, tarih_bitis)
     where_sql = " AND ".join(where)
+    order_sql = _SIRALAMA_AKTIF.get(sirala, _SIRALAMA_AKTIF["vade"])
     # Açık (henüz kapanmamış) borç/alacaklar her zaman dikkat gerektirir —
     # Parça İade'deki bekleyen kayıtlar gibi limitsiz listelenir, aksi halde
     # 100'den fazla açık kayıt varsa eskiler sessizce listeden düşerdi.
@@ -50,7 +89,7 @@ async def list_debts(
            FROM debts d
            LEFT JOIN customers c ON d.customer_id = c.id
            WHERE {where_sql}
-           ORDER BY d.due_date ASC NULLS LAST, d.created_at DESC""",
+           ORDER BY {order_sql}""",
         *params,
     )
     return [dict(r) for r in rows]
@@ -59,6 +98,11 @@ async def list_debts(
 @router.get("/gecmis")
 async def gecmis_debts(
     q: Optional[str] = Query(None),
+    min_tutar: Optional[float] = Query(None),
+    max_tutar: Optional[float] = Query(None),
+    tarih_baslangic: Optional[date] = Query(None),
+    tarih_bitis: Optional[date] = Query(None),
+    sirala: Optional[str] = Query(None),
     dukkan_id: int = Depends(get_dukkan_id),
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
@@ -69,7 +113,9 @@ async def gecmis_debts(
         params.append(f"%{q}%")
         idx = len(params)
         where.append(f"(c.name ILIKE ${idx} OR d.alacakli_adi ILIKE ${idx} OR d.notes ILIKE ${idx})")
+    _tutar_tarih_filtresi(where, params, min_tutar, max_tutar, tarih_baslangic, tarih_bitis)
     where_sql = " AND ".join(where)
+    order_sql = _SIRALAMA_GECMIS.get(sirala, _SIRALAMA_GECMIS["yeni"])
     rows = await db.fetch(
         f"""SELECT d.*,
                   COALESCE(c.name, d.alacakli_adi, 'Bilinmiyor') as customer_name,
@@ -78,7 +124,7 @@ async def gecmis_debts(
            FROM debts d
            LEFT JOIN customers c ON d.customer_id = c.id
            WHERE {where_sql}
-           ORDER BY d.created_at DESC LIMIT 200""",
+           ORDER BY {order_sql} LIMIT 200""",
         *params,
     )
     return [dict(r) for r in rows]

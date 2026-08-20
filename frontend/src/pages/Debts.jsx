@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import {
   Banknote, Landmark, ClipboardList, CircleX, User, Ban, Phone, Calendar,
-  CreditCard, FileText, Wallet, X, Search, Pencil, Trash2,
+  CreditCard, FileText, Wallet, X, Search, Pencil, Trash2, Filter,
 } from "lucide-react";
 
 export default function Debts({ user }) {
@@ -27,6 +27,12 @@ export default function Debts({ user }) {
   const [payForm, setPayForm] = useState({ amount: "", payment_type: "nakit" });
   const [payErr, setPayErr] = useState("");
   const [arama, setArama] = useState("");
+  const [sirala, setSirala] = useState("vade");
+  const [showFiltre, setShowFiltre] = useState(false);
+  const [minTutar, setMinTutar] = useState("");
+  const [maxTutar, setMaxTutar] = useState("");
+  const [tarihBaslangic, setTarihBaslangic] = useState("");
+  const [tarihBitis, setTarihBitis] = useState("");
   const [form, setForm] = useState({
     customer_id: null, customer_name_display: "",
     alacakli_adi: "",
@@ -47,28 +53,39 @@ export default function Debts({ user }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Arama yazarken her tuşta değil, 300ms bekleyip sakinleşince çek.
+  // Arama/filtre/sıralama değişince listeyi yeniden çek — her tuşta değil,
+  // 300ms bekleyip sakinleşince (debounce).
   const ilkYuklemeRef = useRef(true);
   useEffect(() => {
     if (ilkYuklemeRef.current) { ilkYuklemeRef.current = false; return; }
     const t = setTimeout(load, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [arama]);
+  }, [arama, sirala, minTutar, maxTutar, tarihBaslangic, tarihBitis]);
 
   async function load() {
     setLoading(true);
     try {
+      const ortak = {
+        q: arama, sirala,
+        min_tutar: minTutar || undefined, max_tutar: maxTutar || undefined,
+        tarih_baslangic: tarihBaslangic || undefined, tarih_bitis: tarihBitis || undefined,
+      };
       const [a, d, g] = await Promise.all([
-        api.debts("alacak", arama),
-        api.debts("dukkan_borcu", arama),
-        api.debtsGecmis(arama),
+        api.debts({ tur: "alacak", ...ortak }),
+        api.debts({ tur: "dukkan_borcu", ...ortak }),
+        api.debtsGecmis(ortak),
       ]);
       setAlacaklar(a);
       setDukkanBorclari(d);
       setGecmis(g);
     } finally { setLoading(false); }
   }
+
+  function filtreTemizle() {
+    setMinTutar(""); setMaxTutar(""); setTarihBaslangic(""); setTarihBitis(""); setSirala("vade");
+  }
+  const filtreAktif = minTutar || maxTutar || tarihBaslangic || tarihBitis || sirala !== "vade";
 
   function handleAlacakliChange(val) {
     setForm(f => ({ ...f, alacakli_adi: val }));
@@ -239,6 +256,57 @@ export default function Debts({ user }) {
         <Search size={15} strokeWidth={2} stroke="var(--hint)"
           style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
       </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <select className="form-select" style={{ flex: 1 }} value={sirala} onChange={e => setSirala(e.target.value)}>
+          <option value="vade">Vade Tarihine Göre</option>
+          <option value="eski">En Eski Borç Önce</option>
+          <option value="yeni">En Yeni Borç Önce</option>
+          <option value="tutar_yuksek">Tutar: Yüksekten Düşüğe</option>
+          <option value="tutar_dusuk">Tutar: Düşükten Yükseğe</option>
+        </select>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowFiltre(s => !s)}
+          style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+          <Filter size={14} strokeWidth={2} /> Filtrele{filtreAktif ? " •" : ""}
+        </button>
+      </div>
+
+      {showFiltre && (
+        <div className="card" style={{ marginBottom: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Min Tutar (₺)</label>
+              <input className="form-input" type="number" min="0" value={minTutar}
+                onChange={e => setMinTutar(e.target.value)} placeholder="0" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Max Tutar (₺)</label>
+              <input className="form-input" type="number" min="0" value={maxTutar}
+                onChange={e => setMaxTutar(e.target.value)} placeholder="Sınırsız" />
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Bu Tarihten İtibaren</label>
+              <input className="form-input" type="date" value={tarihBaslangic}
+                max={tarihBitis || undefined} onChange={e => setTarihBaslangic(e.target.value)} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Bu Tarihe Kadar</label>
+              <input className="form-input" type="date" value={tarihBitis}
+                min={tarihBaslangic || undefined} onChange={e => setTarihBitis(e.target.value)} />
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 8 }}>
+            Tarih aralığı, kaydın oluşturulma tarihine göre uygulanır
+          </div>
+          {filtreAktif && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={filtreTemizle} style={{ marginTop: 10 }}>
+              Filtreyi Temizle
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Özet kart */}
       {!loading && tab !== "gecmis" && (
