@@ -467,10 +467,25 @@ export default function Debts({ user }) {
                 )}
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontWeight: 700, color: tab === "gecmis" ? "var(--hint)" : tab === "alacak" ? "var(--success)" : "var(--danger)", fontSize: 17 }}>
-                  ₺{(d.total_amount || 0).toLocaleString("tr-TR")}
-                </div>
-                {tab !== "gecmis" && d.payment_type === "taksit" && d.installment_count > 1 ? (() => {
+                {/* Önceden büyük/renkli rakam hep total_amount idi — göze ilk
+                    çarpan sayı olduğu için çalışan bunu "kalan borç" sanıp
+                    yanılabiliyordu. Artık öne çıkan rakam gerçekten KALAN,
+                    toplam ise küçük gri yardımcı metin. */}
+                {tab === "gecmis" ? (
+                  <div style={{ fontWeight: 700, color: "var(--hint)", fontSize: 17 }}>
+                    ₺{(d.total_amount || 0).toLocaleString("tr-TR")}
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontWeight: 700, color: tab === "alacak" ? "var(--success)" : "var(--danger)", fontSize: 17 }}>
+                      ₺{(d.remaining || 0).toLocaleString("tr-TR")}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--hint)" }}>
+                      kalan · toplam ₺{(d.total_amount || 0).toLocaleString("tr-TR")}
+                    </div>
+                  </>
+                )}
+                {tab !== "gecmis" && d.payment_type === "taksit" && d.installment_count > 1 && (() => {
                   const taksitTutari = (d.total_amount || 0) / (d.installment_count || 1);
                   const odenenTaksit = Math.floor((d.paid_amount || 0) / taksitTutari);
                   const kalanTaksit = (d.installment_count || 1) - odenenTaksit;
@@ -482,11 +497,7 @@ export default function Debts({ user }) {
                       </div>
                     </div>
                   );
-                })() : tab !== "gecmis" && (
-                  <div style={{ fontSize: 12, color: "var(--hint)" }}>
-                    kalan: ₺{(d.remaining || 0).toLocaleString("tr-TR")}
-                  </div>
-                )}
+                })()}
               </div>
             </div>
             {tab !== "gecmis" && (
