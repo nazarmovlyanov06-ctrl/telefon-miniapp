@@ -477,11 +477,14 @@ export default function Debts({ user }) {
                   </div>
                 ) : (
                   <>
-                    <div style={{ fontWeight: 700, color: tab === "alacak" ? "var(--success)" : "var(--danger)", fontSize: 17 }}>
-                      ₺{(d.remaining || 0).toLocaleString("tr-TR")}
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--hint)" }}>Kalan</span>
+                      <span style={{ fontWeight: 700, color: tab === "alacak" ? "var(--success)" : "var(--danger)", fontSize: 17 }}>
+                        ₺{(d.remaining || 0).toLocaleString("tr-TR")}
+                      </span>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--hint)" }}>
-                      kalan · toplam ₺{(d.total_amount || 0).toLocaleString("tr-TR")}
+                      toplam ₺{(d.total_amount || 0).toLocaleString("tr-TR")}
                     </div>
                   </>
                 )}
