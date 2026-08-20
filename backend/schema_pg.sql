@@ -407,7 +407,8 @@ CREATE TABLE IF NOT EXISTS aksesuarlar (
     kategori TEXT DEFAULT 'Diğer',
     gorsel_url TEXT,
     toptanci_id INTEGER REFERENCES toptancilar(id),
-    min_stok INTEGER DEFAULT 5
+    min_stok INTEGER DEFAULT 5,
+    barkot TEXT
 );
 
 CREATE TABLE IF NOT EXISTS aksesuar_satislar (

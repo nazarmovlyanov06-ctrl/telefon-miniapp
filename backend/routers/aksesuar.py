@@ -1,3 +1,4 @@
+import re
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from typing import Optional
@@ -82,6 +83,33 @@ async def sil_kategori(
     return {"ok": True}
 
 
+@router.get("/barkot/{kod}")
+async def barkot_ara(
+    kod: str,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    # "Barkotla Sat" hızlı akışı — önce elle girilmiş/taranmış gerçek
+    # barkota bakılır, yoksa etikette bastığımız "AKS000123" biçimindeki
+    # kendi otomatik kodumuz olup olmadığına bakılır (id'den türetilir, ayrıca
+    # saklanmaz).
+    row = await db.fetchrow(
+        "SELECT a.*, t.ad as toptanci_adi FROM aksesuarlar a LEFT JOIN toptancilar t ON t.id = a.toptanci_id WHERE a.dukkan_id=$1 AND a.barkot=$2",
+        dukkan_id, kod,
+    )
+    if not row:
+        m = re.fullmatch(r"AKS0*(\d+)", kod.strip().upper())
+        if m:
+            row = await db.fetchrow(
+                "SELECT a.*, t.ad as toptanci_adi FROM aksesuarlar a LEFT JOIN toptancilar t ON t.id = a.toptanci_id WHERE a.dukkan_id=$1 AND a.id=$2",
+                dukkan_id, int(m.group(1)),
+            )
+    if not row:
+        raise HTTPException(404, "Bu barkoda ait ürün bulunamadı")
+    return dict(row)
+
+
 @router.get("/satislar")
 async def satis_gecmisi(
     q: Optional[str] = Query(None),
@@ -146,10 +174,11 @@ async def create_aksesuar(
     stok = int(body.get("stok", 0))
     async with db.transaction():
         row = await db.fetchrow(
-            """INSERT INTO aksesuarlar (dukkan_id, ad, stok, alis_fiyati, satis_fiyati, kategori, toptanci_id, min_stok)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id""",
+            """INSERT INTO aksesuarlar (dukkan_id, ad, stok, alis_fiyati, satis_fiyati, kategori, toptanci_id, min_stok, barkot)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id""",
             dukkan_id, body["ad"], stok, float(body["alis_fiyati"]), float(body["satis_fiyati"]),
             body.get("kategori", "Diğer"), body.get("toptanci_id"), int(body.get("min_stok") or 5),
+            (body.get("barkot") or "").strip() or None,
         )
         if stok > 0:
             await _hareket_ekle(db, dukkan_id, row["id"], "giris", stok, user["id"], "ilk_stok")
@@ -171,10 +200,11 @@ async def update_aksesuar(
     async with db.transaction():
         await db.execute(
             """UPDATE aksesuarlar SET ad=$1, stok=$2, alis_fiyati=$3, satis_fiyati=$4, kategori=$5,
-               toptanci_id=$6, min_stok=$7 WHERE id=$8 AND dukkan_id=$9""",
+               toptanci_id=$6, min_stok=$7, barkot=$8 WHERE id=$9 AND dukkan_id=$10""",
             body.get("ad"), yeni_stok, float(body.get("alis_fiyati", 0)),
             float(body.get("satis_fiyati", 0)), body.get("kategori", "Diğer"),
-            body.get("toptanci_id"), int(body.get("min_stok") or 5), aksesuar_id, dukkan_id,
+            body.get("toptanci_id"), int(body.get("min_stok") or 5),
+            (body.get("barkot") or "").strip() or None, aksesuar_id, dukkan_id,
         )
         fark = yeni_stok - eski["stok"]
         if fark != 0:

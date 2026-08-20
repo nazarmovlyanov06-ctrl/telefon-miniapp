@@ -287,6 +287,7 @@ export const api = {
   aksesuarKategoriSil: (ad) => del(`/aksesuarlar/kategoriler?ad=${encodeURIComponent(ad)}`),
   aksesuarHareketler: (id) => get(`/aksesuarlar/${id}/hareketler`),
   aksesuarStokEkle: (id, data) => post(`/aksesuarlar/${id}/stok-ekle`, data),
+  aksesuarBarkotAra: (kod) => get(`/aksesuarlar/barkot/${encodeURIComponent(kod)}`),
   aksesuarSatisGecmisi: (params = {}) => {
     const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v)));
     const s = q.toString();

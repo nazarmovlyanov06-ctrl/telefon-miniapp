@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 
-export default function BarcodeScanner({ onScan, onClose }) {
+export default function BarcodeScanner({ onScan, onClose, mod = "imei" }) {
   const videoRef = useRef(null);
   const readerRef = useRef(null);
   const [error, setError] = useState("");
@@ -42,7 +42,8 @@ export default function BarcodeScanner({ onScan, onClose }) {
     readerRef.current
       .decodeFromVideoDevice(deviceId, videoRef.current, (result, err, controls) => {
         if (!controlsRef.current) controlsRef.current = controls;
-        if (result) {
+        if (!result) return;
+        if (mod === "imei") {
           const text = result.getText().replace(/\D/g, "");
           if (text.length === 15) {
             controls.stop();
@@ -52,6 +53,11 @@ export default function BarcodeScanner({ onScan, onClose }) {
             controls.stop();
             onScan(text.slice(0, 15));
           }
+        } else {
+          // Genel barkot modu — Code128/EAN/UPC vb. herhangi bir format ve
+          // uzunluk kabul edilir, IMEI'deki gibi 14-15 haneli sayı zorunluluğu yok.
+          controls.stop();
+          onScan(result.getText());
         }
       })
       .catch(() => setError("Kamera başlatılamadı"));
@@ -71,7 +77,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
         padding: "12px 16px",
         color: "#fff",
       }}>
-        <span style={{ fontWeight: 700, fontSize: 16 }}>📷 IMEI Barkodu Okut</span>
+        <span style={{ fontWeight: 700, fontSize: 16 }}>📷 {mod === "imei" ? "IMEI Barkodu Okut" : "Barkod Okut"}</span>
         <button
           onClick={onClose}
           style={{
@@ -125,7 +131,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
           <div style={{ color: "#f87171", marginBottom: 10 }}>{error}</div>
         ) : (
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginBottom: 10 }}>
-            Telefon kutusundaki IMEI barkodunu çerçeve içine getirin
+            {mod === "imei" ? "Telefon kutusundaki IMEI barkodunu çerçeve içine getirin" : "Barkodu çerçeve içine getirin"}
           </div>
         )}
         {cameras.length > 1 && (

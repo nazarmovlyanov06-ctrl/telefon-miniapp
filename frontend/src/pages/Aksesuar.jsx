@@ -1,15 +1,35 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import JsBarcode from "jsbarcode";
 import { api } from "../api";
 import {
   Tag, CircleX, TriangleAlert, Trash2, Search, Filter, X, Pencil,
   Headphones, ArrowDownCircle, ArrowUpCircle, RefreshCw, Phone, Package,
-  Truck, PackagePlus,
+  Truck, PackagePlus, Printer, ScanLine, Camera,
 } from "lucide-react";
 import UrunGorsel from "../components/UrunGorsel";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
+import BarcodeScanner from "../components/BarcodeScanner";
 
 const DEFAULT_CATS = ["Şarj Aleti", "Kılıf", "Kırılmaz Cam", "Kulaklık", "Powerbank", "Diğer"];
+
+// Ürünün kendi barkodu yoksa (üretici barkodu girilmemişse) id'den türetilen
+// bir kod basılır — ayrıca saklanmaz, hem yazdırırken hem ararken aynı
+// formülle (AKS + 6 haneli id) üretilip/çözülür.
+function barkotDegeri(item) {
+  return item.barkot || `AKS${String(item.id).padStart(6, "0")}`;
+}
+
+function BarkotSVG({ value }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current || !value) return;
+    try {
+      JsBarcode(ref.current, value, { format: "CODE128", width: 1.6, height: 42, fontSize: 12, margin: 4 });
+    } catch { /* barkot kütüphanesinin desteklemediği bir karakter varsa boş bırak */ }
+  }, [value]);
+  return <svg ref={ref} />;
+}
 
 const HAREKET_META = {
   giris: { label: "Stok girişi", color: "var(--success)", icon: ArrowDownCircle },
@@ -46,7 +66,7 @@ function tarihFmt(iso) {
 }
 
 /* ── Ürün Detay Modalı — karta tıklayınca açılır, stok geçmişi + aksiyonlar ── */
-function UrunDetayModal({ item, onClose, onSat, onDuzenle, onSil, onStokEkle, canDelete }) {
+function UrunDetayModal({ item, onClose, onSat, onDuzenle, onSil, onStokEkle, onYazdir, canDelete }) {
   const [hareketler, setHareketler] = useState(null);
 
   useEffect(() => {
@@ -93,9 +113,12 @@ function UrunDetayModal({ item, onClose, onSat, onDuzenle, onSil, onStokEkle, ca
           <PackagePlus size={13} strokeWidth={2} /> Stok Ekle
         </button>
       </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <button className="btn btn-ghost btn-sm" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }} onClick={() => onDuzenle(item)}>
           <Pencil size={13} strokeWidth={2} /> Düzenle
+        </button>
+        <button className="btn btn-ghost btn-sm" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }} onClick={() => onYazdir(item)}>
+          <Printer size={13} strokeWidth={2} /> Etiket Yazdır
         </button>
         {canDelete && (
           <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)", display: "flex", alignItems: "center", padding: "0 10px" }} onClick={() => onSil(item)}>
@@ -129,6 +152,31 @@ function UrunDetayModal({ item, onClose, onSat, onDuzenle, onSil, onStokEkle, ca
   );
 }
 
+/* ── Etiket Yazdır Modalı — barkot+fiyat etiketi, window.print() ile ────── */
+function EtiketYazdirModal({ item, onClose }) {
+  const kod = barkotDegeri(item);
+  return (
+    <AltPencere onClose={onClose} maxWidth={340}>
+      <PencereBaslik onClose={onClose}>Etiket Yazdır</PencereBaslik>
+      <div className="etiket-print-alan" style={{ background: "#fff", color: "#000", borderRadius: 10, padding: 14, textAlign: "center", border: "1px solid var(--divider)" }}>
+        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.ad}</div>
+        <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>{item.satis_fiyati}₺</div>
+        <BarkotSVG value={kod} />
+      </div>
+      <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 10 }}>
+        "Yazdır"a basınca tarayıcının yazdırma penceresi açılır — orada yazıcınızı ve kağıt/etiket boyutunu seçebilirsiniz.
+        {!item.barkot && " Bu ürüne özel barkot girilmediği için otomatik üretilen kod kullanıldı."}
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button className="btn btn-primary" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} onClick={() => window.print()}>
+          <Printer size={14} strokeWidth={2} /> Yazdır
+        </button>
+        <button className="btn btn-ghost" onClick={onClose}>Kapat</button>
+      </div>
+    </AltPencere>
+  );
+}
+
 export default function Aksesuar({ user }) {
   const navigate = useNavigate();
   const [tab, setTab] = useState("urunler"); // urunler | gecmis
@@ -141,7 +189,7 @@ export default function Aksesuar({ user }) {
   const [showKatYonet, setShowKatYonet] = useState(false);
   const [yeniKat, setYeniKat] = useState("");
   const [formModal, setFormModal] = useState(null); // null | { mode }
-  const [form, setForm] = useState({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer", toptanci_id: "", min_stok: "5" });
+  const [form, setForm] = useState({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer", toptanci_id: "", min_stok: "5", barkot: "" });
   const [detayItem, setDetayItem] = useState(null);
   const [stokEkleItem, setStokEkleItem] = useState(null);
   const [stokEkleData, setStokEkleData] = useState({ miktar: "1", alis_fiyati: "", toptanci_id: "" });
@@ -149,6 +197,9 @@ export default function Aksesuar({ user }) {
   const [satData, setSatData] = useState({ miktar: "1", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
   const [err, setErr] = useState("");
   const [deleteId, setDeleteId] = useState(null);
+  const [yazdirItem, setYazdirItem] = useState(null);
+  const [tarayici, setTarayici] = useState(null); // null | "form" | "satis"
+  const [barkotSatisHata, setBarkotSatisHata] = useState("");
 
   // Satış Geçmişi sekmesi
   const [satislar, setSatislar] = useState([]);
@@ -216,7 +267,7 @@ export default function Aksesuar({ user }) {
   }
 
   function yeniUrunAc() {
-    setForm({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer", toptanci_id: "", min_stok: "5" });
+    setForm({ ad: "", stok: "1", alis_fiyati: "", satis_fiyati: "", kategori: "Diğer", toptanci_id: "", min_stok: "5", barkot: "" });
     setErr("");
     setFormModal({ mode: "yeni" });
   }
@@ -226,6 +277,7 @@ export default function Aksesuar({ user }) {
       ad: item.ad, stok: String(item.stok), alis_fiyati: String(item.alis_fiyati),
       satis_fiyati: String(item.satis_fiyati), kategori: item.kategori || "Diğer",
       toptanci_id: item.toptanci_id ? String(item.toptanci_id) : "", min_stok: String(item.min_stok ?? 5),
+      barkot: item.barkot || "",
     });
     setErr("");
     setDetayItem(null);
@@ -238,6 +290,7 @@ export default function Aksesuar({ user }) {
       ad: form.ad, stok: parseInt(form.stok), alis_fiyati: parseFloat(form.alis_fiyati),
       satis_fiyati: parseFloat(form.satis_fiyati), kategori: form.kategori,
       toptanci_id: form.toptanci_id ? parseInt(form.toptanci_id) : null, min_stok: parseInt(form.min_stok) || 5,
+      barkot: form.barkot,
     };
     try {
       if (formModal.mode === "duzenle") await api.updateAksesuar(formModal.id, payload);
@@ -276,6 +329,22 @@ export default function Aksesuar({ user }) {
     setSatData({ miktar: "1", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
     setErr("");
     setSatForm(item);
+  }
+
+  async function barkotTarandi(kod) {
+    setTarayici(null);
+    if (tarayici === "form") {
+      setForm(f => ({ ...f, barkot: kod }));
+      return;
+    }
+    // "satis" modu — taranan barkoda ait ürünü bul, doğrudan Sat penceresini aç.
+    setBarkotSatisHata("");
+    try {
+      const urun = await api.aksesuarBarkotAra(kod);
+      satAc(urun);
+    } catch (e) {
+      setBarkotSatisHata(e.message);
+    }
   }
 
   async function submitSat(e) {
@@ -354,13 +423,24 @@ export default function Aksesuar({ user }) {
             </div>
           )}
 
-          {/* Arama */}
-          <div className="form-group" style={{ position: "relative", marginBottom: 10 }}>
-            <input className="form-input" style={{ paddingLeft: 36 }} value={urunArama}
-              onChange={e => setUrunArama(e.target.value)} placeholder="Ürün adı ara..." />
-            <Search size={15} strokeWidth={2} stroke="var(--hint)"
-              style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+          {/* Arama + Barkotla Sat */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <div className="form-group" style={{ position: "relative", marginBottom: 0, flex: 1 }}>
+              <input className="form-input" style={{ paddingLeft: 36 }} value={urunArama}
+                onChange={e => setUrunArama(e.target.value)} placeholder="Ürün adı ara..." />
+              <Search size={15} strokeWidth={2} stroke="var(--hint)"
+                style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+            </div>
+            <button type="button" className="btn btn-primary btn-sm" style={{ whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}
+              onClick={() => { setBarkotSatisHata(""); setTarayici("satis"); }}>
+              <ScanLine size={15} strokeWidth={2} /> Barkotla Sat
+            </button>
           </div>
+          {barkotSatisHata && (
+            <div style={{ color: "var(--danger)", fontSize: 12.5, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <CircleX size={13} strokeWidth={2} /> {barkotSatisHata}
+            </div>
+          )}
 
           {/* Kategori Filtre Chipsleri */}
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 10, scrollbarWidth: "none" }}>
@@ -531,6 +611,18 @@ export default function Aksesuar({ user }) {
               <input className="form-input" type="number" min="0" value={form.min_stok} onChange={e => setForm({ ...form, min_stok: e.target.value })} placeholder="5" />
               <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>Stok bu sayının altına/eşitine düşünce "Düşük" uyarısı gösterilir</div>
             </div>
+            <div className="form-group">
+              <label className="form-label">Barkot (opsiyonel)</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input className="form-input" style={{ flex: 1 }} value={form.barkot}
+                  onChange={e => setForm({ ...form, barkot: e.target.value })} placeholder="Üretici barkodu varsa tarat veya yaz" />
+                <button type="button" className="btn btn-ghost btn-sm" style={{ display: "flex", alignItems: "center", padding: "0 12px" }}
+                  onClick={() => setTarayici("form")} title="Barkod tarat">
+                  <Camera size={15} strokeWidth={2} />
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--hint)", marginTop: 4 }}>Boş bırakılırsa etiket basılırken otomatik bir kod üretilir</div>
+            </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button type="submit" className="btn btn-primary">{formModal.mode === "duzenle" ? "Güncelle" : "Kaydet"}</button>
               <button type="button" className="btn btn-ghost" onClick={() => setFormModal(null)}>İptal</button>
@@ -543,8 +635,17 @@ export default function Aksesuar({ user }) {
       {detayItem && (
         <UrunDetayModal item={detayItem} onClose={() => setDetayItem(null)}
           onSat={satAc} onDuzenle={duzenleAc} onStokEkle={stokEkleAc}
+          onYazdir={item => { setDetayItem(null); setYazdirItem(item); }}
           onSil={item => { setDetayItem(null); setDeleteId(item.id); }}
           canDelete={user?.rol === "patron"} />
+      )}
+
+      {/* Etiket Yazdır Modalı */}
+      {yazdirItem && <EtiketYazdirModal item={yazdirItem} onClose={() => setYazdirItem(null)} />}
+
+      {/* Barkod Tarayıcı — forma barkot girmek veya barkotla satış için */}
+      {tarayici && (
+        <BarcodeScanner mod="barkot" onScan={barkotTarandi} onClose={() => setTarayici(null)} />
       )}
 
       {/* Stok Ekle Modalı — toptancıdan yeni parti geldiğinde hızlı giriş */}

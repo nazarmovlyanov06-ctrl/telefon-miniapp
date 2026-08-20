@@ -511,3 +511,17 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .dash-blok-titriyor { animation: none; outline: 1.5px dashed var(--hint); }
 }
+
+/* ── Etiket yazdırma ─────────────────────────────────────────
+   window.print() çağrıldığında sayfanın geri kalanı gizlenir, sadece
+   .etiket-print-alan basılır. Etiket boyutu ilgili sayfada @page ile
+   ayrıca ayarlanabilir; burada varsayılan 40x30mm. */
+@media print {
+  body * { visibility: hidden; }
+  .etiket-print-alan, .etiket-print-alan * { visibility: visible; }
+  .etiket-print-alan {
+    position: fixed; inset: 0; margin: 0; padding: 6px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  @page { size: 40mm 30mm; margin: 0; }
+}
