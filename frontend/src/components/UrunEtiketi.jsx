@@ -118,7 +118,7 @@ export function EtiketIcerik({ item, ayarlar = ETIKET_AYAR_VARSAYILAN, duzenlene
         position: "relative", background: "#fff", color: "#000", borderRadius: 10, padding: 10,
         boxSizing: "border-box", textAlign: "center", overflow: duzenlenebilir ? "visible" : "hidden",
         border: cerceveGoster ? "1.5px solid #333" : "none",
-        width: `${genislikMm}mm`, minHeight: `${yukseklikMm}mm`,
+        width: `${genislikMm}mm`, height: `${yukseklikMm}mm`,
       }}>
         {logoGoster && (
           <div
