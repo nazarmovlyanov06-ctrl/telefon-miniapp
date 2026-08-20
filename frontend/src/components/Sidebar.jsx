@@ -93,7 +93,7 @@ function cikisYap() {
   window.location.href = "/giris";
 }
 
-export default function Sidebar({ dukkanAdi, user }) {
+export default function Sidebar({ dukkanAdi, user, bildirimSayisi = 0 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [rozetler, setRozetler] = useState({});
@@ -112,7 +112,7 @@ export default function Sidebar({ dukkanAdi, user }) {
         <Wrench size={20} />
         {dukkanAdi || "Telefon Servis"}
       </div>
-      <Grup items={ANA} pathname={pathname} navigate={navigate} rozetler={rozetler} />
+      <Grup items={ANA} pathname={pathname} navigate={navigate} rozetler={{ ...rozetler, "/": bildirimSayisi || rozetler["/"] }} />
       <Grup label="Finans" items={user?.rol === "patron" ? FINANS : FINANS.filter(i => !i.patronOnly)} pathname={pathname} navigate={navigate} />
       <Grup label="Satış & Stok" items={SATIS_STOK} pathname={pathname} navigate={navigate} />
       <Grup label="Müşteri" items={MUSTERI} pathname={pathname} navigate={navigate} />

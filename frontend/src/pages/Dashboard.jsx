@@ -8,7 +8,7 @@ import {
   TriangleAlert, Plus, Wrench, X, ArrowRight, TrendingUp,
   ChevronDown, ChevronUp, Landmark, Target, Factory, Undo2, PhoneCall,
   Ban, MessageSquareWarning, Store, CalendarClock, Star, Repeat,
-  MessageCircle, Banknote, ScanLine, Users, SlidersHorizontal, Check,
+  MessageCircle, Banknote, ScanLine, Users, SlidersHorizontal, Check, Bell,
 } from "lucide-react";
 
 /* ── Kalıcı tarayıcı tercihleri ──────────────────────────────────────── */
@@ -540,11 +540,75 @@ function HizliDuzenleModal({ secili, onClose, onKaydet }) {
   );
 }
 
+/* ── Bildirim zili paneli ──────────────────────────────────────────────── */
+
+const BILDIRIM_TUR_META = {
+  alacak_vadesi: { icon: CreditCard, color: "var(--red)" },
+  tamir_teslim_bekliyor: { icon: Wrench, color: "var(--orange)" },
+  randevu_talebi: { icon: CalendarClock, color: "var(--blue)" },
+  takas_teklifi: { icon: Repeat, color: "var(--blue2)" },
+  musteri_mesaji: { icon: MessageCircle, color: "var(--green)" },
+};
+
+function bildirimZamanFmt(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function BildirimPanelModal({ onClose, onOkundu }) {
+  const [liste, setListe] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    api.bildirimler().then(r => {
+      setListe(r.liste || []);
+      api.bildirimlerOkundu().catch(() => {});
+      onOkundu();
+    }).catch(() => setListe([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function tikla(b) {
+    onClose();
+    if (b.ilgili_tip === "debt") navigate("/debts");
+    else if (b.ilgili_tip === "repair") navigate(`/repairs/${b.ilgili_id}`);
+    else if (b.tur === "randevu_talebi") navigate("/randevu-talepleri");
+    else if (b.tur === "takas_teklifi") navigate("/vitrin-takas");
+    else if (b.tur === "musteri_mesaji") navigate("/musteri-mesajlari");
+  }
+
+  return (
+    <AltPencere onClose={onClose}>
+      <PencereBaslik onClose={onClose}>Bildirimler</PencereBaslik>
+      {liste === null ? (
+        <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Yükleniyor...</div>
+      ) : liste.length === 0 ? (
+        <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Bildirim yok</div>
+      ) : liste.map((b, i) => {
+        const meta = BILDIRIM_TUR_META[b.tur] || { icon: Bell, color: "var(--hint)" };
+        const Ikon = meta.icon;
+        return (
+          <div key={b.id} onClick={() => tikla(b)}
+            style={{ display: "flex", gap: 10, padding: "10px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none", cursor: "pointer" }}>
+            <Ikon size={16} stroke={meta.color} strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{b.baslik}</div>
+              {b.mesaj && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 2 }}>{b.mesaj}</div>}
+              <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3 }}>{bildirimZamanFmt(b.created_at)}</div>
+            </div>
+          </div>
+        );
+      })}
+    </AltPencere>
+  );
+}
+
 /* ── Sayfa ───────────────────────────────────────────────────────────────── */
 
-export default function Dashboard({ user }) {
+export default function Dashboard({ user, bildirimSayisi = 0, onBildirimOkundu }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [bildirimAcik, setBildirimAcik] = useState(false);
   const [priceHidden, setPriceHidden] = useState(() => localStorage.getItem("priceHidden") === "1");
   const [acikDurum, setAcikDurum] = useState(null);
   const [acikKasaTip, setAcikKasaTip] = useState(null);
@@ -959,11 +1023,27 @@ export default function Dashboard({ user }) {
           <div style={{ fontSize: 12.5, color: "var(--hint)" }}>{selam}{isim ? `, ${isim}` : ""}</div>
           <div style={{ fontSize: 21, fontWeight: 700, color: "var(--text-strong)" }}>Bugün</div>
         </div>
-        <button onClick={togglePriceHide}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", padding: 6, display: "flex" }}
-          title={priceHidden ? "Fiyatları göster" : "Fiyatları gizle"}>
-          {priceHidden ? <EyeOff size={19} strokeWidth={1.8} /> : <Eye size={19} strokeWidth={1.8} />}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <button onClick={() => !titriyor && setBildirimAcik(true)}
+            style={{ position: "relative", background: "none", border: "none", cursor: "pointer", color: "var(--hint)", padding: 6, display: "flex" }}
+            title="Bildirimler">
+            <Bell size={19} strokeWidth={1.8} />
+            {bildirimSayisi > 0 && (
+              <span style={{
+                position: "absolute", top: 2, right: 2, minWidth: 15, height: 15, padding: "0 3px",
+                borderRadius: 8, background: "var(--danger)", color: "#fff",
+                fontSize: 9.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {bildirimSayisi > 99 ? "99+" : bildirimSayisi}
+              </span>
+            )}
+          </button>
+          <button onClick={togglePriceHide}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", padding: 6, display: "flex" }}
+            title={priceHidden ? "Fiyatları göster" : "Fiyatları gizle"}>
+            {priceHidden ? <EyeOff size={19} strokeWidth={1.8} /> : <Eye size={19} strokeWidth={1.8} />}
+          </button>
+        </div>
       </div>
 
       {titriyor && (
@@ -1021,6 +1101,10 @@ export default function Dashboard({ user }) {
       {secilenArama && <AranacakDetayModal kayit={secilenArama} onClose={() => setSecilenArama(null)} />}
       {hizliDuzenleAcik && (
         <HizliDuzenleModal secili={hizliErisim} onClose={() => setHizliDuzenleAcik(false)} onKaydet={hizliKaydet} />
+      )}
+      {bildirimAcik && (
+        <BildirimPanelModal onClose={() => setBildirimAcik(false)}
+          onOkundu={() => onBildirimOkundu && onBildirimOkundu()} />
       )}
     </div>
   );

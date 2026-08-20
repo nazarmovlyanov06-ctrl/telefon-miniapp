@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from database import get_db
 from photo_storage import save_upload
 from auth import hash_sifre, dogrula_sifre, olustur_musteri_token, get_current_musteri
+from routers.bildirim import bildirim_ekle
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -86,10 +87,14 @@ async def randevu_talebi(slug: str, body: dict, db: asyncpg.Connection = Depends
     telefon = (body.get("telefon") or "").strip()
     if not musteri_adi or not telefon:
         raise HTTPException(400, "Ad ve telefon gerekli")
-    await db.execute(
+    row = await db.fetchrow(
         """INSERT INTO randevu_talepleri (dukkan_id, musteri_adi, telefon, cihaz_model, aciklama)
-           VALUES ($1, $2, $3, $4, $5)""",
+           VALUES ($1, $2, $3, $4, $5) RETURNING id""",
         d["id"], musteri_adi, telefon, body.get("cihaz_model"), body.get("aciklama"),
+    )
+    await bildirim_ekle(
+        db, d["id"], "randevu_talebi", f"{musteri_adi} — yeni randevu talebi",
+        body.get("cihaz_model"), "randevu", row["id"],
     )
     return {"ok": True}
 
@@ -217,10 +222,14 @@ async def takas_teklifi(
             foto_url, _, _ = await save_upload(foto, "takas", d["id"])
         except ValueError as e:
             raise HTTPException(400, str(e))
-    await db.execute(
+    row = await db.fetchrow(
         """INSERT INTO takas_teklifleri (dukkan_id, musteri_adi, telefon, cihaz_model, aciklama, foto_url)
-           VALUES ($1, $2, $3, $4, $5, $6)""",
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id""",
         d["id"], musteri_adi.strip(), telefon.strip(), cihaz_model.strip(), aciklama or None, foto_url,
+    )
+    await bildirim_ekle(
+        db, d["id"], "takas_teklifi", f"{musteri_adi.strip()} — yeni takas teklifi",
+        cihaz_model.strip(), "takas", row["id"],
     )
     return {"ok": True}
 
@@ -489,5 +498,9 @@ async def musteri_mesaj_gonder(
         """INSERT INTO musteri_mesajlari (dukkan_id, customer_id, gonderen, mesaj)
            VALUES ($1, $2, 'musteri', $3)""",
         d["id"], musteri["id"], mesaj,
+    )
+    await bildirim_ekle(
+        db, d["id"], "musteri_mesaji", f"{musteri['name'] or 'Müşteri'} — yeni mesaj",
+        mesaj[:120], "musteri_mesaj", musteri["id"],
     )
     return {"ok": True}

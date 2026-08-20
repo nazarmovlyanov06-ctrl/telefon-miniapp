@@ -16,7 +16,7 @@ function ortaModulleriOku(patron) {
     .slice(0, adet);
 }
 
-export default function BottomNav({ user }) {
+export default function BottomNav({ user, bildirimSayisi = 0 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const patron = user?.rol === "patron";
@@ -44,8 +44,17 @@ export default function BottomNav({ user }) {
             className={`nav-item ${active ? "active" : ""}`}
             onClick={() => navigate(item.path)}
           >
-            <span className="nav-icon">
+            <span className="nav-icon" style={{ position: "relative" }}>
               <Icon size={21} strokeWidth={active ? 2.2 : 1.8} />
+              {item.path === "/" && bildirimSayisi > 0 && (
+                <span style={{
+                  position: "absolute", top: -4, right: -8, minWidth: 15, height: 15, padding: "0 3px",
+                  borderRadius: 8, background: "var(--danger)", color: "#fff",
+                  fontSize: 9.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {bildirimSayisi > 99 ? "99+" : bildirimSayisi}
+                </span>
+              )}
             </span>
             {item.label}
           </button>

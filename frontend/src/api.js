@@ -408,6 +408,11 @@ export const api = {
   // Portalden kaydolan yeni müşteriler (bildirim)
   yeniUyeler: () => get("/customers/yeni-uyeler"),
   yeniUyeleriGordum: () => post("/customers/yeni-uyeleri-gordum", {}),
+
+  // Bildirim zili — alacak vadesi/tamir teslim (günlük), randevu/takas/müşteri mesajı (anlık)
+  bildirimSayisi: () => get("/bildirimler/sayim"),
+  bildirimler: () => get("/bildirimler/"),
+  bildirimlerOkundu: () => post("/bildirimler/okundu", {}),
   vitrinRandevuTalepleri: () => get("/vitrin/randevu-talepleri"),
   vitrinRandevuDurumGuncelle: (id, durum) => put(`/vitrin/randevu-talepleri/${id}/durum`, { durum }),
   vitrinDegerlendirmeler: () => get("/vitrin/degerlendirmeler"),

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Clock, User, TriangleAlert, Wrench } from "lucide-react";
 import { api, getToken, setToken } from "./api";
+import { bildirimSesiCal, hazirlaSesi } from "./bildirimSesi";
 import Login from "./pages/Login";
 import Kayit from "./pages/Kayit";
 import SifremiUnuttum from "./pages/SifremiUnuttum";
@@ -70,7 +71,7 @@ import "./index.css";
 // Bu sayfalarda geri butonu ve paddingTop gösterilmez (kendi header'ları var)
 const ROOT_PATHS = ["/", "/repairs", "/customers", "/parts", "/more", "/search", "/ai", "/destek"];
 
-function NavShell({ children, user }) {
+function NavShell({ children, user, bildirimSayisi }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const touchStartX = useRef(null);
@@ -103,7 +104,7 @@ function NavShell({ children, user }) {
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      <Sidebar user={user} />
+      <Sidebar user={user} bildirimSayisi={bildirimSayisi} />
       {/* Geri butonu — kök sayfalarda gizli */}
       {!isRoot && (
         <button
@@ -130,10 +131,43 @@ function NavShell({ children, user }) {
 }
 
 function AppRoutes({ user }) {
+  // Bildirim zili — vade/teslim hatırlatmaları (günlük) + randevu/takas/mesaj
+  // (anlık) tek bir merkezi poll'dan geliyor; Sidebar (masaüstü), BottomNav
+  // (mobil) ve Dashboard'daki zil ikonu aynı sayıyı props'tan paylaşıyor —
+  // her biri kendi başına çekseydi hem gereksiz istek hem çift ses çalardı.
+  const [bildirimSayisi, setBildirimSayisi] = useState(0);
+  const oncekiSayiRef = useRef(null);
+
+  useEffect(() => {
+    document.addEventListener("click", hazirlaSesi, { once: true });
+    document.addEventListener("touchstart", hazirlaSesi, { once: true });
+  }, []);
+
+  useEffect(() => {
+    let iptal = false;
+    async function kontrolEt() {
+      try {
+        const r = await api.bildirimSayisi();
+        if (iptal) return;
+        const yeni = r.okunmamis || 0;
+        if (oncekiSayiRef.current !== null && yeni > oncekiSayiRef.current) {
+          bildirimSesiCal();
+        }
+        oncekiSayiRef.current = yeni;
+        setBildirimSayisi(yeni);
+      } catch { /* bir sonraki poll'da tekrar dener */ }
+    }
+    kontrolEt();
+    const iv = setInterval(kontrolEt, 25000);
+    return () => { iptal = true; clearInterval(iv); };
+  }, []);
+
   return (
-    <NavShell user={user}>
+    <NavShell user={user} bildirimSayisi={bildirimSayisi}>
       <Routes>
-        <Route path="/" element={<Dashboard user={user} />} />
+        <Route path="/" element={
+          <Dashboard user={user} bildirimSayisi={bildirimSayisi} onBildirimOkundu={() => setBildirimSayisi(0)} />
+        } />
         <Route path="/repairs" element={<Repairs user={user} />} />
         <Route path="/repairs/new" element={<NewRepair />} />
         <Route path="/repairs/:id" element={<RepairDetail user={user} />} />
@@ -167,7 +201,7 @@ function AppRoutes({ user }) {
         <Route path="/vitrin-takas" element={<VitrinTakas />} />
         <Route path="/musteri-mesajlari" element={<MusteriMesajlari />} />
       </Routes>
-      <BottomNav user={user} />
+      <BottomNav user={user} bildirimSayisi={bildirimSayisi} />
     </NavShell>
   );
 }

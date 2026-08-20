@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS dukkanlar (
     hizmetler TEXT,
     logo_url TEXT,
     kapak_url TEXT,
+    son_hatirlatma_tarihi DATE,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -284,6 +285,18 @@ CREATE TABLE IF NOT EXISTS debt_payments (
     notes TEXT,
     created_by INTEGER REFERENCES kullanicilar(id),
     paid_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS bildirimler (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    tur TEXT NOT NULL,
+    baslik TEXT NOT NULL,
+    mesaj TEXT,
+    ilgili_tip TEXT,
+    ilgili_id INTEGER,
+    okundu_mu BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS toptanci_alislar (
