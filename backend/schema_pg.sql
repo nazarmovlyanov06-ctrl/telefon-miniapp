@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS dukkanlar (
     etiket_yukseklik_mm REAL DEFAULT 30,
     etiket_logo_goster BOOLEAN DEFAULT false,
     etiket_kategori_goster BOOLEAN DEFAULT true,
+    etiket_cerceve_goster BOOLEAN DEFAULT true,
+    etiket_ayirici_cizgi_goster BOOLEAN DEFAULT false,
+    etiket_logo_boyut INTEGER DEFAULT 22,
     created_at TIMESTAMP DEFAULT now()
 );
 

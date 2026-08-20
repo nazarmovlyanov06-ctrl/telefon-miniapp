@@ -16,7 +16,11 @@ export default function EtiketAyarlari({ user }) {
   useEffect(() => {
     api.etiketAyarlari()
       .then(setForm)
-      .catch(() => setForm({ etiket_genislik_mm: 40, etiket_yukseklik_mm: 30, etiket_logo_goster: false, etiket_kategori_goster: true, logo_url: null }));
+      .catch(() => setForm({
+        etiket_genislik_mm: 40, etiket_yukseklik_mm: 30, etiket_logo_goster: false,
+        etiket_kategori_goster: true, etiket_cerceve_goster: true,
+        etiket_ayirici_cizgi_goster: false, etiket_logo_boyut: 22, logo_url: null,
+      }));
   }, []);
 
   async function kaydet(e) {
@@ -34,6 +38,7 @@ export default function EtiketAyarlari({ user }) {
     ...form,
     etiket_genislik_mm: parseFloat(form.etiket_genislik_mm) || 40,
     etiket_yukseklik_mm: parseFloat(form.etiket_yukseklik_mm) || 30,
+    etiket_logo_boyut: parseInt(form.etiket_logo_boyut) || 22,
   };
 
   return (
@@ -69,6 +74,16 @@ export default function EtiketAyarlari({ user }) {
                 onChange={e => setForm(f => ({ ...f, etiket_kategori_goster: e.target.checked }))} style={{ width: 16, height: 16 }} />
               <span style={{ fontSize: 13.5 }}>Kategori adını etikette göster</span>
             </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}>
+              <input type="checkbox" checked={!!form.etiket_cerceve_goster}
+                onChange={e => setForm(f => ({ ...f, etiket_cerceve_goster: e.target.checked }))} style={{ width: 16, height: 16 }} />
+              <span style={{ fontSize: 13.5 }}>Etiketin çevresinde çerçeve göster</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}>
+              <input type="checkbox" checked={!!form.etiket_ayirici_cizgi_goster}
+                onChange={e => setForm(f => ({ ...f, etiket_ayirici_cizgi_goster: e.target.checked }))} style={{ width: 16, height: 16 }} />
+              <span style={{ fontSize: 13.5 }}>Ürün adı ile fiyat arasına çizgi çek</span>
+            </label>
             <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: form.logo_url ? 4 : 12, cursor: form.logo_url ? "pointer" : "not-allowed", opacity: form.logo_url ? 1 : 0.5 }}>
               <input type="checkbox" disabled={!form.logo_url || !patron} checked={!!form.etiket_logo_goster}
                 onChange={e => setForm(f => ({ ...f, etiket_logo_goster: e.target.checked }))} style={{ width: 16, height: 16 }} />
@@ -80,6 +95,14 @@ export default function EtiketAyarlari({ user }) {
                 <button type="button" className="btn btn-ghost btn-sm" style={{ padding: "2px 8px", height: "auto" }} onClick={() => navigate("/vitrin-ayarlari")}>
                   Vitrin Ayarları'ndan yükle
                 </button>
+              </div>
+            )}
+            {form.logo_url && form.etiket_logo_goster && (
+              <div className="form-group">
+                <label className="form-label">Logo Boyutu ({form.etiket_logo_boyut || 22}px)</label>
+                <input type="range" min="10" max="80" value={form.etiket_logo_boyut || 22}
+                  onChange={e => setForm(f => ({ ...f, etiket_logo_boyut: e.target.value }))}
+                  style={{ width: "100%" }} />
               </div>
             )}
             {patron && (

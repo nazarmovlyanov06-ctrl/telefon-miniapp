@@ -23,6 +23,7 @@ export function BarkotSVG({ value }) {
 export const ETIKET_AYAR_VARSAYILAN = {
   etiket_genislik_mm: 40, etiket_yukseklik_mm: 30,
   etiket_logo_goster: false, etiket_kategori_goster: true, logo_url: null,
+  etiket_cerceve_goster: true, etiket_ayirici_cizgi_goster: false, etiket_logo_boyut: 22,
 };
 
 // Yazdırmadan hemen önce çağrılır — @page boyutu dükkanın Etiket Ayarları'nda
@@ -47,21 +48,25 @@ export function EtiketIcerik({ item, ayarlar = ETIKET_AYAR_VARSAYILAN }) {
   const kod = barkotDegeri(item);
   const logoGoster = ayarlar.etiket_logo_goster && ayarlar.logo_url;
   const kategoriGoster = ayarlar.etiket_kategori_goster !== false;
+  const cerceveGoster = ayarlar.etiket_cerceve_goster !== false;
+  const ayiriciGoster = !!ayarlar.etiket_ayirici_cizgi_goster;
+  const logoBoyut = ayarlar.etiket_logo_boyut || 22;
   return (
     <div className="etiket-tek">
       <div style={{
         background: "#fff", color: "#000", borderRadius: 10, padding: 10,
-        textAlign: "center", border: "1px solid var(--divider)",
+        textAlign: "center", border: cerceveGoster ? "1px solid var(--divider)" : "none",
         width: `${ayarlar.etiket_genislik_mm || 40}mm`,
       }}>
         {logoGoster && (
-          <img src={fotoUrl(ayarlar.logo_url)} alt="" style={{ height: 22, maxWidth: "70%", objectFit: "contain", marginBottom: 4 }} />
+          <img src={fotoUrl(ayarlar.logo_url)} alt="" style={{ height: logoBoyut, maxWidth: "70%", objectFit: "contain", marginBottom: 4 }} />
         )}
         {kategoriGoster && item.kategori && (
           <div style={{ fontSize: 9, color: "#666", textTransform: "uppercase", letterSpacing: 0.3 }}>{item.kategori}</div>
         )}
         <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 2, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.ad}</div>
-        <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 5 }}>{item.satis_fiyati}₺</div>
+        {ayiriciGoster && <div style={{ borderTop: "1px solid #ccc", margin: "4px 6px" }} />}
+        <div style={{ fontWeight: 800, fontSize: 16, marginTop: ayiriciGoster ? 4 : 0, marginBottom: 5 }}>{item.satis_fiyati}₺</div>
         <BarkotSVG value={kod} />
       </div>
     </div>
