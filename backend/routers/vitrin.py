@@ -78,7 +78,9 @@ async def etiket_ayarlari_getir(
     row = await db.fetchrow(
         """SELECT etiket_genislik_mm, etiket_yukseklik_mm, etiket_logo_goster,
                   etiket_kategori_goster, etiket_cerceve_goster, etiket_ayirici_cizgi_goster,
-                  etiket_logo_boyut, logo_url FROM dukkanlar WHERE id=$1""",
+                  etiket_logo_boyut, etiket_logo_x_pct, etiket_logo_y_pct,
+                  etiket_logo_genislik_mm, etiket_logo_yukseklik_mm, logo_url
+           FROM dukkanlar WHERE id=$1""",
         dukkan_id,
     )
     return dict(row)
@@ -95,16 +97,19 @@ async def etiket_ayarlari_guncelle(
     yukseklik = float(body.get("etiket_yukseklik_mm") or 30)
     if not (10 <= genislik <= 200) or not (10 <= yukseklik <= 200):
         raise HTTPException(400, "Etiket boyutu 10-200mm aralığında olmalı")
-    logo_boyut = int(body.get("etiket_logo_boyut") or 22)
-    if not (10 <= logo_boyut <= 80):
-        raise HTTPException(400, "Logo boyutu 10-80px aralığında olmalı")
+    logo_x = max(0, min(100, float(body.get("etiket_logo_x_pct") if body.get("etiket_logo_x_pct") is not None else 50)))
+    logo_y = max(0, min(100, float(body.get("etiket_logo_y_pct") if body.get("etiket_logo_y_pct") is not None else 15)))
+    logo_genislik = max(3, min(genislik, float(body.get("etiket_logo_genislik_mm") or 15)))
+    logo_yukseklik = max(3, min(yukseklik, float(body.get("etiket_logo_yukseklik_mm") or 8)))
     await db.execute(
         """UPDATE dukkanlar SET etiket_genislik_mm=$1, etiket_yukseklik_mm=$2,
            etiket_logo_goster=$3, etiket_kategori_goster=$4, etiket_cerceve_goster=$5,
-           etiket_ayirici_cizgi_goster=$6, etiket_logo_boyut=$7 WHERE id=$8""",
+           etiket_ayirici_cizgi_goster=$6, etiket_logo_x_pct=$7, etiket_logo_y_pct=$8,
+           etiket_logo_genislik_mm=$9, etiket_logo_yukseklik_mm=$10 WHERE id=$11""",
         genislik, yukseklik, bool(body.get("etiket_logo_goster", False)),
         bool(body.get("etiket_kategori_goster", True)), bool(body.get("etiket_cerceve_goster", True)),
-        bool(body.get("etiket_ayirici_cizgi_goster", False)), logo_boyut, dukkan_id,
+        bool(body.get("etiket_ayirici_cizgi_goster", False)), logo_x, logo_y,
+        logo_genislik, logo_yukseklik, dukkan_id,
     )
     return {"ok": True}
 

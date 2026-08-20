@@ -1,0 +1,4 @@
+ALTER TABLE dukkanlar ADD COLUMN IF NOT EXISTS etiket_logo_x_pct REAL DEFAULT 50;
+ALTER TABLE dukkanlar ADD COLUMN IF NOT EXISTS etiket_logo_y_pct REAL DEFAULT 15;
+ALTER TABLE dukkanlar ADD COLUMN IF NOT EXISTS etiket_logo_genislik_mm REAL DEFAULT 15;
+ALTER TABLE dukkanlar ADD COLUMN IF NOT EXISTS etiket_logo_yukseklik_mm REAL DEFAULT 8;

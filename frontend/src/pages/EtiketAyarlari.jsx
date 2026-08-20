@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { Printer, CircleX, Store } from "lucide-react";
+import { Printer, CircleX, Store, Move } from "lucide-react";
 import { EtiketIcerik } from "../components/UrunEtiketi";
 
 const ORNEK_URUN = { id: 1, ad: "Örnek Ürün", satis_fiyati: 199, kategori: "Kılıf", barkot: null };
@@ -19,7 +19,9 @@ export default function EtiketAyarlari({ user }) {
       .catch(() => setForm({
         etiket_genislik_mm: 40, etiket_yukseklik_mm: 30, etiket_logo_goster: false,
         etiket_kategori_goster: true, etiket_cerceve_goster: true,
-        etiket_ayirici_cizgi_goster: false, etiket_logo_boyut: 22, logo_url: null,
+        etiket_ayirici_cizgi_goster: false,
+        etiket_logo_x_pct: 50, etiket_logo_y_pct: 15,
+        etiket_logo_genislik_mm: 15, etiket_logo_yukseklik_mm: 8, logo_url: null,
       }));
   }, []);
 
@@ -34,12 +36,17 @@ export default function EtiketAyarlari({ user }) {
 
   if (!form) return <div className="loading">Yükleniyor...</div>;
 
+  const onizlemeGenislikMm = parseFloat(form.etiket_genislik_mm) || 40;
   const onizlemeAyarlari = {
     ...form,
-    etiket_genislik_mm: parseFloat(form.etiket_genislik_mm) || 40,
+    etiket_genislik_mm: onizlemeGenislikMm,
     etiket_yukseklik_mm: parseFloat(form.etiket_yukseklik_mm) || 30,
-    etiket_logo_boyut: parseInt(form.etiket_logo_boyut) || 22,
   };
+  // Küçük etiketler düzenlerken rahat sürüklenebilsin diye büyütülür, büyük
+  // etiketler ekrana sığsın diye küçültülür — sürükleme/boyutlandırma
+  // matematiği gerçek render edilmiş piksel boyutunu ölçtüğü için ölçekten
+  // etkilenmez.
+  const onizlemeOlcek = Math.min(3, Math.max(0.4, 300 / (onizlemeGenislikMm * 3.78)));
 
   return (
     <div className="page">
@@ -97,14 +104,6 @@ export default function EtiketAyarlari({ user }) {
                 </button>
               </div>
             )}
-            {form.logo_url && form.etiket_logo_goster && (
-              <div className="form-group">
-                <label className="form-label">Logo Boyutu ({form.etiket_logo_boyut || 22}px)</label>
-                <input type="range" min="10" max="80" value={form.etiket_logo_boyut || 22}
-                  onChange={e => setForm(f => ({ ...f, etiket_logo_boyut: e.target.value }))}
-                  style={{ width: "100%" }} />
-              </div>
-            )}
             {patron && (
               <button type="submit" className="btn btn-primary">{kaydedildi ? "Kaydedildi ✓" : "Kaydet"}</button>
             )}
@@ -116,8 +115,18 @@ export default function EtiketAyarlari({ user }) {
       </div>
 
       <div className="section-title">Önizleme</div>
-      <div className="card" style={{ display: "flex", justifyContent: "center", padding: 20 }}>
-        <EtiketIcerik item={ORNEK_URUN} ayarlar={onizlemeAyarlari} />
+      {form.etiket_logo_goster && form.logo_url && (
+        <div style={{ fontSize: 11.5, color: "var(--hint)", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+          <Move size={12} strokeWidth={2} /> Logoyu sürükleyerek taşı, mavi tutamaçlarla enine veya boyuna ayrı ayrı büyüt/küçült
+        </div>
+      )}
+      <div className="card" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 30, minHeight: 220, overflow: "auto" }}>
+        <div style={{ transform: `scale(${onizlemeOlcek})` }}>
+          <EtiketIcerik item={ORNEK_URUN} ayarlar={onizlemeAyarlari}
+            duzenlenebilir={patron && !!(form.etiket_logo_goster && form.logo_url)}
+            onLogoTasi={(x, y) => setForm(f => ({ ...f, etiket_logo_x_pct: x, etiket_logo_y_pct: y }))}
+            onLogoBoyutlandir={(w, h) => setForm(f => ({ ...f, etiket_logo_genislik_mm: w, etiket_logo_yukseklik_mm: h }))} />
+        </div>
       </div>
     </div>
   );
