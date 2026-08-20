@@ -129,15 +129,32 @@ export function EtiketIcerik({ item, ayarlar = ETIKET_AYAR_VARSAYILAN, duzenlene
               width: `${logoGenislikMm}mm`, height: `${logoYukseklikMm}mm`,
               cursor: duzenlenebilir ? "move" : "default",
               outline: duzenlenebilir ? "1px dashed #3b82f6" : "none",
+              touchAction: duzenlenebilir ? "none" : "auto",
+              userSelect: "none", WebkitUserSelect: "none",
             }}>
-            <img src={fotoUrl(ayarlar.logo_url)} alt=""
+            <img src={fotoUrl(ayarlar.logo_url)} alt="" draggable={false}
               style={{ width: "100%", height: "100%", objectFit: "fill", pointerEvents: "none", display: "block" }} />
             {duzenlenebilir && (
               <>
+                {/* Tutamaçlar dokunmatik ekranda kolay yakalansın diye görünenden
+                    büyük bir dokunma alanına sahip — görünür nokta 14px, gerçek
+                    hedef alanı ~34px. */}
                 <div onPointerDown={boyutlandirBasla("genislik")} title="Enine boyutlandır"
-                  style={{ position: "absolute", right: -5, top: "50%", transform: "translateY(-50%)", width: 9, height: 22, borderRadius: 3, background: "#3b82f6", cursor: "ew-resize" }} />
+                  style={{
+                    position: "absolute", right: -17, top: "50%", transform: "translateY(-50%)",
+                    width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "ew-resize", touchAction: "none",
+                  }}>
+                  <div style={{ width: 14, height: 26, borderRadius: 4, background: "#3b82f6", boxShadow: "0 0 0 2px #fff" }} />
+                </div>
                 <div onPointerDown={boyutlandirBasla("yukseklik")} title="Boyuna boyutlandır"
-                  style={{ position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)", width: 22, height: 9, borderRadius: 3, background: "#3b82f6", cursor: "ns-resize" }} />
+                  style={{
+                    position: "absolute", bottom: -17, left: "50%", transform: "translateX(-50%)",
+                    width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "ns-resize", touchAction: "none",
+                  }}>
+                  <div style={{ width: 26, height: 14, borderRadius: 4, background: "#3b82f6", boxShadow: "0 0 0 2px #fff" }} />
+                </div>
               </>
             )}
           </div>
