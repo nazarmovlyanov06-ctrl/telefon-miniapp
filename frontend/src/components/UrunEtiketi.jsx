@@ -42,6 +42,7 @@ export const ETIKET_AYAR_VARSAYILAN = {
   etiket_metin_genislik_mm: 34, etiket_metin_yukseklik_mm: 13,
   etiket_barkot_x_pct: 50, etiket_barkot_y_pct: 80,
   etiket_barkot_genislik_mm: 34, etiket_barkot_yukseklik_mm: 10,
+  etiket_tamir_genislik_mm: 70, etiket_tamir_yukseklik_mm: 50,
 };
 
 // Metin bloğunun font boyutları bu referans yüksekliğe göre ölçeklenir.

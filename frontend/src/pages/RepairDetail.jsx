@@ -3,11 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { api, fotoUrl } from "../api";
 import { PatternPreview } from "../components/PatternLock";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
+import { TamirEtiketi } from "../components/TamirEtiketi";
+import { etiketSayfaBoyutuAyarla } from "../components/UrunEtiketi";
 import {
   Pencil, Home, CheckCircle2, Receipt, Copy, Check, MessageCircle,
   Trash2, Lock, Eye, EyeOff, Calendar, ClipboardList,
   Wrench, Camera, User, X, CircleX, Search, FileClock, Package, QrCode,
-  TriangleAlert, UserCheck, RotateCcw, PowerOff,
+  TriangleAlert, UserCheck, RotateCcw, PowerOff, Printer,
 } from "lucide-react";
 
 const STATUSES = [
@@ -179,6 +181,10 @@ export default function RepairDetail({ user }) {
   const [linkCopied, setLinkCopied] = useState(false);
   const [dukkanSlug, setDukkanSlug] = useState(null);
 
+  // Tamir stikeri (barkotlu, teknisyene vermeden önce cihaza yapıştırılır)
+  const [etiketModal, setEtiketModal] = useState(false);
+  const [etiketAyarlari, setEtiketAyarlari] = useState(null);
+
   // Ekran kilidi göster/gizle
   const [showLock, setShowLock] = useState(false);
 
@@ -208,6 +214,7 @@ export default function RepairDetail({ user }) {
         status: r.status,
         notes: r.notes || "",
         warranty_days: r.warranty_days || "",
+        tahmini_teslim_tarihi: r.tahmini_teslim_tarihi ? r.tahmini_teslim_tarihi.slice(0, 10) : "",
       });
       if (r.final_price) setTeslimForm(f => ({ ...f, final_price: r.final_price }));
       // asyncpg jsonb kolonlarını ham JSON metni olarak döndürür, parse gerekiyor.
@@ -839,6 +846,34 @@ export default function RepairDetail({ user }) {
         </div>
       )}
 
+      {/* Tamir stikeri yazdırma modalı */}
+      {etiketModal && etiketAyarlari && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setEtiketModal(false)}>
+          <div className="card" style={{ width: "100%", maxWidth: 380, textAlign: "center" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <Printer size={16} strokeWidth={2} /> Tamir Stikeri
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+              <div className="etiket-yazdirma-alani">
+                <TamirEtiketi repair={repair} ayarlar={etiketAyarlari} />
+              </div>
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--hint)", marginBottom: 12 }}>
+              "Yazdır"a basınca tarayıcının yazdırma penceresi açılır — orada yazıcınızı seçebilirsiniz. Stiker boyutu/logosu Ayarlar → Etiket Ayarları'ndan değiştirilebilir.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                onClick={() => { etiketSayfaBoyutuAyarla({ etiket_genislik_mm: etiketAyarlari.etiket_tamir_genislik_mm, etiket_yukseklik_mm: etiketAyarlari.etiket_tamir_yukseklik_mm }); window.print(); }}>
+                <Printer size={14} strokeWidth={2} /> Yazdır
+              </button>
+              <button className="btn btn-ghost" onClick={() => setEtiketModal(false)}>Kapat</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Fotoğraf büyük görünüm */}
       {fotoView && (
         <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}
@@ -887,10 +922,17 @@ export default function RepairDetail({ user }) {
               <option value="borc">Borç</option>
             </select>
           </div>
-          <div className="form-group">
-            <label className="form-label">Garanti (gün)</label>
-            <input className="form-input" type="number" value={form.warranty_days}
-              onChange={(e) => setForm({ ...form, warranty_days: e.target.value })} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="form-group">
+              <label className="form-label">Garanti (gün)</label>
+              <input className="form-input" type="number" value={form.warranty_days}
+                onChange={(e) => setForm({ ...form, warranty_days: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Tahmini Teslim Tarihi</label>
+              <input className="form-input" type="date" value={form.tahmini_teslim_tarihi}
+                onChange={(e) => setForm({ ...form, tahmini_teslim_tarihi: e.target.value })} />
+            </div>
           </div>
           <div className="form-group">
             <label className="form-label">Not</label>
@@ -1225,6 +1267,16 @@ export default function RepairDetail({ user }) {
                 <QrCode size={13} strokeWidth={2} /> Dijital Fiş / QR
               </button>
             )}
+            <button className="btn btn-ghost btn-sm"
+              onClick={async () => {
+                if (!etiketAyarlari) {
+                  try { setEtiketAyarlari(await api.etiketAyarlari()); } catch { setEtiketAyarlari({}); }
+                }
+                setEtiketModal(true);
+              }}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Printer size={13} strokeWidth={2} /> Etiket Yazdır
+            </button>
           </div>
 
           {/* Kullanılan Parçalar */}

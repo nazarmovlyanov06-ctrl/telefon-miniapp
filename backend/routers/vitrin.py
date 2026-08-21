@@ -83,7 +83,8 @@ async def etiket_ayarlari_getir(
                   etiket_metin_x_pct, etiket_metin_y_pct,
                   etiket_metin_genislik_mm, etiket_metin_yukseklik_mm,
                   etiket_barkot_x_pct, etiket_barkot_y_pct,
-                  etiket_barkot_genislik_mm, etiket_barkot_yukseklik_mm, logo_url
+                  etiket_barkot_genislik_mm, etiket_barkot_yukseklik_mm,
+                  etiket_tamir_genislik_mm, etiket_tamir_yukseklik_mm, logo_url
            FROM dukkanlar WHERE id=$1""",
         dukkan_id,
     )
@@ -120,6 +121,11 @@ async def etiket_ayarlari_guncelle(
     barkot_genislik = olcu("etiket_barkot_genislik_mm", 34, genislik)
     barkot_yukseklik = olcu("etiket_barkot_yukseklik_mm", 10, yukseklik)
 
+    tamir_genislik = float(body.get("etiket_tamir_genislik_mm") or 70)
+    tamir_yukseklik = float(body.get("etiket_tamir_yukseklik_mm") or 50)
+    if not (10 <= tamir_genislik <= 200) or not (10 <= tamir_yukseklik <= 200):
+        raise HTTPException(400, "Tamir stiker boyutu 10-200mm aralığında olmalı")
+
     await db.execute(
         """UPDATE dukkanlar SET etiket_genislik_mm=$1, etiket_yukseklik_mm=$2,
            etiket_logo_goster=$3, etiket_kategori_goster=$4,
@@ -128,13 +134,15 @@ async def etiket_ayarlari_guncelle(
            etiket_metin_x_pct=$10, etiket_metin_y_pct=$11,
            etiket_metin_genislik_mm=$12, etiket_metin_yukseklik_mm=$13,
            etiket_barkot_x_pct=$14, etiket_barkot_y_pct=$15,
-           etiket_barkot_genislik_mm=$16, etiket_barkot_yukseklik_mm=$17
-           WHERE id=$18""",
+           etiket_barkot_genislik_mm=$16, etiket_barkot_yukseklik_mm=$17,
+           etiket_tamir_genislik_mm=$18, etiket_tamir_yukseklik_mm=$19
+           WHERE id=$20""",
         genislik, yukseklik, bool(body.get("etiket_logo_goster", False)),
         bool(body.get("etiket_kategori_goster", True)),
         bool(body.get("etiket_ayirici_cizgi_goster", False)), logo_x, logo_y,
         logo_genislik, logo_yukseklik, metin_x, metin_y, metin_genislik, metin_yukseklik,
-        barkot_x, barkot_y, barkot_genislik, barkot_yukseklik, dukkan_id,
+        barkot_x, barkot_y, barkot_genislik, barkot_yukseklik,
+        tamir_genislik, tamir_yukseklik, dukkan_id,
     )
     return {"ok": True}
 

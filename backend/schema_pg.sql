@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS dukkanlar (
     etiket_barkot_y_pct REAL DEFAULT 80,
     etiket_barkot_genislik_mm REAL DEFAULT 34,
     etiket_barkot_yukseklik_mm REAL DEFAULT 10,
+    etiket_tamir_genislik_mm REAL DEFAULT 70,
+    etiket_tamir_yukseklik_mm REAL DEFAULT 50,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -134,6 +136,7 @@ CREATE TABLE IF NOT EXISTS repairs (
     -- Duruma özel ek bilgi: iptalde iade edilen kalemler + kime iade
     -- edildiği, teslimde kime teslim edildiği (JSON, esnek yapı).
     durum_detay JSONB,
+    tahmini_teslim_tarihi DATE,
     UNIQUE(dukkan_id, repair_no)
 );
 

@@ -70,7 +70,7 @@ export default function NewRepair() {
   const [form, setForm] = useState({
     customer_name: "", customer_phone: "",
     device_model: "", imei: "", fault_desc: "",
-    estimated_price: "", notes: "",
+    estimated_price: "", notes: "", tahmini_teslim_tarihi: "",
   });
 
   // Zorunlu alanlara odaklanıp kaydırmak için — kayıt, bunlar doldurulmadan
@@ -537,11 +537,19 @@ export default function NewRepair() {
             </div>
           </div>
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Tahmini Ücret (₺)</label>
-            <input className="form-input" placeholder="0" type="number"
-              value={form.estimated_price}
-              onChange={e => set("estimated_price", e.target.value)} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Tahmini Ücret (₺)</label>
+              <input className="form-input" placeholder="0" type="number"
+                value={form.estimated_price}
+                onChange={e => set("estimated_price", e.target.value)} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Tahmini Teslim Tarihi</label>
+              <input className="form-input" type="date"
+                value={form.tahmini_teslim_tarihi}
+                onChange={e => set("tahmini_teslim_tarihi", e.target.value)} />
+            </div>
           </div>
         </div>
 

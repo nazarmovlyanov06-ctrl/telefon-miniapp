@@ -3,8 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { Printer, CircleX, Store, Move } from "lucide-react";
 import { EtiketIcerik, ETIKET_AYAR_VARSAYILAN } from "../components/UrunEtiketi";
+import { TamirEtiketi } from "../components/TamirEtiketi";
 
 const ORNEK_URUN = { id: 1, ad: "Örnek Ürün", satis_fiyati: 199, kategori: "Kılıf", barkot: null };
+const ORNEK_TAMIR = {
+  id: 1, repair_no: "T2608210001", customer_name: "Ahmet Yılmaz", customer_phone: "0555 123 45 67",
+  device_model: "iPhone 13", fault_desc: "Ekran kırık", screen_lock_type: "pin", screen_lock_value: "1234",
+  created_at: new Date().toISOString(), tahmini_teslim_tarihi: new Date(Date.now() + 2 * 86400000).toISOString(),
+};
 
 export default function EtiketAyarlari({ user }) {
   const navigate = useNavigate();
@@ -20,7 +26,7 @@ export default function EtiketAyarlari({ user }) {
   }, []);
 
   async function kaydet(e) {
-    e.preventDefault(); setErr(""); setKaydedildi(false);
+    e?.preventDefault(); setErr(""); setKaydedildi(false);
     try {
       await api.etiketAyarlariGuncelle(form);
       setKaydedildi(true);
@@ -51,9 +57,10 @@ export default function EtiketAyarlari({ user }) {
         </h1>
       </div>
       <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 14 }}>
-        Aksesuar'da yazdırılan barkotlu fiyat etiketlerinin boyutunu ve görünümünü buradan ayarlayabilirsin.
+        Aksesuar'da ve Tamir'de yazdırılan barkotlu etiketlerin boyutunu ve görünümünü buradan ayarlayabilirsin.
       </div>
 
+      <div className="section-title">Aksesuar Etiketi</div>
       <div className="card" style={{ marginBottom: 14 }}>
         <fieldset disabled={!patron} style={{ border: "none", padding: 0, margin: 0 }}>
           <form onSubmit={kaydet}>
@@ -120,6 +127,39 @@ export default function EtiketAyarlari({ user }) {
             onBarkotTasi={(x, y) => setForm(f => ({ ...f, etiket_barkot_x_pct: x, etiket_barkot_y_pct: y }))}
             onBarkotBoyutlandir={(w, h) => setForm(f => ({ ...f, etiket_barkot_genislik_mm: w, etiket_barkot_yukseklik_mm: h }))} />
         </div>
+      </div>
+
+      <div className="section-title" style={{ marginTop: 20 }}>Tamir Stikeri</div>
+      <div style={{ fontSize: 13, color: "var(--hint)", marginBottom: 14 }}>
+        Cihazı teknisyene vermeden önce arkasına yapıştırılan, müşteri/arıza/kilit bilgili barkotlu stiker. Tamir sayfasında "Etiket Yazdır" ile basılır.
+      </div>
+      <div className="card" style={{ marginBottom: 14 }}>
+        <fieldset disabled={!patron} style={{ border: "none", padding: 0, margin: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Genişlik (mm)</label>
+              <input className="form-input" type="number" min="10" max="200" value={form.etiket_tamir_genislik_mm ?? 70}
+                onChange={e => setForm(f => ({ ...f, etiket_tamir_genislik_mm: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Yükseklik (mm)</label>
+              <input className="form-input" type="number" min="10" max="200" value={form.etiket_tamir_yukseklik_mm ?? 50}
+                onChange={e => setForm(f => ({ ...f, etiket_tamir_yukseklik_mm: e.target.value }))} />
+            </div>
+          </div>
+          {patron && (
+            <button type="button" className="btn btn-primary" onClick={() => kaydet()}>{kaydedildi ? "Kaydedildi ✓" : "Kaydet"}</button>
+          )}
+        </fieldset>
+      </div>
+
+      <div className="section-title">Önizleme</div>
+      <div className="card" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 30, minHeight: 160, overflow: "auto" }}>
+        <TamirEtiketi repair={ORNEK_TAMIR} ayarlar={{
+          ...form,
+          etiket_tamir_genislik_mm: parseFloat(form.etiket_tamir_genislik_mm) || 70,
+          etiket_tamir_yukseklik_mm: parseFloat(form.etiket_tamir_yukseklik_mm) || 50,
+        }} />
       </div>
     </div>
   );

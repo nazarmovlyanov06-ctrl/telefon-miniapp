@@ -188,8 +188,8 @@ async def create_repair(
         """INSERT INTO repairs
            (dukkan_id, repair_no, customer_id, device_model, imei, fault_desc,
             estimated_price, status, assigned_to, notes, created_by,
-            screen_lock_type, screen_lock_value)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'bekliyor', $8, $9, $10, $11, $12)
+            screen_lock_type, screen_lock_value, tahmini_teslim_tarihi)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'bekliyor', $8, $9, $10, $11, $12, $13)
            RETURNING id""",
         dukkan_id,
         repair_no,
@@ -203,6 +203,7 @@ async def create_repair(
         user["id"],
         body.get("screen_lock_type"),
         body.get("screen_lock_value"),
+        body.get("tahmini_teslim_tarihi") or None,
     )
     return {"id": new_repair["id"], "repair_no": repair_no}
 
@@ -232,6 +233,7 @@ async def update_repair(
     tamirde_at = now if yeni_durum == "tamirde" else None
     completed_at = now if yeni_durum == "hazir" else None
     delivered_at = now if yeni_durum == "teslim" else None
+    tahmini_teslim_tarihi = body.get("tahmini_teslim_tarihi") or None
 
     # "Kime teslim edildi" — sadece bu çağrı teslim'e geçiriyorsa kaydedilir,
     # aksi halde mevcut durum_detay korunur (aşağıda COALESCE ile).
@@ -254,8 +256,9 @@ async def update_repair(
            delivered_at=COALESCE($15, delivered_at),
            durum_detay=COALESCE($16::jsonb, durum_detay),
            son_guncelleyen_id=$17,
+           tahmini_teslim_tarihi=COALESCE($18, tahmini_teslim_tarihi),
            updated_at=now()
-           WHERE id=$18 AND dukkan_id=$19""",
+           WHERE id=$19 AND dukkan_id=$20""",
         body.get("device_model"),
         body.get("fault_desc"),
         yeni_durum,
@@ -273,6 +276,7 @@ async def update_repair(
         delivered_at,
         yeni_durum_detay,
         user["id"],
+        tahmini_teslim_tarihi,
         repair_id,
         dukkan_id,
     )
