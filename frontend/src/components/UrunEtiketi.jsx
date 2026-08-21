@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import JsBarcode from "jsbarcode";
 import { fotoUrl } from "../api";
 
@@ -67,10 +67,12 @@ export function etiketSayfaBoyutuAyarla(ayarlar) {
  * yükseklik) ORANSIZ boyutlandırılabilen tek bir öğe kutusu — logo, metin
  * ve barkot bloklarının üçü de bunu kullanır. `duzenlenebilir` false iken
  * düz bir konumlandırılmış kutu olarak (etkileşimsiz) render edilir. */
+const ORTALAMA_ESIGI = 2.5; // % — sürüklerken bu kadar yaklaşınca tam ortaya (%50) yapışır
+
 function SurukleBoyutKutu({
   kutuRef, genislikMmToplam, yukseklikMmToplam,
   xPct, yPct, genislikMm, yukseklikMm,
-  duzenlenebilir, onTasi, onBoyutlandir,
+  duzenlenebilir, onTasi, onBoyutlandir, onOrtaHizala,
   minGenislik = 5, minYukseklik = 3, children,
 }) {
   function oranAl() {
@@ -83,13 +85,19 @@ function SurukleBoyutKutu({
     e.preventDefault(); e.stopPropagation();
     const { rect } = oranAl();
     function hareket(ev) {
-      const xp = Math.max(0, Math.min(100, ((ev.clientX - rect.left) / rect.width) * 100));
-      const yp = Math.max(0, Math.min(100, ((ev.clientY - rect.top) / rect.height) * 100));
+      let xp = Math.max(0, Math.min(100, ((ev.clientX - rect.left) / rect.width) * 100));
+      let yp = Math.max(0, Math.min(100, ((ev.clientY - rect.top) / rect.height) * 100));
+      const xOrtada = Math.abs(xp - 50) < ORTALAMA_ESIGI;
+      const yOrtada = Math.abs(yp - 50) < ORTALAMA_ESIGI;
+      if (xOrtada) xp = 50;
+      if (yOrtada) yp = 50;
+      onOrtaHizala && onOrtaHizala(xOrtada, yOrtada);
       onTasi && onTasi(Math.round(xp * 10) / 10, Math.round(yp * 10) / 10);
     }
     function birak() {
       window.removeEventListener("pointermove", hareket);
       window.removeEventListener("pointerup", birak);
+      onOrtaHizala && onOrtaHizala(false, false);
     }
     window.addEventListener("pointermove", hareket);
     window.addEventListener("pointerup", birak);
@@ -169,6 +177,9 @@ export function EtiketIcerik({
   onLogoTasi, onLogoBoyutlandir, onMetinTasi, onMetinBoyutlandir, onBarkotTasi, onBarkotBoyutlandir,
 }) {
   const kutuRef = useRef(null);
+  const [merkezX, setMerkezX] = useState(false);
+  const [merkezY, setMerkezY] = useState(false);
+  function ortaHizala(x, y) { setMerkezX(x); setMerkezY(y); }
   const kod = barkotDegeri(item);
   const logoGoster = ayarlar.etiket_logo_goster && ayarlar.logo_url;
   const kategoriGoster = ayarlar.etiket_kategori_goster !== false;
@@ -202,7 +213,7 @@ export function EtiketIcerik({
         {logoGoster && (
           <SurukleBoyutKutu kutuRef={kutuRef} genislikMmToplam={genislikMm} yukseklikMmToplam={yukseklikMm}
             xPct={logoXPct} yPct={logoYPct} genislikMm={logoGenislikMm} yukseklikMm={logoYukseklikMm}
-            duzenlenebilir={duzenlenebilir} onTasi={onLogoTasi} onBoyutlandir={onLogoBoyutlandir}>
+            duzenlenebilir={duzenlenebilir} onTasi={onLogoTasi} onBoyutlandir={onLogoBoyutlandir} onOrtaHizala={ortaHizala}>
             <img src={fotoUrl(ayarlar.logo_url)} alt="" draggable={false}
               style={{ width: "100%", height: "100%", objectFit: "fill", pointerEvents: "none", display: "block" }} />
           </SurukleBoyutKutu>
@@ -210,7 +221,7 @@ export function EtiketIcerik({
 
         <SurukleBoyutKutu kutuRef={kutuRef} genislikMmToplam={genislikMm} yukseklikMmToplam={yukseklikMm}
           xPct={metinXPct} yPct={metinYPct} genislikMm={metinGenislikMm} yukseklikMm={metinYukseklikMm}
-          duzenlenebilir={duzenlenebilir} onTasi={onMetinTasi} onBoyutlandir={onMetinBoyutlandir}
+          duzenlenebilir={duzenlenebilir} onTasi={onMetinTasi} onBoyutlandir={onMetinBoyutlandir} onOrtaHizala={ortaHizala}
           minGenislik={10} minYukseklik={5}>
           <div style={{ width: "100%", textAlign: "center", overflow: "hidden", pointerEvents: "none" }}>
             {kategoriGoster && item.kategori && (
@@ -224,10 +235,17 @@ export function EtiketIcerik({
 
         <SurukleBoyutKutu kutuRef={kutuRef} genislikMmToplam={genislikMm} yukseklikMmToplam={yukseklikMm}
           xPct={barkotXPct} yPct={barkotYPct} genislikMm={barkotGenislikMm} yukseklikMm={barkotYukseklikMm}
-          duzenlenebilir={duzenlenebilir} onTasi={onBarkotTasi} onBoyutlandir={onBarkotBoyutlandir}
+          duzenlenebilir={duzenlenebilir} onTasi={onBarkotTasi} onBoyutlandir={onBarkotBoyutlandir} onOrtaHizala={ortaHizala}
           minGenislik={10} minYukseklik={5}>
           <BarkotSVG value={kod} />
         </SurukleBoyutKutu>
+
+        {duzenlenebilir && merkezX && (
+          <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "#ef4444", pointerEvents: "none" }} />
+        )}
+        {duzenlenebilir && merkezY && (
+          <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1, background: "#ef4444", pointerEvents: "none" }} />
+        )}
       </div>
     </div>
   );
