@@ -115,7 +115,7 @@ async def katalog(
     ağ isteği incelemesiyle bile maliyet asla sızmaz."""
     rows = await db.fetch(
         """SELECT id, model, renk, depolama, ram, gorsel_url, liste_fiyati, kaynak,
-                  aksesuarlar, degisen_parca, garanti_var, garanti_aciklama, fatura_var
+                  aksesuarlar, degisen_parca, garanti_bitis_tarihi, fatura_var
            FROM ikinci_el WHERE dukkan_id = $1 AND durum = 'stokta'
            ORDER BY liste_fiyati ASC NULLS LAST, created_at DESC""",
         dukkan_id,
@@ -171,16 +171,16 @@ async def create_cihaz(
             """INSERT INTO ikinci_el
                (dukkan_id, model, imei, renk, depolama, ram, ozellikler,
                 kimden, kimden_telefon, alis_fiyati, notlar, durum, kaynak, aksesuarlar, liste_fiyati,
-                degisen_parca, garanti_var, garanti_aciklama, fatura_var)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'stokta', $12, $13::jsonb, $14, $15, $16, $17, $18)
+                degisen_parca, garanti_bitis_tarihi, fatura_var)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'stokta', $12, $13::jsonb, $14, $15, $16, $17)
                RETURNING id""",
             dukkan_id, body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
             body.get("ram"), body.get("ozellikler"),
             kimden, kimden_telefon,
             float(body["alis_fiyati"]), body.get("notlar"),
             body.get("kaynak", "dukkan"), aksesuarlar, liste_fiyati,
-            body.get("degisen_parca") or None, bool(body.get("garanti_var")),
-            body.get("garanti_aciklama") or None, bool(body.get("fatura_var")),
+            body.get("degisen_parca") or None, body.get("garanti_bitis_tarihi") or None,
+            bool(body.get("fatura_var")),
         )
         if kimden and kimden_telefon:
             existing = await db.fetchrow(
@@ -214,13 +214,13 @@ async def update_cihaz(
     result = await db.execute(
         """UPDATE ikinci_el SET model=$1, imei=$2, renk=$3, depolama=$4, ram=$5,
            ozellikler=$6, kimden=$7, kimden_telefon=$8, alis_fiyati=$9, notlar=$10, liste_fiyati=$11,
-           degisen_parca=$12, garanti_var=$13, garanti_aciklama=$14, fatura_var=$15
-           WHERE id=$16 AND dukkan_id=$17""",
+           degisen_parca=$12, garanti_bitis_tarihi=$13, fatura_var=$14
+           WHERE id=$15 AND dukkan_id=$16""",
         body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
         body.get("ram"), body.get("ozellikler"), body.get("kimden"), body.get("kimden_telefon"),
         float(body["alis_fiyati"]), body.get("notlar"), liste_fiyati,
-        body.get("degisen_parca") or None, bool(body.get("garanti_var")),
-        body.get("garanti_aciklama") or None, bool(body.get("fatura_var")),
+        body.get("degisen_parca") or None, body.get("garanti_bitis_tarihi") or None,
+        bool(body.get("fatura_var")),
         cihaz_id, dukkan_id,
     )
     if result == "UPDATE 0":

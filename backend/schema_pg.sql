@@ -358,8 +358,7 @@ CREATE TABLE IF NOT EXISTS ikinci_el (
     aksesuarlar JSONB,
     liste_fiyati REAL,
     degisen_parca TEXT,
-    garanti_var BOOLEAN DEFAULT false,
-    garanti_aciklama TEXT,
+    garanti_bitis_tarihi TEXT,
     fatura_var BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT now()
 );

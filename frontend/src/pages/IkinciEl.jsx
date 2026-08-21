@@ -21,6 +21,16 @@ function gunSayisi(tarihStr) {
   return Math.floor((Date.now() - new Date(tarihStr)) / 86400000);
 }
 
+// Etikette/katalogda "Garantili" gibi statik bir yazı yerine kaç ay garanti
+// kaldığı görünsün diye — bitiş tarihinden bugüne kalan gün sayısı aya
+// çevriliyor. Süre dolmuşsa veya tarih hiç girilmemişse null döner.
+function garantiAyKalan(bitisTarihi) {
+  if (!bitisTarihi) return null;
+  const gunFark = (new Date(bitisTarihi) - new Date()) / 86400000;
+  if (gunFark <= 0) return null;
+  return Math.max(1, Math.round(gunFark / 30));
+}
+
 const SIRALAMA_SECENEKLERI = [
   { key: "yeni", label: "En Yeni" },
   { key: "eski", label: "En Eski" },
@@ -33,14 +43,16 @@ const SIRALAMA_SECENEKLERI = [
 // 2.El cihazın kendi alan adlarını buna çevirir. Fiyat 2.El etiketinde hiç
 // gösterilmiyor (satis_fiyati kasıtlı olarak hep null) — müşteriye elden
 // gösterilen bir etiket, alış/satış fiyatı içermemeli. Onun yerine, fiyatın
-// durduğu yerde garanti durumu ("Garantili") gösteriliyor. Barkot olarak
-// IMEI kullanılır (zaten benzersiz), yoksa id'den türetilir.
+// durduğu yerde kalan garanti süresi ("4 Ay Garanti") gösteriliyor — statik
+// "Garantili" yazısı yerine, süresi dolunca otomatik kaybolsun diye. Barkot
+// olarak IMEI kullanılır (zaten benzersiz), yoksa id'den türetilir.
 function cihazToItem(c) {
+  const ayKalan = garantiAyKalan(c.garanti_bitis_tarihi);
   return {
     id: c.id, ad: c.model, satis_fiyati: null,
     kategori: [c.renk, c.depolama, c.ram].filter(Boolean).join(" · ") || null,
     barkot: c.imei || null,
-    ekstra: c.garanti_var ? "Garantili" : null,
+    ekstra: ayKalan ? `${ayKalan} Ay Garanti` : null,
   };
 }
 
@@ -83,7 +95,7 @@ export default function IkinciEl({ user }) {
   const [etiketModalItems, setEtiketModalItems] = useState(null);
   const [topluEtiketModal, setTopluEtiketModal] = useState(false);
   const [topluEtiketSecili, setTopluEtiketSecili] = useState(new Set());
-  const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", liste_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {}, degisen_parca: "", garanti_var: false, garanti_aciklama: "", fatura_var: false });
+  const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", liste_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {}, degisen_parca: "", garanti_bitis_tarihi: "", fatura_var: false });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
   const [err, setErr] = useState("");
@@ -156,8 +168,8 @@ export default function IkinciEl({ user }) {
       ram: c.ram || "", ozellikler: c.ozellikler || "", kimden: c.kimden || "",
       kimden_telefon: c.kimden_telefon || "", alis_fiyati: c.alis_fiyati ?? "",
       liste_fiyati: c.liste_fiyati ?? "", notlar: c.notlar || "",
-      degisen_parca: c.degisen_parca || "", garanti_var: !!c.garanti_var,
-      garanti_aciklama: c.garanti_aciklama || "", fatura_var: !!c.fatura_var,
+      degisen_parca: c.degisen_parca || "", garanti_bitis_tarihi: c.garanti_bitis_tarihi || "",
+      fatura_var: !!c.fatura_var,
     });
     loadFotolar(c.id);
   }
@@ -236,7 +248,7 @@ export default function IkinciEl({ user }) {
     try {
       await api.createIkinciEl({ ...form, alis_fiyati: parseFloat(form.alis_fiyati), liste_fiyati: form.liste_fiyati ? parseFloat(form.liste_fiyati) : null });
       setShowForm(false);
-      setForm({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", liste_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {}, degisen_parca: "", garanti_var: false, garanti_aciklama: "", fatura_var: false });
+      setForm({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", liste_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {}, degisen_parca: "", garanti_bitis_tarihi: "", fatura_var: false });
       karaSonuclar.current = {}; setKaraUyari([]);
       load();
     } catch (e) { setErr(e.message); }
@@ -535,13 +547,8 @@ export default function IkinciEl({ user }) {
                   <input className="form-input" value={form.degisen_parca} onChange={e => setForm({ ...form, degisen_parca: e.target.value })} placeholder="Ekran, Batarya..." />
                 </div>
                 <div className="form-group">
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                    <input type="checkbox" checked={form.garanti_var} onChange={e => setForm({ ...form, garanti_var: e.target.checked })} style={{ width: 16, height: 16 }} />
-                    <span className="form-label" style={{ margin: 0 }}>Garantisi devam ediyor</span>
-                  </label>
-                  {form.garanti_var && (
-                    <input className="form-input" style={{ marginTop: 6 }} value={form.garanti_aciklama} onChange={e => setForm({ ...form, garanti_aciklama: e.target.value })} placeholder="Örn: Yetkili serviste 6 ay garantili" />
-                  )}
+                  <label className="form-label">Garanti Bitiş Tarihi (varsa) — Katalogda kalan ay olarak gösterilir</label>
+                  <input className="form-input" type="date" value={form.garanti_bitis_tarihi} onChange={e => setForm({ ...form, garanti_bitis_tarihi: e.target.value })} />
                 </div>
                 <div className="form-group">
                   <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -929,13 +936,8 @@ export default function IkinciEl({ user }) {
                     <input className="form-input" value={duzenleForm.degisen_parca} onChange={e => setDuzenleForm(f => ({ ...f, degisen_parca: e.target.value }))} placeholder="Ekran, Batarya..." />
                   </div>
                   <div className="form-group">
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                      <input type="checkbox" checked={duzenleForm.garanti_var} onChange={e => setDuzenleForm(f => ({ ...f, garanti_var: e.target.checked }))} style={{ width: 16, height: 16 }} />
-                      <span className="form-label" style={{ margin: 0 }}>Garantisi devam ediyor</span>
-                    </label>
-                    {duzenleForm.garanti_var && (
-                      <input className="form-input" style={{ marginTop: 6 }} value={duzenleForm.garanti_aciklama} onChange={e => setDuzenleForm(f => ({ ...f, garanti_aciklama: e.target.value }))} placeholder="Örn: Yetkili serviste 6 ay garantili" />
-                    )}
+                    <label className="form-label">Garanti Bitiş Tarihi (varsa) — Katalogda kalan ay olarak gösterilir</label>
+                    <input className="form-input" type="date" value={duzenleForm.garanti_bitis_tarihi} onChange={e => setDuzenleForm(f => ({ ...f, garanti_bitis_tarihi: e.target.value }))} />
                   </div>
                   <div className="form-group">
                     <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>

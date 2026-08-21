@@ -11,6 +11,15 @@ function aksesuarlarParse(ham) {
   try { return JSON.parse(ham); } catch { return {}; }
 }
 
+// Bkz. IkinciEl.jsx'teki aynı isimli fonksiyon — kalan garanti süresi ay
+// olarak gösterilsin diye, statik "Garantili" yazısı yerine.
+function garantiAyKalan(bitisTarihi) {
+  if (!bitisTarihi) return null;
+  const gunFark = (new Date(bitisTarihi) - new Date()) / 86400000;
+  if (gunFark <= 0) return null;
+  return Math.max(1, Math.round(gunFark / 30));
+}
+
 // Müşteriye elden gösterilecek katalog — sadece marka/model/renk/hafıza/RAM
 // ve varsa liste fiyatı görünür. Alış fiyatı bu ekranda hiçbir yerde yok:
 // backend /katalog uç noktaları o alanı zaten hiç döndürmüyor, burada da
@@ -99,6 +108,7 @@ export default function Katalog() {
         const c = detay.item;
         const aksesuarlar = aksesuarlarParse(c.aksesuarlar);
         const secilenAksesuarlar = Object.entries(AKSESUAR_ETIKETLERI).filter(([key]) => aksesuarlar[key]);
+        const ayKalan = garantiAyKalan(c.garanti_bitis_tarihi);
         return (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
             onClick={() => setDetay(null)}>
@@ -129,8 +139,8 @@ export default function Katalog() {
                     {c.degisen_parca && (
                       <Detay icon={Wrench} label="Değişen Parça" value={c.degisen_parca} />
                     )}
-                    {c.garanti_var && (
-                      <Detay icon={ShieldCheck} label="Garantisi Devam Ediyor" value={c.garanti_aciklama || null} vurgu="var(--success)" />
+                    {ayKalan && (
+                      <Detay icon={ShieldCheck} label={`${ayKalan} Ay Garanti`} vurgu="var(--success)" />
                     )}
                     {secilenAksesuarlar.length > 0 && (
                       <Detay icon={Box} label="Yanında Gelenler"
