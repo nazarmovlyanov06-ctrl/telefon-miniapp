@@ -81,7 +81,7 @@ export default function IkinciEl({ user }) {
   const [etiketModalItems, setEtiketModalItems] = useState(null);
   const [topluEtiketModal, setTopluEtiketModal] = useState(false);
   const [topluEtiketSecili, setTopluEtiketSecili] = useState(new Set());
-  const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", liste_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {} });
+  const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", liste_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {}, degisen_parca: "", garanti_var: false, garanti_aciklama: "", fatura_var: false });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
   const [err, setErr] = useState("");
@@ -154,6 +154,8 @@ export default function IkinciEl({ user }) {
       ram: c.ram || "", ozellikler: c.ozellikler || "", kimden: c.kimden || "",
       kimden_telefon: c.kimden_telefon || "", alis_fiyati: c.alis_fiyati ?? "",
       liste_fiyati: c.liste_fiyati ?? "", notlar: c.notlar || "",
+      degisen_parca: c.degisen_parca || "", garanti_var: !!c.garanti_var,
+      garanti_aciklama: c.garanti_aciklama || "", fatura_var: !!c.fatura_var,
     });
     loadFotolar(c.id);
   }
@@ -232,7 +234,7 @@ export default function IkinciEl({ user }) {
     try {
       await api.createIkinciEl({ ...form, alis_fiyati: parseFloat(form.alis_fiyati), liste_fiyati: form.liste_fiyati ? parseFloat(form.liste_fiyati) : null });
       setShowForm(false);
-      setForm({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", liste_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {} });
+      setForm({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", liste_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {}, degisen_parca: "", garanti_var: false, garanti_aciklama: "", fatura_var: false });
       karaSonuclar.current = {}; setKaraUyari([]);
       load();
     } catch (e) { setErr(e.message); }
@@ -502,6 +504,25 @@ export default function IkinciEl({ user }) {
                 <div className="form-group">
                   <label className="form-label">Liste Fiyatı (₺) — Katalogda gösterilir</label>
                   <input className="form-input" type="number" value={form.liste_fiyati} onChange={e => setForm({ ...form, liste_fiyati: e.target.value })} placeholder="Boş bırakılırsa katalogda fiyat görünmez" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Değişen Parça (varsa) — Katalogda gösterilir</label>
+                  <input className="form-input" value={form.degisen_parca} onChange={e => setForm({ ...form, degisen_parca: e.target.value })} placeholder="Ekran, Batarya..." />
+                </div>
+                <div className="form-group">
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input type="checkbox" checked={form.garanti_var} onChange={e => setForm({ ...form, garanti_var: e.target.checked })} style={{ width: 16, height: 16 }} />
+                    <span className="form-label" style={{ margin: 0 }}>Garantisi devam ediyor</span>
+                  </label>
+                  {form.garanti_var && (
+                    <input className="form-input" style={{ marginTop: 6 }} value={form.garanti_aciklama} onChange={e => setForm({ ...form, garanti_aciklama: e.target.value })} placeholder="Örn: Yetkili serviste 6 ay garantili" />
+                  )}
+                </div>
+                <div className="form-group">
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input type="checkbox" checked={form.fatura_var} onChange={e => setForm({ ...form, fatura_var: e.target.checked })} style={{ width: 16, height: 16 }} />
+                    <span className="form-label" style={{ margin: 0 }}>Faturası var</span>
+                  </label>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Not</label>
@@ -877,6 +898,25 @@ export default function IkinciEl({ user }) {
                   <div className="form-group">
                     <label className="form-label">Liste Fiyatı (₺) — Katalogda gösterilir</label>
                     <input className="form-input" type="number" value={duzenleForm.liste_fiyati} onChange={e => setDuzenleForm(f => ({ ...f, liste_fiyati: e.target.value }))} placeholder="Boş bırakılırsa katalogda fiyat görünmez" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Değişen Parça (varsa) — Katalogda gösterilir</label>
+                    <input className="form-input" value={duzenleForm.degisen_parca} onChange={e => setDuzenleForm(f => ({ ...f, degisen_parca: e.target.value }))} placeholder="Ekran, Batarya..." />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                      <input type="checkbox" checked={duzenleForm.garanti_var} onChange={e => setDuzenleForm(f => ({ ...f, garanti_var: e.target.checked }))} style={{ width: 16, height: 16 }} />
+                      <span className="form-label" style={{ margin: 0 }}>Garantisi devam ediyor</span>
+                    </label>
+                    {duzenleForm.garanti_var && (
+                      <input className="form-input" style={{ marginTop: 6 }} value={duzenleForm.garanti_aciklama} onChange={e => setDuzenleForm(f => ({ ...f, garanti_aciklama: e.target.value }))} placeholder="Örn: Yetkili serviste 6 ay garantili" />
+                    )}
+                  </div>
+                  <div className="form-group">
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                      <input type="checkbox" checked={duzenleForm.fatura_var} onChange={e => setDuzenleForm(f => ({ ...f, fatura_var: e.target.checked }))} style={{ width: 16, height: 16 }} />
+                      <span className="form-label" style={{ margin: 0 }}>Faturası var</span>
+                    </label>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Not</label>

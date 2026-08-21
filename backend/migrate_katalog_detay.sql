@@ -1,0 +1,5 @@
+ALTER TABLE ikinci_el ADD COLUMN IF NOT EXISTS degisen_parca TEXT;
+ALTER TABLE ikinci_el ADD COLUMN IF NOT EXISTS garanti_var BOOLEAN DEFAULT false;
+ALTER TABLE ikinci_el ADD COLUMN IF NOT EXISTS garanti_aciklama TEXT;
+ALTER TABLE ikinci_el ADD COLUMN IF NOT EXISTS fatura_var BOOLEAN DEFAULT false;
+ALTER TABLE sifir_cihazlar ADD COLUMN IF NOT EXISTS fatura_turu TEXT;

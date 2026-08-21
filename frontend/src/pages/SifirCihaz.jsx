@@ -73,9 +73,9 @@ export default function SifirCihaz({ user }) {
 
   const [form, setForm] = useState({
     model: "", imei: "", renk: "", depolama: "", kimden: "", kimden_telefon: "",
-    kaynak: "dukkan", alis_fiyati: "", liste_fiyati: "", alis_tarihi: today(), notlar: "", aksesuarlar: {}
+    kaynak: "dukkan", alis_fiyati: "", liste_fiyati: "", fatura_turu: "", alis_tarihi: today(), notlar: "", aksesuarlar: {}
   });
-  const [listeFiyatDuzenle, setListeFiyatDuzenle] = useState(null); // { id, deger }
+  const [katalogDuzenle, setKatalogDuzenle] = useState(null); // { id, liste_fiyati, fatura_turu }
   const [satForm, setSatForm] = useState({
     satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "",
     musteri_telefon: "", odemeler: null, taksit_sayi: "1"
@@ -120,18 +120,21 @@ export default function SifirCihaz({ user }) {
   async function submitAlim(e) {
     e.preventDefault(); setErr("");
     try {
-      await api.createSifir({ ...form, alis_fiyati: parseFloat(form.alis_fiyati), liste_fiyati: form.liste_fiyati ? parseFloat(form.liste_fiyati) : null });
+      await api.createSifir({ ...form, alis_fiyati: parseFloat(form.alis_fiyati), liste_fiyati: form.liste_fiyati ? parseFloat(form.liste_fiyati) : null, fatura_turu: form.fatura_turu || null });
       setShowForm(false);
-      setForm({ model: "", imei: "", renk: "", depolama: "", kimden: "", kimden_telefon: "", kaynak: "dukkan", alis_fiyati: "", liste_fiyati: "", alis_tarihi: today(), notlar: "", aksesuarlar: {} });
+      setForm({ model: "", imei: "", renk: "", depolama: "", kimden: "", kimden_telefon: "", kaynak: "dukkan", alis_fiyati: "", liste_fiyati: "", fatura_turu: "", alis_tarihi: today(), notlar: "", aksesuarlar: {} });
       karaSonuclar.current = {}; setKaraUyari([]);
       load();
     } catch (e) { setErr(e.message); }
   }
 
-  async function kaydetListeFiyat() {
+  async function kaydetKatalogDetay() {
     try {
-      await api.sifirListeFiyatGuncelle(listeFiyatDuzenle.id, listeFiyatDuzenle.deger ? parseFloat(listeFiyatDuzenle.deger) : null);
-      setListeFiyatDuzenle(null);
+      await api.sifirKatalogDetayGuncelle(katalogDuzenle.id, {
+        liste_fiyati: katalogDuzenle.liste_fiyati ? parseFloat(katalogDuzenle.liste_fiyati) : null,
+        fatura_turu: katalogDuzenle.fatura_turu || null,
+      });
+      setKatalogDuzenle(null);
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -332,6 +335,15 @@ export default function SifirCihaz({ user }) {
                     placeholder="Boş bırakılırsa katalogda fiyat görünmez" />
                 </div>
                 <div className="form-group">
+                  <label className="form-label">Fatura Türü</label>
+                  <select className="form-select" value={form.fatura_turu}
+                    onChange={e => setForm({ ...form, fatura_turu: e.target.value })}>
+                    <option value="">Belirtilmemiş</option>
+                    <option value="MF">Müşteri Faturalı (MF)</option>
+                    <option value="AF">Adına Fatura (AF)</option>
+                  </select>
+                </div>
+                <div className="form-group">
                   <label className="form-label">Not</label>
                   <input className="form-input" value={form.notlar}
                     onChange={e => setForm({ ...form, notlar: e.target.value })} />
@@ -382,20 +394,31 @@ export default function SifirCihaz({ user }) {
                 {isSelected && (
                   <div className="card" style={{ marginTop: -8, borderRadius: "0 0 12px 12px", background: "var(--bg2)" }}>
                     <div style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid var(--divider)" }}>
-                      {listeFiyatDuzenle?.id === c.id ? (
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <input className="form-input" type="number" autoFocus style={{ flex: 1 }}
-                            placeholder="Katalog fiyatı"
-                            value={listeFiyatDuzenle.deger}
-                            onChange={e => setListeFiyatDuzenle(v => ({ ...v, deger: e.target.value }))} />
-                          <button className="btn btn-primary btn-sm" onClick={kaydetListeFiyat}>Kaydet</button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => setListeFiyatDuzenle(null)}>İptal</button>
+                      {katalogDuzenle?.id === c.id ? (
+                        <div>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                            <input className="form-input" type="number" autoFocus style={{ flex: 1 }}
+                              placeholder="Katalog fiyatı"
+                              value={katalogDuzenle.liste_fiyati}
+                              onChange={e => setKatalogDuzenle(v => ({ ...v, liste_fiyati: e.target.value }))} />
+                            <select className="form-select" style={{ width: "auto" }}
+                              value={katalogDuzenle.fatura_turu}
+                              onChange={e => setKatalogDuzenle(v => ({ ...v, fatura_turu: e.target.value }))}>
+                              <option value="">Fatura yok</option>
+                              <option value="MF">MF</option>
+                              <option value="AF">AF</option>
+                            </select>
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button className="btn btn-primary btn-sm" onClick={kaydetKatalogDetay}>Kaydet</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setKatalogDuzenle(null)}>İptal</button>
+                          </div>
                         </div>
                       ) : (
                         <div className="card-row" style={{ cursor: "pointer" }}
-                          onClick={() => setListeFiyatDuzenle({ id: c.id, deger: c.liste_fiyati ?? "" })}>
+                          onClick={() => setKatalogDuzenle({ id: c.id, liste_fiyati: c.liste_fiyati ?? "", fatura_turu: c.fatura_turu || "" })}>
                           <span style={{ fontSize: 12.5, color: "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}>
-                            <Tag size={12} strokeWidth={2} /> Liste Fiyatı (Katalog)
+                            <Tag size={12} strokeWidth={2} /> Liste Fiyatı (Katalog){c.fatura_turu ? ` · ${c.fatura_turu}` : ""}
                           </span>
                           <span style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
                             {c.liste_fiyati ? c.liste_fiyati.toLocaleString("tr-TR") + " ₺" : "Belirtilmemiş"}

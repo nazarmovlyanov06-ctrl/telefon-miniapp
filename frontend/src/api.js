@@ -244,7 +244,7 @@ export const api = {
   sifirSat: (id, data) => post(`/sifir-cihaz/${id}/sat`, data),
   sifirSatilanlar: () => get("/sifir-cihaz/satilanlar"),
   sifirKatalog: () => get("/sifir-cihaz/katalog"),
-  sifirListeFiyatGuncelle: (id, liste_fiyati) => put(`/sifir-cihaz/${id}/liste-fiyat`, { liste_fiyati }),
+  sifirKatalogDetayGuncelle: (id, data) => put(`/sifir-cihaz/${id}/katalog-detay`, data),
 
   // Garanti
   garantiList: (params = {}) => {

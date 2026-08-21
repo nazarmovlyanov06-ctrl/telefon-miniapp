@@ -2,7 +2,7 @@ import {
   Wrench, Users, Package, Landmark, TrendingDown, Target, CreditCard,
   Smartphone, Headphones, Factory, Undo2, ShieldCheck, PhoneCall, Ban,
   MessageSquareWarning, Store, CalendarClock, Star, Repeat, MessageCircle,
-  Banknote, BarChart3, ScanLine, Settings, LifeBuoy, Printer,
+  Banknote, BarChart3, ScanLine, Settings, LifeBuoy, Printer, LayoutGrid,
 } from "lucide-react";
 
 // Alt menü + Daha sayfasında gösterilebilecek TÜM modüller — Ana Sayfa ve
@@ -17,6 +17,8 @@ export const TUM_MODULLER = [
   { icon: Target, label: "Hedef", path: "/hedef", color: "var(--blue)" },
   { icon: CreditCard, label: "Borçlar", path: "/debts", color: "var(--purple)" },
   { icon: Smartphone, label: "2. El", path: "/ikinciel", color: "var(--green)" },
+  { icon: Package, label: "Sıfır Cihaz", path: "/sifir-cihaz", color: "var(--blue)" },
+  { icon: LayoutGrid, label: "Katalog", path: "/katalog", color: "var(--gold)" },
   { icon: Headphones, label: "Aksesuar", path: "/aksesuar", color: "var(--orange)" },
   { icon: Factory, label: "Toptancı", path: "/toptanci", color: "var(--blue)" },
   { icon: Undo2, label: "Parça İade", path: "/parca-iade", color: "var(--gold)" },

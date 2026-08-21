@@ -357,6 +357,10 @@ CREATE TABLE IF NOT EXISTS ikinci_el (
     gorsel_url TEXT,
     aksesuarlar JSONB,
     liste_fiyati REAL,
+    degisen_parca TEXT,
+    garanti_var BOOLEAN DEFAULT false,
+    garanti_aciklama TEXT,
+    fatura_var BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -544,6 +548,7 @@ CREATE TABLE IF NOT EXISTS sifir_cihazlar (
     gorsel_url TEXT,
     aksesuarlar JSONB,
     liste_fiyati REAL,
+    fatura_turu TEXT,
     created_at TIMESTAMP DEFAULT now()
 );
 
