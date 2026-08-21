@@ -3,7 +3,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from database import get_db
 from auth import get_current_user, get_dukkan_id
-from photo_storage import save_upload
+from photo_storage import save_upload, save_photo, delete_photo
 from odeme_yardimci import kaydet_odeme
 from datetime import date
 
@@ -19,6 +19,22 @@ async def _with_masraflar(db: asyncpg.Connection, dukkan_id: int, rows: list) ->
         )
         r["masraflar"] = [dict(x) for x in m]
     return out
+
+
+async def _diger_tablo_eslesmeler(db: asyncpg.Connection, dukkan_id: int, imei_kosulu: str, deger):
+    """IMEI geçmişi sadece ikinci_el içinde aranıyordu — aynı IMEI'nin daha
+    önce Sıfır Cihaz veya Tamir kaydına da girmiş olması (ör. çalıntı/iade
+    cihazın farklı bir modül üzerinden tekrar satılmaya çalışılması) hiç
+    görünmüyordu. Bu iki tabloyu da ayrıca kontrol edip özet döndürüyor."""
+    sifir = await db.fetch(
+        f"SELECT id, model, durum, alis_fiyati, satis_fiyati, created_at FROM sifir_cihazlar WHERE {imei_kosulu} AND dukkan_id = $2 ORDER BY created_at DESC",
+        deger, dukkan_id,
+    )
+    tamir = await db.fetch(
+        f"SELECT repair_no, device_model, status, created_at FROM repairs WHERE {imei_kosulu} AND dukkan_id = $2 ORDER BY created_at DESC",
+        deger, dukkan_id,
+    )
+    return {"sifir_cihaz": [dict(r) for r in sifir], "tamir": [dict(r) for r in tamir]}
 
 
 @router.get("/imei-tam/{imei}")
@@ -37,7 +53,9 @@ async def imei_tam_gecmis(
            ORDER BY c.created_at ASC""",
         imei, dukkan_id,
     )
-    return await _with_masraflar(db, dukkan_id, rows)
+    sonuc = await _with_masraflar(db, dukkan_id, rows)
+    diger = await _diger_tablo_eslesmeler(db, dukkan_id, "imei = $1", imei)
+    return {"ikinci_el": sonuc, **diger}
 
 
 @router.get("/imei-gecmis/{son4}")
@@ -56,7 +74,9 @@ async def imei_gecmis(
            ORDER BY c.created_at ASC""",
         dukkan_id, f"%{son4}",
     )
-    return await _with_masraflar(db, dukkan_id, rows)
+    sonuc = await _with_masraflar(db, dukkan_id, rows)
+    diger = await _diger_tablo_eslesmeler(db, dukkan_id, "imei LIKE $1", f"%{son4}")
+    return {"ikinci_el": sonuc, **diger}
 
 
 @router.get("/listesi")
@@ -149,6 +169,32 @@ async def create_cihaz(
                     dukkan_id, kimden, kimden_telefon,
                 )
     return {"id": row["id"]}
+
+
+@router.put("/{cihaz_id}")
+async def update_cihaz(
+    cihaz_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Aksesuar/Parça'nın aksine 2.El'de düzenleme hiç yoktu — bir yazım
+    hatasını (model/renk/depolama) veya alış fiyatını düzeltmek için kaydı
+    silip yeniden girmek gerekiyordu, bu da masraf geçmişini ve satış
+    bağlantısını kaybettiriyordu. Not: satış/durum bilgisi kasıtlı olarak
+    burada değiştirilmiyor — o akış hâlâ /sat üzerinden yürüyor."""
+    result = await db.execute(
+        """UPDATE ikinci_el SET model=$1, imei=$2, renk=$3, depolama=$4, ram=$5,
+           ozellikler=$6, kimden=$7, kimden_telefon=$8, alis_fiyati=$9, notlar=$10
+           WHERE id=$11 AND dukkan_id=$12""",
+        body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
+        body.get("ram"), body.get("ozellikler"), body.get("kimden"), body.get("kimden_telefon"),
+        float(body["alis_fiyati"]), body.get("notlar"), cihaz_id, dukkan_id,
+    )
+    if result == "UPDATE 0":
+        raise HTTPException(404, "Cihaz bulunamadı")
+    return {"ok": True}
 
 
 @router.delete("/{cihaz_id}")
@@ -295,3 +341,67 @@ async def gorsel_yukle(
         url, kayit_id, dukkan_id,
     )
     return {"url": url}
+
+
+# ── Ek fotoğraflar (durum/hasar kanıtı) ─────────────────────────────────
+# gorsel_url tek bir "vitrin" fotoğrafı — yenisi yüklenince eskisinin üstüne
+# yazılıyordu. İkinci el bir cihazın durumunu (çizik, ekran, arka kapak)
+# göstermek için tek fotoğraf yetersiz kalıyordu; Tamir/Yedek Telefon'daki
+# çoklu-fotoğraf deseni (ayrı tablo) buraya da taşındı — bunlar gorsel_url'i
+# DEĞİŞTİRMEZ, ona ek olarak eklenir.
+
+@router.get("/{cihaz_id}/fotograflar")
+async def cihaz_fotolar(
+    cihaz_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch(
+        "SELECT id, foto, aciklama, created_at FROM ikinci_el_fotograflari WHERE cihaz_id = $1 AND dukkan_id = $2 ORDER BY created_at",
+        cihaz_id, dukkan_id,
+    )
+    return [dict(r) for r in rows]
+
+
+@router.post("/{cihaz_id}/fotograflar")
+async def cihaz_foto_ekle(
+    cihaz_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    foto = body.get("foto", "")
+    if not foto:
+        raise HTTPException(400, "Fotoğraf verisi gerekli")
+    try:
+        foto_path = save_photo(foto, "ikincielfoto", cihaz_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await db.execute(
+        "INSERT INTO ikinci_el_fotograflari (dukkan_id, cihaz_id, foto, aciklama) VALUES ($1, $2, $3, $4)",
+        dukkan_id, cihaz_id, foto_path, body.get("aciklama"),
+    )
+    return {"ok": True}
+
+
+@router.delete("/{cihaz_id}/fotograflar/{foto_id}")
+async def cihaz_foto_sil(
+    cihaz_id: int,
+    foto_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    row = await db.fetchrow(
+        "SELECT foto FROM ikinci_el_fotograflari WHERE id = $1 AND cihaz_id = $2 AND dukkan_id = $3",
+        foto_id, cihaz_id, dukkan_id,
+    )
+    await db.execute(
+        "DELETE FROM ikinci_el_fotograflari WHERE id = $1 AND cihaz_id = $2 AND dukkan_id = $3",
+        foto_id, cihaz_id, dukkan_id,
+    )
+    if row:
+        delete_photo(row["foto"])
+    return {"ok": True}

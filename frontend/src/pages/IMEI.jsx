@@ -199,6 +199,22 @@ export default function IMEI() {
               ))}
             </>
           )}
+
+          {result.sifir_cihaz?.length > 0 && (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 14, margin: "12px 0 6px", display: "flex", alignItems: "center", gap: 7 }}>
+                <Smartphone size={14} strokeWidth={2} /> Sıfır Cihaz Geçmişi
+              </div>
+              {result.sifir_cihaz.map((s, i) => (
+                <div key={i} className="card">
+                  <div className="card-row">
+                    <span style={{ fontWeight: 600 }}>{s.model}</span>
+                    <span className={`badge ${s.durum === "stokta" ? "badge-tamirde" : "badge-teslim"}`}>{s.durum}</span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </>
       )}
 

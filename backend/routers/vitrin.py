@@ -374,9 +374,34 @@ async def takas_teklifi_guncelle(
     if durum not in ("yeni", "teklif_verildi", "kabul_edildi", "reddedildi"):
         raise HTTPException(400, "Geçersiz durum")
     teklif_tutari = body.get("teklif_tutari")
+
+    mevcut = await db.fetchrow(
+        "SELECT durum, musteri_adi, telefon, cihaz_model, aciklama, foto_url, teklif_tutari FROM takas_teklifleri WHERE id = $1 AND dukkan_id = $2",
+        id, dukkan_id,
+    )
+    if not mevcut:
+        raise HTTPException(404, "Teklif bulunamadı")
+
+    # Kabul edilince müşterinin zaten girdiği model/açıklama/fotoğraf/teklif
+    # tutarı BOŞA GİTMESİN diye 2.El stoğuna otomatik eklenir — daha önce
+    # dükkan sahibi aynı bilgileri elle IkinciEl.jsx'e tekrar giriyordu.
+    # Yalnızca durum İLK KEZ "kabul_edildi"ye geçerken eklenir (tekrar
+    # kaydedilirse ikinci bir kayıt oluşmasın diye).
+    yeni_tutar = float(teklif_tutari) if teklif_tutari else mevcut["teklif_tutari"]
+    if durum == "kabul_edildi" and mevcut["durum"] != "kabul_edildi":
+        if not yeni_tutar:
+            raise HTTPException(400, "Kabul etmeden önce bir teklif tutarı girilmeli")
+        await db.execute(
+            """INSERT INTO ikinci_el (dukkan_id, model, kimden, kimden_telefon, alis_fiyati,
+               notlar, durum, kaynak, gorsel_url)
+               VALUES ($1, $2, $3, $4, $5, $6, 'stokta', 'takas', $7)""",
+            dukkan_id, mevcut["cihaz_model"], mevcut["musteri_adi"], mevcut["telefon"],
+            yeni_tutar, mevcut["aciklama"], mevcut["foto_url"],
+        )
+
     result = await db.execute(
         "UPDATE takas_teklifleri SET durum = $1, teklif_tutari = $2 WHERE id = $3 AND dukkan_id = $4",
-        durum, float(teklif_tutari) if teklif_tutari else None, id, dukkan_id,
+        durum, yeni_tutar, id, dukkan_id,
     )
     if result == "UPDATE 0":
         raise HTTPException(404, "Teklif bulunamadı")

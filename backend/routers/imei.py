@@ -121,6 +121,12 @@ async def query_imei(
     )
     second_hand = [dict(r) for r in sh_rows]
 
+    sifir_rows = await db.fetch(
+        "SELECT model, durum, alis_fiyati, satis_fiyati, created_at FROM sifir_cihazlar WHERE imei = $1 AND dukkan_id = $2 ORDER BY created_at DESC",
+        imei, dukkan_id,
+    )
+    sifir_cihaz = [dict(r) for r in sifir_rows]
+
     api_result = None
     if IMEI_API_KEY:
         try:
@@ -148,6 +154,7 @@ async def query_imei(
         "valid": True,
         "local_repairs": local_records,
         "second_hand": second_hand,
+        "sifir_cihaz": sifir_cihaz,
         "api_info": api_result,
         "tac": imei[:8],
     }

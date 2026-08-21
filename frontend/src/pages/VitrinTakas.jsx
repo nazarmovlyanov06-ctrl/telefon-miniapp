@@ -16,6 +16,8 @@ export default function VitrinTakas() {
   const [loading, setLoading] = useState(true);
   const [teklifTutari, setTeklifTutari] = useState({});
   const [foto, setFoto] = useState(null);
+  const [err, setErr] = useState("");
+  const [eklenenId, setEklenenId] = useState(null);
   const [highlightId, setHighlightId] = useState(() => {
     const h = new URLSearchParams(window.location.search).get("highlight");
     return h ? parseInt(h) : null;
@@ -36,8 +38,15 @@ export default function VitrinTakas() {
   }, [list, highlightId]);
 
   async function guncelle(id, durum) {
-    await api.vitrinTakasTeklifiGuncelle(id, durum, teklifTutari[id]);
-    load();
+    setErr("");
+    try {
+      await api.vitrinTakasTeklifiGuncelle(id, durum, teklifTutari[id]);
+      if (durum === "kabul_edildi") {
+        setEklenenId(id);
+        setTimeout(() => setEklenenId(null), 4000);
+      }
+      load();
+    } catch (e) { setErr(e.message); }
   }
 
   return (
@@ -48,6 +57,8 @@ export default function VitrinTakas() {
           <Repeat size={19} strokeWidth={2} /> Takas Teklifleri
         </div>
       </div>
+
+      {err && <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 10, fontWeight: 600 }}>{err}</div>}
 
       {foto && (
         <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -89,6 +100,11 @@ export default function VitrinTakas() {
               </div>
               <span className="badge" style={{ background: `${meta.color}22`, color: meta.color, flexShrink: 0 }}>{meta.label}</span>
             </div>
+            {eklenenId === t.id && (
+              <div style={{ fontSize: 12.5, color: "var(--success)", fontWeight: 600, marginTop: 8 }}>
+                ✓ 2.El Cihaz stoğuna otomatik eklendi
+              </div>
+            )}
             {(t.durum === "yeni" || t.durum === "teklif_verildi") && (
               <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
                 <input className="form-input" type="number" placeholder="Teklif (₺)" style={{ width: 110 }}

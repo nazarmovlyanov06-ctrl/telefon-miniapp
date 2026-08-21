@@ -591,6 +591,15 @@ CREATE TABLE IF NOT EXISTS tamir_sablonlar (
     created_at TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS ikinci_el_fotograflari (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    cihaz_id INTEGER REFERENCES ikinci_el(id) ON DELETE CASCADE,
+    foto TEXT NOT NULL,
+    aciklama TEXT,
+    created_at TIMESTAMP DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS tamir_fotograflari (
     id SERIAL PRIMARY KEY,
     dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,

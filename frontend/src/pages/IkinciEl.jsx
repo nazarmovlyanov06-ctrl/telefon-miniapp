@@ -26,6 +26,28 @@ function cihazToItem(c) {
   };
 }
 
+// IMEI geçmişi eskiden sadece ikinci_el içinde aranıyordu — aynı IMEI'nin
+// Sıfır Cihaz veya Tamir'de de kaydı varsa (ör. iade/çalıntı bir cihazın
+// başka bir modülden tekrar satılmaya çalışılması) hiç görünmüyordu.
+function DigerEslesmeler({ diger }) {
+  if (!diger || (diger.sifir_cihaz.length === 0 && diger.tamir.length === 0)) return null;
+  return (
+    <div style={{ background: "rgba(246,162,74,0.1)", border: "1px solid rgba(246,162,74,0.3)", borderRadius: 10, padding: "10px 12px", marginBottom: 14 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--orange)", marginBottom: 4 }}>Diğer modüllerde de bulundu</div>
+      {diger.sifir_cihaz.map(s => (
+        <div key={"sifir" + s.id} style={{ fontSize: 12, color: "var(--text)" }}>
+          Sıfır Cihaz: {s.model} · {s.durum === "satildi" ? "Satıldı" : "Stokta"} · {(s.created_at || "").slice(0, 10)}
+        </div>
+      ))}
+      {diger.tamir.map((t, i) => (
+        <div key={"tamir" + i} style={{ fontSize: 12, color: "var(--text)" }}>
+          Tamir: #{t.repair_no} · {t.device_model} · {(t.created_at || "").slice(0, 10)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function IkinciEl({ user }) {
   const navigate = useNavigate();
   const [priceHidden, setPriceHidden] = useState(() => localStorage.getItem("priceHidden") === "1");
@@ -82,6 +104,7 @@ export default function IkinciEl({ user }) {
   const [imeiLoading, setImeiLoading] = useState(false);
   const [imeiModal, setImeiModal] = useState(null); // { imei, model }
   const [imeiModalData, setImeiModalData] = useState([]);
+  const [imeiModalDiger, setImeiModalDiger] = useState({ sifir_cihaz: [], tamir: [] });
   const [imeiModalLoading, setImeiModalLoading] = useState(false);
 
   useEffect(() => {
@@ -183,9 +206,11 @@ export default function IkinciEl({ user }) {
     setImeiModal({ imei, model });
     setImeiModalLoading(true);
     setImeiModalData([]);
+    setImeiModalDiger({ sifir_cihaz: [], tamir: [] });
     try {
       const data = await api.ikinciElIMEITam(imei);
-      setImeiModalData(data);
+      setImeiModalData(data.ikinci_el || []);
+      setImeiModalDiger({ sifir_cihaz: data.sifir_cihaz || [], tamir: data.tamir || [] });
     } catch { setImeiModalData([]); }
     finally { setImeiModalLoading(false); }
   }
@@ -193,9 +218,11 @@ export default function IkinciEl({ user }) {
   async function searchIMEI() {
     if (imeiSon4.length < 4) return;
     setImeiLoading(true); setImeiGecmis(null);
+    setImeiModalDiger({ sifir_cihaz: [], tamir: [] });
     try {
       const data = await api.ikinciElIMEI(imeiSon4);
-      setImeiGecmis(data);
+      setImeiGecmis(data.ikinci_el || []);
+      setImeiModalDiger({ sifir_cihaz: data.sifir_cihaz || [], tamir: data.tamir || [] });
     } catch { setImeiGecmis([]); }
     finally { setImeiLoading(false); }
   }
@@ -660,6 +687,8 @@ export default function IkinciEl({ user }) {
               <button className="btn btn-ghost btn-sm" onClick={() => setImeiModal(null)}><X size={15} strokeWidth={2} /></button>
             </div>
 
+            <DigerEslesmeler diger={imeiModalDiger} />
+
             {imeiModalLoading ? (
               <div style={{ textAlign: "center", padding: 20, color: "var(--hint)" }}>Yükleniyor...</div>
             ) : imeiModalData.length === 0 ? (
@@ -774,6 +803,7 @@ export default function IkinciEl({ user }) {
               {imeiLoading ? "..." : "Ara"}
             </button>
           </div>
+          {imeiGecmis !== null && <DigerEslesmeler diger={imeiModalDiger} />}
           {imeiGecmis === null ? (
             <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center" }}>IMEI son 4 hanesini girin</div>
           ) : imeiGecmis.length === 0 ? (

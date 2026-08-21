@@ -271,6 +271,46 @@ export default function Stats() {
         </>
       )}
 
+      {/* En çok satan 2.El modeller + toplam kâr + ortalama satış süresi —
+          önceden 2.El için sadece stok adedi görünüyordu */}
+      {data.ikinciel_top?.length > 0 && (
+        <>
+          <div className="section-title">En Çok Satan 2.El Modeller</div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="card-row">
+              <span style={{ color: "var(--hint)" }}>Toplam 2.El Kârı</span>
+              <span style={{ fontWeight: 700, color: "var(--success)" }}>₺{Math.round(data.ikinciel_kar_toplam || 0).toLocaleString("tr-TR")}</span>
+            </div>
+            {data.ikinciel_ort_satis_gun != null && (
+              <div className="card-row">
+                <span style={{ color: "var(--hint)" }}>Ortalama Satış Süresi</span>
+                <span style={{ fontWeight: 700 }}>{Math.round(data.ikinciel_ort_satis_gun)} gün</span>
+              </div>
+            )}
+          </div>
+          <div className="card">
+            {data.ikinciel_top.map((m, i) => (
+              <div key={i} style={{ marginBottom: i < data.ikinciel_top.length - 1 ? 12 : 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 13 }}>
+                  <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Smartphone size={12} stroke="var(--green)" strokeWidth={2} /> {m.model}
+                  </span>
+                  <span style={{ color: "var(--hint)", fontWeight: 700, flexShrink: 0 }}>{m.adet} adet · ₺{Math.round(m.ciro).toLocaleString("tr-TR")}</span>
+                </div>
+                <div style={{ height: 6, background: "var(--bg2)", borderRadius: 4 }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${(m.ciro / data.ikinciel_top[0].ciro) * 100}%`,
+                    background: "var(--green)",
+                    borderRadius: 4,
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       {/* En çok harcayan müşteriler */}
       {data.musteri_top.length > 0 && (
         <>

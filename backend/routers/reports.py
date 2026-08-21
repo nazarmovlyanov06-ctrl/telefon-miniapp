@@ -283,6 +283,37 @@ async def genel_stats(
         dukkan_id,
     ) or 0
 
+    # 2.El için Aksesuar'daki gibi hiçbir analiz yoktu — sadece stok adedi
+    # görünüyordu. En çok satan modeller + kâr + ortalama satış süresi
+    # (alım-satım arası kaç gün geçtiği, "durgun stok" farkındalığı için).
+    ikinciel_top_rows = await db.fetch(
+        """SELECT model, COUNT(*) as adet, SUM(satis_fiyati) as ciro,
+                  SUM(alis_fiyati) as alis_toplam,
+                  SUM(COALESCE((SELECT SUM(m.tutar) FROM ikinci_el_masraflar m WHERE m.cihaz_id=c.id), 0)) as masraf_toplam
+           FROM ikinci_el c
+           WHERE c.dukkan_id=$1 AND c.durum='satildi'
+           GROUP BY model
+           ORDER BY ciro DESC LIMIT 8""",
+        dukkan_id,
+    )
+    ikinciel_top = [
+        {"model": r["model"], "adet": r["adet"], "ciro": float(r["ciro"] or 0),
+         "kar": float((r["ciro"] or 0) - (r["alis_toplam"] or 0) - (r["masraf_toplam"] or 0))}
+        for r in ikinciel_top_rows
+    ]
+    ikinciel_kar_toplam = await db.fetchval(
+        """SELECT COALESCE(SUM(c.satis_fiyati - c.alis_fiyati -
+                  COALESCE((SELECT SUM(m.tutar) FROM ikinci_el_masraflar m WHERE m.cihaz_id=c.id), 0)), 0)
+           FROM ikinci_el c WHERE c.dukkan_id=$1 AND c.durum='satildi'""",
+        dukkan_id,
+    ) or 0
+    ikinciel_ort_satis_gun = await db.fetchval(
+        """SELECT AVG(satis_tarihi::date - created_at::date)
+           FROM ikinci_el WHERE dukkan_id=$1 AND durum='satildi'
+                 AND satis_tarihi IS NOT NULL AND satis_tarihi != ''""",
+        dukkan_id,
+    )
+
     async def scalar(sql, *params):
         return await db.fetchval(sql, *params) or 0
 
@@ -295,6 +326,9 @@ async def genel_stats(
         "toptanci_red": toptanci_red,
         "aksesuar_top": aksesuar_top,
         "aksesuar_kar_toplam": aksesuar_kar_toplam,
+        "ikinciel_top": ikinciel_top,
+        "ikinciel_kar_toplam": ikinciel_kar_toplam,
+        "ikinciel_ort_satis_gun": float(ikinciel_ort_satis_gun) if ikinciel_ort_satis_gun is not None else None,
         "sayilar": {
             "musteri": await scalar("SELECT COUNT(*) FROM customers WHERE dukkan_id=$1", dukkan_id),
             "tamir_toplam": await scalar("SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1", dukkan_id),
