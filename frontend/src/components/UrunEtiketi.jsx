@@ -9,15 +9,15 @@ export function barkotDegeri(item) {
   return item.barkot || `AKS${String(item.id).padStart(6, "0")}`;
 }
 
-export function BarkotSVG({ value }) {
+export function BarkotSVG({ value, yukseklik = 34, fontSize = 10 }) {
   const ref = useRef(null);
   useEffect(() => {
     if (!ref.current || !value) return;
     try {
-      JsBarcode(ref.current, value, { format: "CODE128", width: 1.6, height: 42, fontSize: 12, margin: 4 });
+      JsBarcode(ref.current, value, { format: "CODE128", width: 1.4, height: yukseklik, fontSize, margin: 2 });
     } catch { /* barkot kütüphanesinin desteklemediği bir karakter varsa boş bırak */ }
-  }, [value]);
-  return <svg ref={ref} />;
+  }, [value, yukseklik, fontSize]);
+  return <svg ref={ref} style={{ maxWidth: "100%" }} />;
 }
 
 export const ETIKET_AYAR_VARSAYILAN = {
@@ -68,6 +68,10 @@ export function EtiketIcerik({ item, ayarlar = ETIKET_AYAR_VARSAYILAN, duzenlene
   // serbestçe taşınabildiği için bu tam bir metin sarma değil, makul bir
   // varsayılan boşluk.
   const ustBosluk = logoGoster ? Math.min((logoYPct / 100) * yukseklikMm + logoYukseklikMm / 2, yukseklikMm * 0.6) : 0;
+  // Barkod, metin bloğuyla birlikte kutunun sabit yüksekliğine (çerçeveye) taşmadan
+  // sığsın diye etiket boyutuna göre ölçeklenir — küçük etiketlerde otomatik küçülür.
+  const barkotYukseklik = Math.max(18, Math.min(34, yukseklikMm * 1.15 - (kategoriGoster && item.kategori ? 6 : 0)));
+  const barkotFontSize = barkotYukseklik < 26 ? 8 : 10;
 
   function pxMmOrani() {
     const rect = kutuRef.current.getBoundingClientRect();
@@ -115,9 +119,10 @@ export function EtiketIcerik({ item, ayarlar = ETIKET_AYAR_VARSAYILAN, duzenlene
   return (
     <div className="etiket-tek">
       <div ref={kutuRef} style={{
-        position: "relative", background: "#fff", color: "#000", borderRadius: 10, padding: 10,
+        position: "relative", background: "#fff", color: "#000", borderRadius: 6, padding: "5px 8px",
         boxSizing: "border-box", textAlign: "center", overflow: duzenlenebilir ? "visible" : "hidden",
         border: cerceveGoster ? "1.5px solid #333" : "none",
+        display: "flex", flexDirection: "column", justifyContent: "center",
         width: `${genislikMm}mm`, height: `${yukseklikMm}mm`,
       }}>
         {logoGoster && (
@@ -159,14 +164,14 @@ export function EtiketIcerik({ item, ayarlar = ETIKET_AYAR_VARSAYILAN, duzenlene
             )}
           </div>
         )}
-        <div style={{ paddingTop: ustBosluk ? `${ustBosluk}mm` : 0 }}>
+        <div style={{ paddingTop: ustBosluk ? `${ustBosluk}mm` : 0, minHeight: 0 }}>
           {kategoriGoster && item.kategori && (
-            <div style={{ fontSize: 9, color: "#666", textTransform: "uppercase", letterSpacing: 0.3 }}>{item.kategori}</div>
+            <div style={{ fontSize: 8, color: "#666", textTransform: "uppercase", letterSpacing: 0.3, lineHeight: 1.2 }}>{item.kategori}</div>
           )}
-          <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 2, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.ad}</div>
-          {ayiriciGoster && <div style={{ borderTop: "1px solid #ccc", margin: "4px 6px" }} />}
-          <div style={{ fontWeight: 800, fontSize: 16, marginTop: ayiriciGoster ? 4 : 0, marginBottom: 5 }}>{item.satis_fiyati}₺</div>
-          <BarkotSVG value={kod} />
+          <div style={{ fontWeight: 700, fontSize: 11.5, marginBottom: 1, lineHeight: 1.2, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.ad}</div>
+          {ayiriciGoster && <div style={{ borderTop: "1px solid #ccc", margin: "3px 8px" }} />}
+          <div style={{ fontWeight: 800, fontSize: 14.5, lineHeight: 1.2, marginTop: ayiriciGoster ? 2 : 0, marginBottom: 2 }}>{item.satis_fiyati}₺</div>
+          <BarkotSVG value={kod} yukseklik={barkotYukseklik} fontSize={barkotFontSize} />
         </div>
       </div>
     </div>

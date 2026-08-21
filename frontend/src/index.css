@@ -523,7 +523,7 @@ body {
   .etiket-yazdirma-alani, .etiket-yazdirma-alani * { visibility: visible; }
   .etiket-yazdirma-alani { position: fixed; inset: 0; margin: 0; }
   .etiket-yazdirma-alani .etiket-tek {
-    width: 100%; height: 100%; box-sizing: border-box; padding: 6px;
+    width: 100%; height: 100%; box-sizing: border-box;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     page-break-after: always; break-after: page;
   }
