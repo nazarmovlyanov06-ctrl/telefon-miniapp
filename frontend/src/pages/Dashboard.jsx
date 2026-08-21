@@ -8,7 +8,7 @@ import {
   TriangleAlert, Plus, Wrench, X, ArrowRight, TrendingUp,
   ChevronDown, ChevronUp, Landmark, Target, Factory, Undo2, PhoneCall,
   Ban, MessageSquareWarning, Store, CalendarClock, Star, Repeat,
-  MessageCircle, Banknote, ScanLine, Users, SlidersHorizontal, Check, Bell,
+  MessageCircle, Banknote, ScanLine, Users, SlidersHorizontal, Check, Bell, Clock,
 } from "lucide-react";
 
 /* ── Kalıcı tarayıcı tercihleri ──────────────────────────────────────── */
@@ -68,7 +68,7 @@ function hizliErisimOku() {
 // stok) sırası — basılı tutup titretip sürükleyerek değiştirilebilir, cihazda
 // saklanır.
 const BLOK_ANAHTAR = "dashboard_blok_sirasi";
-const VARSAYILAN_BLOK_SIRASI = ["durum", "kasa", "kazanc", "borc", "garanti", "arama", "hizli", "bekleyenler", "stok"];
+const VARSAYILAN_BLOK_SIRASI = ["durum", "kasa", "kazanc", "borc", "garanti", "arama", "hizli", "bekleyenler", "stok", "durgun_2el"];
 function blokSirasiOku() {
   try {
     const v = JSON.parse(localStorage.getItem(BLOK_ANAHTAR));
@@ -440,6 +440,29 @@ function StokDetayModal({ liste, onClose }) {
   );
 }
 
+/* ── Durgun 2.El stok önizlemesi ────────────────────────────────────────── */
+
+function Durgun2ElDetayModal({ liste, onClose }) {
+  const navigate = useNavigate();
+  return (
+    <AltPencere onClose={onClose}>
+      <PencereBaslik onClose={onClose}>Durgun 2.El Stok</PencereBaslik>
+      <button className="btn btn-primary btn-sm" onClick={() => navigate("/ikinciel?sort=durgun")}
+        style={{ width: "100%", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        Tümünü Gör <ArrowRight size={13} strokeWidth={2.4} />
+      </button>
+      {liste.length === 0 ? (
+        <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Durgun stok yok</div>
+      ) : liste.map((s, i) => (
+        <div key={s.id} className="card-row" style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none" }}>
+          <span style={{ fontSize: 13 }}>{s.model}</span>
+          <span style={{ fontWeight: 700, color: "var(--red)" }}>{s.gun} gün</span>
+        </div>
+      ))}
+    </AltPencere>
+  );
+}
+
 /* ── Bugün Gelir/Gider ve Bu Ay Kazanç ─────────────────────────────────── */
 
 function KasaHareketModal({ tip, onClose }) {
@@ -623,6 +646,7 @@ export default function Dashboard({ user, bildirimSayisi = 0, onBildirimOkundu }
   const [aktifTamirAcik, setAktifTamirAcik] = useState(false);
   const [acikBorcAcik, setAcikBorcAcik] = useState(false);
   const [stokAcik, setStokAcik] = useState(false);
+  const [durgun2ElAcik, setDurgun2ElAcik] = useState(false);
   const [hizliErisim, setHizliErisim] = useState(hizliErisimOku);
   const [hizliDuzenleAcik, setHizliDuzenleAcik] = useState(false);
   const navigate = useNavigate();
@@ -800,6 +824,7 @@ export default function Dashboard({ user, bildirimSayisi = 0, onBildirimOkundu }
   const aranacaklar = data?.aranacaklar || [];
   const kasa = data?.kasa_bugun || {};
   const stokListe = uyarilar.stok || [];
+  const durgunListe = uyarilar.durgun_2el || [];
 
   const isim = user?.ad?.split(" ")[0] || "";
   const saat = new Date().getHours();
@@ -1002,6 +1027,19 @@ export default function Dashboard({ user, bildirimSayisi = 0, onBildirimOkundu }
           </div>
         );
 
+      case "durgun_2el":
+        if (durgunListe.length === 0) return null;
+        return (
+          <div className="card" onClick={() => !titriyor && setDurgun2ElAcik(true)} style={{ cursor: "pointer" }}>
+            <div className="card-row">
+              <span style={{ color: "var(--red)", fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                <Clock size={15} strokeWidth={2} /> Durgun 2.El Stok
+              </span>
+              <span style={{ fontWeight: 700, color: "var(--red)", fontSize: 13 }}>{durgunListe.length} cihaz →</span>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1091,6 +1129,7 @@ export default function Dashboard({ user, bildirimSayisi = 0, onBildirimOkundu }
       {acikKasaTip && <KasaHareketModal tip={acikKasaTip} onClose={() => setAcikKasaTip(null)} />}
       {kazancAcik && <BuAyKazancModal kaynaklar={bu_ay.kaynaklar || []} toplam={bu_ay.gelir || 0} onClose={() => setKazancAcik(false)} />}
       {stokAcik && <StokDetayModal liste={stokListe} onClose={() => setStokAcik(false)} />}
+      {durgun2ElAcik && <Durgun2ElDetayModal liste={durgunListe} onClose={() => setDurgun2ElAcik(false)} />}
       {aktifTamirAcik && <AktifTamirModal onClose={() => setAktifTamirAcik(false)} />}
       {acikBorcAcik && (
         <AcikBorcModal onClose={() => setAcikBorcAcik(false)}

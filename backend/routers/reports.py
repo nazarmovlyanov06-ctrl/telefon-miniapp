@@ -53,6 +53,17 @@ async def dashboard(
         dukkan_id,
     )]
 
+    # 2.El'de 60+ gündür stokta bekleyen cihazlar — sayfaya girip "Durgun
+    # Önce" sıralamasını seçmeden dükkan sahibi bunu Ana Sayfa'da görsün diye.
+    durgun_2el_uyari = [dict(r) for r in await db.fetch(
+        """SELECT id, model, alis_fiyati,
+                  (now()::date - created_at::date) as gun
+           FROM ikinci_el
+           WHERE dukkan_id=$1 AND durum='stokta' AND created_at <= now() - interval '60 days'
+           ORDER BY created_at ASC LIMIT 5""",
+        dukkan_id,
+    )]
+
     # Dashboard'daki satırlara tıklayınca ayrı bir istek atmadan detay penceresi
     # açılabilsin diye buradaki sorgular sadece uyarı satırı için değil, o
     # kaydın tam detayını göstermeye yetecek kolonları da döndürüyor.
@@ -140,7 +151,7 @@ async def dashboard(
             "tamir": bu_ay_tamir,
             "kaynaklar": bu_ay_kaynaklar if patron_mu else [],
         },
-        "uyarilar": {"stok": stok_uyari, "garanti": garanti_uyari, "borc": borc_uyari},
+        "uyarilar": {"stok": stok_uyari, "garanti": garanti_uyari, "borc": borc_uyari, "durgun_2el": durgun_2el_uyari},
         "aranacaklar": aranacaklar,
         "son_tamirler": son_tamirler,
         "bugun": {

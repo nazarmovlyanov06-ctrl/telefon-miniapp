@@ -118,11 +118,16 @@ export default function IkinciEl({ user }) {
   const [imeiSon4, setImeiSon4] = useState("");
   const [imeiGecmis, setImeiGecmis] = useState(null);
   const [imeiLoading, setImeiLoading] = useState(false);
+  const [satilanDetay, setSatilanDetay] = useState(null);
   const [imeiModal, setImeiModal] = useState(null); // { imei, model }
   const [imeiModalData, setImeiModalData] = useState([]);
   const [imeiModalDiger, setImeiModalDiger] = useState({ sifir_cihaz: [], tamir: [] });
   const [imeiModalLoading, setImeiModalLoading] = useState(false);
-  const [siralama, setSiralama] = useState("yeni");
+  const [arama, setArama] = useState("");
+  const [siralama, setSiralama] = useState(() => {
+    const s = new URLSearchParams(window.location.search).get("sort");
+    return SIRALAMA_SECENEKLERI.some(o => o.key === s) ? s : "yeni";
+  });
   const [showDuzenle, setShowDuzenle] = useState(false);
   const [duzenleForm, setDuzenleForm] = useState(null);
   const [fotolar, setFotolar] = useState([]);
@@ -299,7 +304,12 @@ export default function IkinciEl({ user }) {
 
   const filteredList = kaynak === "hepsi" ? list : list.filter(c => (c.kaynak || "dukkan") === kaynak);
   const filteredSatilanlar = kaynak === "hepsi" ? satilanlar : satilanlar.filter(c => (c.kaynak || "dukkan") === kaynak);
-  const sortedList = [...filteredList].sort((a, b) => {
+  const aramaLower = arama.trim().toLowerCase();
+  const aramaFiltrele = (c) => !aramaLower ||
+    (c.model || "").toLowerCase().includes(aramaLower) || (c.imei || "").includes(aramaLower);
+  const searchedList = filteredList.filter(aramaFiltrele);
+  const searchedSatilanlar = filteredSatilanlar.filter(aramaFiltrele);
+  const sortedList = [...searchedList].sort((a, b) => {
     const maliyet = (c) => (c.alis_fiyati || 0) + (c.toplam_masraf || 0);
     if (siralama === "eski") return new Date(a.created_at) - new Date(b.created_at);
     if (siralama === "fiyat_yuksek") return maliyet(b) - maliyet(a);
@@ -355,12 +365,16 @@ export default function IkinciEl({ user }) {
         ))}
       </div>
 
-      {tab === "stok" && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-          <select className="form-select" value={siralama} onChange={e => setSiralama(e.target.value)}
-            style={{ width: "auto", fontSize: 12, padding: "6px 10px" }}>
-            {SIRALAMA_SECENEKLERI.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
+      {(tab === "stok" || tab === "satilanlar") && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <input className="form-input" style={{ flex: 1 }} placeholder="Model veya IMEI ara..."
+            value={arama} onChange={e => setArama(e.target.value)} />
+          {tab === "stok" && (
+            <select className="form-select" value={siralama} onChange={e => setSiralama(e.target.value)}
+              style={{ width: "auto", fontSize: 12, padding: "6px 10px", flexShrink: 0 }}>
+              {SIRALAMA_SECENEKLERI.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+          )}
         </div>
       )}
 
@@ -498,6 +512,8 @@ export default function IkinciEl({ user }) {
 
           {filteredList.length === 0 ? (
             <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Stokta 2. el cihaz yok</div>
+          ) : sortedList.length === 0 ? (
+            <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Aramayla eşleşen cihaz yok</div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {sortedList.map(c => {
@@ -547,24 +563,70 @@ export default function IkinciEl({ user }) {
         <>
           {filteredSatilanlar.length === 0 ? (
             <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Henüz satılan cihaz yok</div>
-          ) : filteredSatilanlar.map(c => {
-            const satMasraflar = c.masraflar || [];
-            return (
-            <div key={c.id} className="card">
-              <div className="card-row" style={{ marginBottom: 6 }}>
+          ) : searchedSatilanlar.length === 0 ? (
+            <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Aramayla eşleşen cihaz yok</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {searchedSatilanlar.map(c => {
+                const kar = (c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0);
+                return (
+                  <div key={c.id} className="card" style={{ padding: 0, overflow: "hidden", cursor: "pointer", margin: 0 }}
+                    onClick={() => setSatilanDetay(c)}>
+                    <div style={{ position: "relative", aspectRatio: "1 / 1", background: c.gorsel_url ? `url(${fotoUrl(c.gorsel_url)}) center/cover` : "var(--bg2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {!c.gorsel_url && <Smartphone size={28} stroke="var(--hint)" strokeWidth={1.5} />}
+                      <span style={{
+                        position: "absolute", top: 6, right: 6, fontSize: 10, fontWeight: 700,
+                        padding: "2px 7px", borderRadius: 20, color: "#fff",
+                        background: kar >= 0 ? "rgba(74,222,128,0.9)" : "rgba(248,113,113,0.9)",
+                      }}>{kar >= 0 ? "+" : ""}{kar.toLocaleString("tr-TR")}₺</span>
+                    </div>
+                    <div style={{ padding: "8px 10px 10px" }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {c.model}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--hint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 1 }}>
+                        {c.musteri_adi || "—"}
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 13, marginTop: 5 }}>
+                        {priceHidden ? "••••" : (c.satis_fiyati || 0).toLocaleString("tr-TR") + " ₺"}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--hint)" }}>{c.satis_tarihi || "—"}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Satılan Cihaz Detay Modalı */}
+      {satilanDetay && (() => {
+        const c = satilanDetay;
+        const satMasraflar = c.masraflar || [];
+        const kar = (c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0);
+        return (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+          }} onClick={() => setSatilanDetay(null)}>
+            <div className="card" style={{ width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto" }}
+              onClick={e => e.stopPropagation()}>
+              <div className="card-row" style={{ marginBottom: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 7 }}>
                   <Smartphone size={16} strokeWidth={2} /> {c.model}
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 700, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)) >= 0 ? "var(--success)" : "var(--red)" }}>
-                    {priceHidden ? "••••" : (c.satis_fiyati || 0).toLocaleString("tr-TR") + " ₺"}
-                  </div>
-                  <div style={{ fontSize: 12, color: ((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)) >= 0 ? "var(--success)" : "var(--red)" }}>
-                    Kâr: {((c.satis_fiyati || 0) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺
-                  </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSatilanDetay(null)}><X size={15} strokeWidth={2} /></button>
+              </div>
+              <div className="card-row" style={{ marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 18 }}>
+                  {priceHidden ? "••••" : (c.satis_fiyati || 0).toLocaleString("tr-TR") + " ₺"}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: kar >= 0 ? "var(--success)" : "var(--red)" }}>
+                  {kar >= 0 ? "+" : ""}{kar.toLocaleString("tr-TR")} ₺ kâr
                 </div>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 6 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
                 {c.renk && <Chip>{c.renk}</Chip>}
                 {c.depolama && <Chip icon={HardDrive}>{c.depolama}</Chip>}
                 {c.ram && <Chip icon={Cpu}>{c.ram}</Chip>}
@@ -576,12 +638,11 @@ export default function IkinciEl({ user }) {
                 <span>{c.satis_tarihi || "—"}</span>
                 {c.imei && (
                   <span
-                    onClick={e => { e.stopPropagation(); openImeiModal(c.imei, c.model); }}
+                    onClick={() => { setSatilanDetay(null); openImeiModal(c.imei, c.model); }}
                     style={{ cursor: "pointer", color: "var(--primary)", fontWeight: 600, textDecoration: "underline", display: "flex", alignItems: "center", gap: 4 }}
                   ><History size={11} strokeWidth={2} /> IMEI Geçmişi</span>
                 )}
               </div>
-              {/* Masraflar */}
               {satMasraflar.length > 0 && (
                 <div style={{ borderTop: "1px solid var(--divider)", paddingTop: 8 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "var(--hint)", marginBottom: 5, display: "flex", alignItems: "center", gap: 5 }}>
@@ -603,9 +664,9 @@ export default function IkinciEl({ user }) {
                 </div>
               )}
             </div>
-          )})}
-        </>
-      )}
+          </div>
+        );
+      })()}
 
       {/* IMEI Geçmiş Modalı */}
       {imeiModal && (
