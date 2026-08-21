@@ -110,6 +110,7 @@ export default function SifirCihaz({ user }) {
       await api.createSifir({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
       setShowForm(false);
       setForm({ model: "", imei: "", renk: "", depolama: "", kimden: "", kimden_telefon: "", kaynak: "dukkan", alis_fiyati: "", alis_tarihi: today(), notlar: "", aksesuarlar: {} });
+      setKaraUyari([]);
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -269,10 +270,18 @@ export default function SifirCihaz({ user }) {
                 <div className="form-group">
                   <label className="form-label">Kimden (Telefon) *</label>
                   <input className="form-input" required inputMode="tel" value={form.kimden_telefon}
-                    onChange={e => setForm({ ...form, kimden_telefon: e.target.value })}
+                    onChange={e => { setForm({ ...form, kimden_telefon: e.target.value }); karaKontrolEt(e.target.value); }}
                     placeholder="0555..." />
                   {form.kimden && form.kimden_telefon && (
                     <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri listesine otomatik eklenecek</div>
+                  )}
+                  {karaUyari.length > 0 && (
+                    <div style={{ background: "rgba(239,68,68,0.12)", borderRadius: 8, padding: "8px 12px", marginTop: 8, borderLeft: "3px solid #ef4444" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", display: "flex", alignItems: "center", gap: 6 }}><Ban size={14} strokeWidth={2} /> Kara Listede!</div>
+                      {karaUyari.map(k => (
+                        <div key={k.id} style={{ fontSize: 12, color: "var(--text)", marginTop: 2 }}>{k.ad}{k.sebep ? ` — ${k.sebep}` : ""}</div>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div className="form-group">
