@@ -726,10 +726,13 @@ export default function IkinciEl({ user }) {
         );
       })()}
 
-      {/* IMEI Geçmiş Modalı */}
+      {/* IMEI Geçmiş Modalı — cihaz detay kartı açıkken IMEI'ye tıklanınca bu
+          modal onun ÜSTÜNDE açılmalı; ikisi de aynı z-index'te olsaydı DOM
+          sırasına göre detay kartı üstte kalıp bunu gizlerdi, o yüzden daha
+          yüksek bir z-index kullanılıyor. */}
       {imeiModal && (
         <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
+          position: "fixed", inset: 0, zIndex: 260,
           background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
         }} onClick={() => setImeiModal(null)}>
           <div onClick={e => e.stopPropagation()} style={{
@@ -965,10 +968,13 @@ export default function IkinciEl({ user }) {
                   </div>
                   <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", flexDirection: "column", gap: 3, marginBottom: 12 }}>
                     {c.imei && (
-                      <span onClick={() => openImeiModal(c.imei, c.model)}
-                        style={{ cursor: "pointer", color: "var(--primary)", fontWeight: 600, textDecoration: "underline", display: "flex", alignItems: "center", gap: 4, width: "fit-content" }}>
-                        <History size={11} strokeWidth={2} /> IMEI: {c.imei}
-                      </span>
+                      <>
+                        <span onClick={() => openImeiModal(c.imei, c.model)}
+                          style={{ cursor: "pointer", color: "var(--primary)", fontWeight: 600, textDecoration: "underline", display: "flex", alignItems: "center", gap: 4, width: "fit-content" }}>
+                          <History size={11} strokeWidth={2} /> IMEI: {c.imei}
+                        </span>
+                        <span style={{ fontSize: 10.5, color: "var(--dim)" }}>IMEI'ye dokunarak bu cihazın alım/satım geçmişini görebilirsiniz</span>
+                      </>
                     )}
                     {c.kimden && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><User size={11} strokeWidth={2} /> {c.kimden}{c.kimden_telefon ? ` · ${c.kimden_telefon}` : ""}</span>}
                     {c.alis_tarihi && <span>Alış: {c.alis_tarihi}</span>}
