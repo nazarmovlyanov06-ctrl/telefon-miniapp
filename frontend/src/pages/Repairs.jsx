@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../api";
-import { Wrench, Search, MessageCircle, Plus, ChevronUp, ChevronDown, Check } from "lucide-react";
+import { Wrench, Search, MessageCircle, Plus, ChevronUp, ChevronDown, Check, Printer, X } from "lucide-react";
+import TamirEtiketModal from "../components/TamirEtiketModal";
 
 const TABS = [
   { key: "", label: "Tümü" },
@@ -227,6 +228,9 @@ export default function Repairs({ user }) {
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState({ col: "created_at", dir: "desc" });
   const [durumSecim, setDurumSecim] = useState(null);
+  const [etiketModalRepairs, setEtiketModalRepairs] = useState(null);
+  const [topluSecimModal, setTopluSecimModal] = useState(false);
+  const [topluSecili, setTopluSecili] = useState(new Set());
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -280,12 +284,18 @@ export default function Repairs({ user }) {
   return (
     <div className="page">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div className="page-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: 9 }}>
+        <div className="page-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: 9, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
           <Wrench size={19} strokeWidth={2} /> Tamirler
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => navigate("/repairs/new")}>
-          <Plus size={14} strokeWidth={2.4} /> Yeni
-        </button>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          <button className="btn btn-ghost btn-sm" title="Toplu Etiket Yazdır"
+            onClick={() => { setTopluSecili(new Set()); setTopluSecimModal(true); }}>
+            <Printer size={14} strokeWidth={2.4} />
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => navigate("/repairs/new")}>
+            <Plus size={14} strokeWidth={2.4} /> Yeni
+          </button>
+        </div>
       </div>
 
       <div className="search-bar">
@@ -351,6 +361,12 @@ export default function Repairs({ user }) {
                         title="WhatsApp ile bildir"
                       ><MessageCircle size={12} strokeWidth={2.2} /> WA</button>
                     )}
+                    <button
+                      onClick={e => { e.stopPropagation(); setEtiketModalRepairs([r]); }}
+                      className="btn btn-ghost btn-sm" style={{ padding: "4px 8px" }}
+                      title="Etiket Yazdır">
+                      <Printer size={12} strokeWidth={2.2} />
+                    </button>
                   </div>
                 </div>
               );
@@ -398,6 +414,12 @@ export default function Repairs({ user }) {
                             title="WhatsApp ile bildir"
                           ><MessageCircle size={12} strokeWidth={2.2} /> WA</button>
                         )}
+                        <button
+                          onClick={e => { e.stopPropagation(); setEtiketModalRepairs([r]); }}
+                          className="btn btn-ghost btn-sm" style={{ padding: "4px 8px", marginLeft: 6 }}
+                          title="Etiket Yazdır">
+                          <Printer size={12} strokeWidth={2.2} />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -410,6 +432,53 @@ export default function Repairs({ user }) {
 
       {durumSecim && (
         <DurumSecPencere repair={durumSecim} onClose={() => setDurumSecim(null)} onDegisti={durumDegisti} />
+      )}
+
+      {topluSecimModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setTopluSecimModal(false)}>
+          <div className="card" style={{ width: "100%", maxWidth: 420, maxHeight: "80vh", display: "flex", flexDirection: "column" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>Toplu Etiket Yazdır ({topluSecili.size})</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setTopluSecimModal(false)}><X size={16} strokeWidth={2} /></button>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 8 }}>Etiketi basılacak tamirleri seç.</div>
+            <div style={{ overflowY: "auto", flex: 1, marginBottom: 12 }}>
+              {sortedRepairs.map(r => {
+                const secili = topluSecili.has(r.id);
+                return (
+                  <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: "1px solid var(--divider)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={secili} style={{ width: 16, height: 16, flexShrink: 0 }}
+                      onChange={() => setTopluSecili(s => {
+                        const yeni = new Set(s);
+                        if (secili) yeni.delete(r.id); else yeni.add(r.id);
+                        return yeni;
+                      })} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.customer_name || "—"} · {r.device_model}</div>
+                      <div style={{ fontSize: 11, color: "var(--hint)" }}>#{r.repair_no}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" disabled={topluSecili.size === 0} style={{ flex: 1 }}
+                onClick={() => {
+                  setEtiketModalRepairs(sortedRepairs.filter(r => topluSecili.has(r.id)));
+                  setTopluSecimModal(false);
+                }}>
+                {topluSecili.size} Etiket Yazdır
+              </button>
+              <button className="btn btn-ghost" onClick={() => setTopluSecimModal(false)}>Kapat</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {etiketModalRepairs && (
+        <TamirEtiketModal repairs={etiketModalRepairs} onClose={() => setEtiketModalRepairs(null)} />
       )}
     </div>
   );

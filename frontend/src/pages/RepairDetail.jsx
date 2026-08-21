@@ -3,8 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { api, fotoUrl } from "../api";
 import { PatternPreview } from "../components/PatternLock";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
-import { TamirEtiketi } from "../components/TamirEtiketi";
-import { etiketSayfaBoyutuAyarla } from "../components/UrunEtiketi";
+import TamirEtiketModal from "../components/TamirEtiketModal";
 import {
   Pencil, Home, CheckCircle2, Receipt, Copy, Check, MessageCircle,
   Trash2, Lock, Eye, EyeOff, Calendar, ClipboardList,
@@ -183,7 +182,6 @@ export default function RepairDetail({ user }) {
 
   // Tamir stikeri (barkotlu, teknisyene vermeden önce cihaza yapıştırılır)
   const [etiketModal, setEtiketModal] = useState(false);
-  const [etiketAyarlari, setEtiketAyarlari] = useState(null);
 
   // Ekran kilidi göster/gizle
   const [showLock, setShowLock] = useState(false);
@@ -847,32 +845,7 @@ export default function RepairDetail({ user }) {
       )}
 
       {/* Tamir stikeri yazdırma modalı */}
-      {etiketModal && etiketAyarlari && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-          onClick={() => setEtiketModal(false)}>
-          <div className="card" style={{ width: "100%", maxWidth: 380, textAlign: "center" }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <Printer size={16} strokeWidth={2} /> Tamir Stikeri
-            </div>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-              <div className="etiket-yazdirma-alani">
-                <TamirEtiketi repair={repair} ayarlar={etiketAyarlari} />
-              </div>
-            </div>
-            <div style={{ fontSize: 11.5, color: "var(--hint)", marginBottom: 12 }}>
-              "Yazdır"a basınca tarayıcının yazdırma penceresi açılır — orada yazıcınızı seçebilirsiniz. Stiker boyutu/logosu Ayarlar → Etiket Ayarları'ndan değiştirilebilir.
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn btn-primary" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                onClick={() => { etiketSayfaBoyutuAyarla({ etiket_genislik_mm: etiketAyarlari.etiket_tamir_genislik_mm, etiket_yukseklik_mm: etiketAyarlari.etiket_tamir_yukseklik_mm }); window.print(); }}>
-                <Printer size={14} strokeWidth={2} /> Yazdır
-              </button>
-              <button className="btn btn-ghost" onClick={() => setEtiketModal(false)}>Kapat</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {etiketModal && <TamirEtiketModal repairs={[repair]} onClose={() => setEtiketModal(false)} />}
 
       {/* Fotoğraf büyük görünüm */}
       {fotoView && (
@@ -1267,14 +1240,7 @@ export default function RepairDetail({ user }) {
                 <QrCode size={13} strokeWidth={2} /> Dijital Fiş / QR
               </button>
             )}
-            <button className="btn btn-ghost btn-sm"
-              onClick={async () => {
-                if (!etiketAyarlari) {
-                  try { setEtiketAyarlari(await api.etiketAyarlari()); } catch { setEtiketAyarlari({}); }
-                }
-                setEtiketModal(true);
-              }}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setEtiketModal(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <Printer size={13} strokeWidth={2} /> Etiket Yazdır
             </button>
           </div>
