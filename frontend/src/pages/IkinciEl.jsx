@@ -342,26 +342,27 @@ export default function IkinciEl({ user }) {
       )}
 
       {/* Kaynak filtresi */}
-      <div className="card-row" style={{ marginBottom: 8, gap: 8 }}>
-        <div className="tabs" style={{ flex: 1, margin: 0 }}>
-          {[
-            { key: "hepsi", label: "Hepsi", icon: null },
-            { key: "dukkan", label: "Dükkan", icon: Store },
-            { key: "getmobile", label: "Getmobil", icon: Package },
-          ].map(k => (
-            <button key={k.key} className={`tab ${kaynak === k.key ? "active" : ""}`}
-              onClick={() => setKaynak(k.key)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {k.icon && <k.icon size={13} strokeWidth={2} />}{k.label}
-            </button>
-          ))}
-        </div>
-        {tab === "stok" && (
+      <div className="tabs" style={{ marginBottom: tab === "stok" ? 4 : 8 }}>
+        {[
+          { key: "hepsi", label: "Hepsi", icon: null },
+          { key: "dukkan", label: "Dükkan", icon: Store },
+          { key: "getmobile", label: "Getmobil", icon: Package },
+        ].map(k => (
+          <button key={k.key} className={`tab ${kaynak === k.key ? "active" : ""}`}
+            onClick={() => setKaynak(k.key)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {k.icon && <k.icon size={13} strokeWidth={2} />}{k.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "stok" && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
           <select className="form-select" value={siralama} onChange={e => setSiralama(e.target.value)}
-            style={{ width: "auto", fontSize: 12, padding: "6px 8px", flexShrink: 0 }}>
+            style={{ width: "auto", fontSize: 12, padding: "6px 10px" }}>
             {SIRALAMA_SECENEKLERI.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="tabs" style={{ marginBottom: 12 }}>
         <button className={`tab ${tab === "stok" ? "active" : ""}`} onClick={() => setTab("stok")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
