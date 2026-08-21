@@ -184,6 +184,8 @@ async def update_cihaz(
     silip yeniden girmek gerekiyordu, bu da masraf geçmişini ve satış
     bağlantısını kaybettiriyordu. Not: satış/durum bilgisi kasıtlı olarak
     burada değiştirilmiyor — o akış hâlâ /sat üzerinden yürüyor."""
+    if not body.get("model") or body.get("alis_fiyati") is None:
+        raise HTTPException(400, "Model ve alış fiyatı zorunlu")
     result = await db.execute(
         """UPDATE ikinci_el SET model=$1, imei=$2, renk=$3, depolama=$4, ram=$5,
            ozellikler=$6, kimden=$7, kimden_telefon=$8, alis_fiyati=$9, notlar=$10
