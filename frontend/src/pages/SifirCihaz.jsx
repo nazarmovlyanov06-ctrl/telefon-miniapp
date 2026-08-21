@@ -12,13 +12,15 @@ import UrunEtiketModal from "../components/UrunEtiketModal";
 
 const AKSESUAR_ETIKETLERI = { kutu: "Kutu", sarj_aleti: "Şarj Aleti", kilif: "Kılıf", kulaklik: "Kulaklık" };
 
-// Bkz. IkinciEl.jsx'teki cihazToItem — aynı mantık: fiyat sadece satıldığında
-// belli olur, barkot olarak IMEI kullanılır.
+// Bkz. IkinciEl.jsx'teki cihazToItem — aynı mantık: fiyat etikette hiç
+// gösterilmiyor, barkot olarak IMEI kullanılır. Fiyatın durduğu yerde
+// fatura türü (MF/AF) gösteriliyor.
 function cihazToItem(c) {
   return {
-    id: c.id, ad: c.model, satis_fiyati: c.satis_fiyati || null,
+    id: c.id, ad: c.model, satis_fiyati: null,
     kategori: [c.renk, c.depolama].filter(Boolean).join(" · ") || null,
     barkot: c.imei || null,
+    ekstra: c.fatura_turu || null,
   };
 }
 

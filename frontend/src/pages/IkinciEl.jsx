@@ -29,16 +29,18 @@ const SIRALAMA_SECENEKLERI = [
   { key: "durgun", label: "Durgun Önce" },
 ];
 
-// Etiket bileşeni {id, ad, satis_fiyati, kategori, barkot} bekliyor — 2.El
-// cihazın kendi alan adlarını buna çevirir. Fiyat sadece SATILDIĞINDA
-// belli olduğu için stoktaki cihazlarda satis_fiyati boş kalabilir —
-// EtiketIcerik bu durumda fiyat satırını atlar. Barkot olarak IMEI
-// kullanılır (zaten benzersiz), yoksa id'den türetilir.
+// Etiket bileşeni {id, ad, satis_fiyati, kategori, barkot, ekstra} bekliyor —
+// 2.El cihazın kendi alan adlarını buna çevirir. Fiyat 2.El etiketinde hiç
+// gösterilmiyor (satis_fiyati kasıtlı olarak hep null) — müşteriye elden
+// gösterilen bir etiket, alış/satış fiyatı içermemeli. Onun yerine, fiyatın
+// durduğu yerde garanti durumu ("Garantili") gösteriliyor. Barkot olarak
+// IMEI kullanılır (zaten benzersiz), yoksa id'den türetilir.
 function cihazToItem(c) {
   return {
-    id: c.id, ad: c.model, satis_fiyati: c.satis_fiyati || null,
-    kategori: [c.renk, c.depolama].filter(Boolean).join(" · ") || null,
+    id: c.id, ad: c.model, satis_fiyati: null,
+    kategori: [c.renk, c.depolama, c.ram].filter(Boolean).join(" · ") || null,
     barkot: c.imei || null,
+    ekstra: c.garanti_var ? "Garantili" : null,
   };
 }
 

@@ -43,7 +43,7 @@ export const ETIKET_AYAR_VARSAYILAN = {
   etiket_metin_x_pct: 50, etiket_metin_y_pct: 42,
   etiket_metin_genislik_mm: 34, etiket_metin_yukseklik_mm: 13,
   etiket_barkot_x_pct: 50, etiket_barkot_y_pct: 80,
-  etiket_barkot_genislik_mm: 34, etiket_barkot_yukseklik_mm: 10,
+  etiket_barkot_genislik_mm: 28, etiket_barkot_yukseklik_mm: 7,
   etiket_tamir_genislik_mm: 70, etiket_tamir_yukseklik_mm: 50,
 };
 
@@ -236,6 +236,11 @@ export function EtiketIcerik({
                 {ayiriciGoster && <div style={{ borderTop: "1px solid #ccc", margin: `${3 * metinOlcek}px 6px` }} />}
                 <div style={{ fontWeight: 800, fontSize: 14.5 * metinOlcek, lineHeight: 1.2, marginTop: ayiriciGoster ? 2 : 0 }}>{item.satis_fiyati}₺</div>
               </>
+            )}
+            {/* Fiyat yerine 2.El/Sıfır Cihaz'ın garanti/fatura türü gibi ek
+                bilgisi — örn. "Garantili" veya "MF"/"AF". */}
+            {item.satis_fiyati == null && item.ekstra && (
+              <div style={{ fontWeight: 700, fontSize: 9.5 * metinOlcek, lineHeight: 1.2, marginTop: 2, letterSpacing: 0.2 }}>{item.ekstra}</div>
             )}
           </div>
         </SurukleBoyutKutu>
