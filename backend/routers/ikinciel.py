@@ -327,23 +327,26 @@ async def ozet(
         dukkan_id,
     )
     rows = [dict(r) for r in rows]
-    toplam_alis = toplam_masraf = toplam_satis = kar = 0.0
+    # Toplam alış SADECE satılan cihazların maliyeti (alış + masraf) — stoktaki
+    # cihazın alış fiyatı da buna dahil edilirse Alış-Satış-Kâr üçlüsü artık
+    # birbirini tutmaz (henüz hiç satılmamış bir cihazın maliyeti kâra hiç
+    # girmediği halde toplama eklenmiş olurdu).
+    toplam_alis = toplam_satis = kar = 0.0
     stokta = satildi = 0
     for r in rows:
-        toplam_alis += r["alis_fiyati"] or 0
-        toplam_masraf += r["toplam_masraf"] or 0
         if r["durum"] == "satildi":
             satildi += 1
             satis = r["satis_fiyati"] or 0
+            maliyet = (r["alis_fiyati"] or 0) + (r["toplam_masraf"] or 0)
             toplam_satis += satis
-            kar += satis - (r["alis_fiyati"] or 0) - (r["toplam_masraf"] or 0)
+            toplam_alis += maliyet
+            kar += satis - maliyet
         else:
             stokta += 1
     return {
         "stokta_adet": stokta,
         "satilan_adet": satildi,
         "toplam_alis": toplam_alis,
-        "toplam_masraf": toplam_masraf,
         "toplam_satis": toplam_satis,
         "net_kar": kar,
     }

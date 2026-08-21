@@ -81,14 +81,21 @@ async def ozet(
     rows = await db.fetch("SELECT * FROM sifir_cihazlar WHERE dukkan_id = $1", dukkan_id)
     rows = [dict(r) for r in rows]
     stokta = satildi = 0
-    kar = 0.0
+    toplam_alis = toplam_satis = kar = 0.0
     for r in rows:
         if r["durum"] == "stokta":
             stokta += 1
         elif r["durum"] == "satildi":
             satildi += 1
-            kar += (r["satis_fiyati"] or 0) - (r["alis_fiyati"] or 0)
-    return {"stokta_adet": stokta, "satilan_adet": satildi, "net_kar": kar}
+            satis = r["satis_fiyati"] or 0
+            alis = r["alis_fiyati"] or 0
+            toplam_satis += satis
+            toplam_alis += alis
+            kar += satis - alis
+    return {
+        "stokta_adet": stokta, "satilan_adet": satildi,
+        "toplam_alis": toplam_alis, "toplam_satis": toplam_satis, "net_kar": kar,
+    }
 
 
 @router.post("/")

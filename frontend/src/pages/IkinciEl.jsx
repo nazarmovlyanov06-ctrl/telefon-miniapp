@@ -338,20 +338,43 @@ export default function IkinciEl({ user }) {
       </div>
 
       {ozet && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
-          <div className="card" style={{ textAlign: "center", margin: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 700 }}>{ozet.stokta_adet ?? 0}</div>
-            <div style={{ fontSize: 11, color: "var(--hint)" }}>Stokta</div>
+        user?.rol === "patron" ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+            <div className="card" style={{ textAlign: "center", margin: 0 }}>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{ozet.stokta_adet ?? 0}</div>
+              <div style={{ fontSize: 11, color: "var(--hint)" }}>Stokta</div>
+            </div>
+            <div className="card" style={{ margin: 0, padding: "10px 12px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 3 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                <span style={{ color: "var(--hint)" }}>Alış</span>
+                <span style={{ fontWeight: 700 }}>{(ozet.toplam_alis || 0).toLocaleString("tr-TR")}₺</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                <span style={{ color: "var(--hint)" }}>Satış</span>
+                <span style={{ fontWeight: 700 }}>{(ozet.toplam_satis || 0).toLocaleString("tr-TR")}₺</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                <span style={{ color: "var(--hint)" }}>Kâr</span>
+                <span style={{ fontWeight: 700, color: "var(--success)" }}>{(ozet.net_kar || 0).toLocaleString("tr-TR")}₺</span>
+              </div>
+            </div>
+            <div className="card" style={{ textAlign: "center", margin: 0 }}>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{ozet.satilan_adet}</div>
+              <div style={{ fontSize: 11, color: "var(--hint)" }}>Satılan</div>
+            </div>
           </div>
-          <div className="card" style={{ textAlign: "center", margin: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--success)" }}>{(ozet.net_kar || 0).toLocaleString("tr-TR")}₺</div>
-            <div style={{ fontSize: 11, color: "var(--hint)" }}>Toplam Kâr</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+            <div className="card" style={{ textAlign: "center", margin: 0 }}>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{ozet.stokta_adet ?? 0}</div>
+              <div style={{ fontSize: 11, color: "var(--hint)" }}>Stokta</div>
+            </div>
+            <div className="card" style={{ textAlign: "center", margin: 0 }}>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{ozet.satilan_adet}</div>
+              <div style={{ fontSize: 11, color: "var(--hint)" }}>Satılan</div>
+            </div>
           </div>
-          <div className="card" style={{ textAlign: "center", margin: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 700 }}>{ozet.satilan_adet}</div>
-            <div style={{ fontSize: 11, color: "var(--hint)" }}>Satılan</div>
-          </div>
-        </div>
+        )
       )}
 
       {/* Kaynak filtresi */}
