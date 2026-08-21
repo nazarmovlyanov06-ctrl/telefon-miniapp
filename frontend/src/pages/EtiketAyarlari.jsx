@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { Printer, CircleX, Store, Move } from "lucide-react";
-import { EtiketIcerik } from "../components/UrunEtiketi";
+import { EtiketIcerik, ETIKET_AYAR_VARSAYILAN } from "../components/UrunEtiketi";
 
 const ORNEK_URUN = { id: 1, ad: "Örnek Ürün", satis_fiyati: 199, kategori: "Kılıf", barkot: null };
 
@@ -16,13 +16,7 @@ export default function EtiketAyarlari({ user }) {
   useEffect(() => {
     api.etiketAyarlari()
       .then(setForm)
-      .catch(() => setForm({
-        etiket_genislik_mm: 40, etiket_yukseklik_mm: 30, etiket_logo_goster: false,
-        etiket_kategori_goster: true, etiket_cerceve_goster: true,
-        etiket_ayirici_cizgi_goster: false,
-        etiket_logo_x_pct: 50, etiket_logo_y_pct: 15,
-        etiket_logo_genislik_mm: 15, etiket_logo_yukseklik_mm: 8, logo_url: null,
-      }));
+      .catch(() => setForm(ETIKET_AYAR_VARSAYILAN));
   }, []);
 
   async function kaydet(e) {
@@ -82,11 +76,6 @@ export default function EtiketAyarlari({ user }) {
               <span style={{ fontSize: 13.5 }}>Kategori adını etikette göster</span>
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}>
-              <input type="checkbox" checked={!!form.etiket_cerceve_goster}
-                onChange={e => setForm(f => ({ ...f, etiket_cerceve_goster: e.target.checked }))} style={{ width: 16, height: 16 }} />
-              <span style={{ fontSize: 13.5 }}>Etiketin çevresinde çerçeve göster</span>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}>
               <input type="checkbox" checked={!!form.etiket_ayirici_cizgi_goster}
                 onChange={e => setForm(f => ({ ...f, etiket_ayirici_cizgi_goster: e.target.checked }))} style={{ width: 16, height: 16 }} />
               <span style={{ fontSize: 13.5 }}>Ürün adı ile fiyat arasına çizgi çek</span>
@@ -115,17 +104,21 @@ export default function EtiketAyarlari({ user }) {
       </div>
 
       <div className="section-title">Önizleme</div>
-      {form.etiket_logo_goster && form.logo_url && (
+      {patron && (
         <div style={{ fontSize: 11.5, color: "var(--hint)", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
-          <Move size={12} strokeWidth={2} /> Logoyu sürükleyerek taşı, mavi tutamaçlarla enine veya boyuna ayrı ayrı büyüt/küçült
+          <Move size={12} strokeWidth={2} /> Logoyu, ürün adı/fiyat bloğunu ve barkodu ayrı ayrı sürükleyerek taşı, mavi tutamaçlarla enine veya boyuna büyüt/küçült
         </div>
       )}
       <div className="card" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 30, minHeight: 220, overflow: "auto" }}>
         <div style={{ transform: `scale(${onizlemeOlcek})` }}>
           <EtiketIcerik item={ORNEK_URUN} ayarlar={onizlemeAyarlari}
-            duzenlenebilir={patron && !!(form.etiket_logo_goster && form.logo_url)}
+            duzenlenebilir={patron}
             onLogoTasi={(x, y) => setForm(f => ({ ...f, etiket_logo_x_pct: x, etiket_logo_y_pct: y }))}
-            onLogoBoyutlandir={(w, h) => setForm(f => ({ ...f, etiket_logo_genislik_mm: w, etiket_logo_yukseklik_mm: h }))} />
+            onLogoBoyutlandir={(w, h) => setForm(f => ({ ...f, etiket_logo_genislik_mm: w, etiket_logo_yukseklik_mm: h }))}
+            onMetinTasi={(x, y) => setForm(f => ({ ...f, etiket_metin_x_pct: x, etiket_metin_y_pct: y }))}
+            onMetinBoyutlandir={(w, h) => setForm(f => ({ ...f, etiket_metin_genislik_mm: w, etiket_metin_yukseklik_mm: h }))}
+            onBarkotTasi={(x, y) => setForm(f => ({ ...f, etiket_barkot_x_pct: x, etiket_barkot_y_pct: y }))}
+            onBarkotBoyutlandir={(w, h) => setForm(f => ({ ...f, etiket_barkot_genislik_mm: w, etiket_barkot_yukseklik_mm: h }))} />
         </div>
       </div>
     </div>

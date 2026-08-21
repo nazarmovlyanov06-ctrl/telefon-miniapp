@@ -25,13 +25,19 @@ CREATE TABLE IF NOT EXISTS dukkanlar (
     etiket_yukseklik_mm REAL DEFAULT 30,
     etiket_logo_goster BOOLEAN DEFAULT false,
     etiket_kategori_goster BOOLEAN DEFAULT true,
-    etiket_cerceve_goster BOOLEAN DEFAULT true,
     etiket_ayirici_cizgi_goster BOOLEAN DEFAULT false,
-    etiket_logo_boyut INTEGER DEFAULT 22,
     etiket_logo_x_pct REAL DEFAULT 50,
     etiket_logo_y_pct REAL DEFAULT 15,
     etiket_logo_genislik_mm REAL DEFAULT 15,
     etiket_logo_yukseklik_mm REAL DEFAULT 8,
+    etiket_metin_x_pct REAL DEFAULT 50,
+    etiket_metin_y_pct REAL DEFAULT 42,
+    etiket_metin_genislik_mm REAL DEFAULT 34,
+    etiket_metin_yukseklik_mm REAL DEFAULT 13,
+    etiket_barkot_x_pct REAL DEFAULT 50,
+    etiket_barkot_y_pct REAL DEFAULT 80,
+    etiket_barkot_genislik_mm REAL DEFAULT 34,
+    etiket_barkot_yukseklik_mm REAL DEFAULT 10,
     created_at TIMESTAMP DEFAULT now()
 );
 

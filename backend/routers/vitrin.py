@@ -77,9 +77,13 @@ async def etiket_ayarlari_getir(
 ):
     row = await db.fetchrow(
         """SELECT etiket_genislik_mm, etiket_yukseklik_mm, etiket_logo_goster,
-                  etiket_kategori_goster, etiket_cerceve_goster, etiket_ayirici_cizgi_goster,
-                  etiket_logo_boyut, etiket_logo_x_pct, etiket_logo_y_pct,
-                  etiket_logo_genislik_mm, etiket_logo_yukseklik_mm, logo_url
+                  etiket_kategori_goster, etiket_ayirici_cizgi_goster,
+                  etiket_logo_x_pct, etiket_logo_y_pct,
+                  etiket_logo_genislik_mm, etiket_logo_yukseklik_mm,
+                  etiket_metin_x_pct, etiket_metin_y_pct,
+                  etiket_metin_genislik_mm, etiket_metin_yukseklik_mm,
+                  etiket_barkot_x_pct, etiket_barkot_y_pct,
+                  etiket_barkot_genislik_mm, etiket_barkot_yukseklik_mm, logo_url
            FROM dukkanlar WHERE id=$1""",
         dukkan_id,
     )
@@ -97,19 +101,40 @@ async def etiket_ayarlari_guncelle(
     yukseklik = float(body.get("etiket_yukseklik_mm") or 30)
     if not (10 <= genislik <= 200) or not (10 <= yukseklik <= 200):
         raise HTTPException(400, "Etiket boyutu 10-200mm aralığında olmalı")
-    logo_x = max(0, min(100, float(body.get("etiket_logo_x_pct") if body.get("etiket_logo_x_pct") is not None else 50)))
-    logo_y = max(0, min(100, float(body.get("etiket_logo_y_pct") if body.get("etiket_logo_y_pct") is not None else 15)))
-    logo_genislik = max(3, min(genislik, float(body.get("etiket_logo_genislik_mm") or 15)))
-    logo_yukseklik = max(3, min(yukseklik, float(body.get("etiket_logo_yukseklik_mm") or 8)))
+
+    def pct(alan, varsayilan):
+        deger = body.get(alan)
+        return max(0, min(100, float(deger if deger is not None else varsayilan)))
+
+    def olcu(alan, varsayilan, ust_sinir):
+        deger = body.get(alan)
+        return max(3, min(ust_sinir, float(deger if deger is not None else varsayilan)))
+
+    logo_x, logo_y = pct("etiket_logo_x_pct", 50), pct("etiket_logo_y_pct", 15)
+    logo_genislik = olcu("etiket_logo_genislik_mm", 15, genislik)
+    logo_yukseklik = olcu("etiket_logo_yukseklik_mm", 8, yukseklik)
+    metin_x, metin_y = pct("etiket_metin_x_pct", 50), pct("etiket_metin_y_pct", 42)
+    metin_genislik = olcu("etiket_metin_genislik_mm", 34, genislik)
+    metin_yukseklik = olcu("etiket_metin_yukseklik_mm", 13, yukseklik)
+    barkot_x, barkot_y = pct("etiket_barkot_x_pct", 50), pct("etiket_barkot_y_pct", 80)
+    barkot_genislik = olcu("etiket_barkot_genislik_mm", 34, genislik)
+    barkot_yukseklik = olcu("etiket_barkot_yukseklik_mm", 10, yukseklik)
+
     await db.execute(
         """UPDATE dukkanlar SET etiket_genislik_mm=$1, etiket_yukseklik_mm=$2,
-           etiket_logo_goster=$3, etiket_kategori_goster=$4, etiket_cerceve_goster=$5,
-           etiket_ayirici_cizgi_goster=$6, etiket_logo_x_pct=$7, etiket_logo_y_pct=$8,
-           etiket_logo_genislik_mm=$9, etiket_logo_yukseklik_mm=$10 WHERE id=$11""",
+           etiket_logo_goster=$3, etiket_kategori_goster=$4,
+           etiket_ayirici_cizgi_goster=$5, etiket_logo_x_pct=$6, etiket_logo_y_pct=$7,
+           etiket_logo_genislik_mm=$8, etiket_logo_yukseklik_mm=$9,
+           etiket_metin_x_pct=$10, etiket_metin_y_pct=$11,
+           etiket_metin_genislik_mm=$12, etiket_metin_yukseklik_mm=$13,
+           etiket_barkot_x_pct=$14, etiket_barkot_y_pct=$15,
+           etiket_barkot_genislik_mm=$16, etiket_barkot_yukseklik_mm=$17
+           WHERE id=$18""",
         genislik, yukseklik, bool(body.get("etiket_logo_goster", False)),
-        bool(body.get("etiket_kategori_goster", True)), bool(body.get("etiket_cerceve_goster", True)),
+        bool(body.get("etiket_kategori_goster", True)),
         bool(body.get("etiket_ayirici_cizgi_goster", False)), logo_x, logo_y,
-        logo_genislik, logo_yukseklik, dukkan_id,
+        logo_genislik, logo_yukseklik, metin_x, metin_y, metin_genislik, metin_yukseklik,
+        barkot_x, barkot_y, barkot_genislik, barkot_yukseklik, dukkan_id,
     )
     return {"ok": True}
 
