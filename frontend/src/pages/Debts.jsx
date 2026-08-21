@@ -5,6 +5,7 @@ import {
   Banknote, Landmark, ClipboardList, CircleX, User, Ban, Phone, Calendar,
   CreditCard, FileText, Wallet, X, Search, Pencil, Trash2, Filter,
 } from "lucide-react";
+import { KATEGORI_META } from "./KaraListe";
 
 export default function Debts({ user }) {
   const [tab, setTab] = useState(() => {
@@ -46,6 +47,21 @@ export default function Debts({ user }) {
   });
   const [err, setErr] = useState("");
   const [karaUyari, setKaraUyari] = useState([]);
+  // Çok gecikmiş bir alacak için "kara listeye ekle" hızlı önerisi
+  const [karaOneriAcik, setKaraOneriAcik] = useState(null); // debt id
+  const [karaOneriForm, setKaraOneriForm] = useState({ sebep: "", kategori: "odeme_yapmadi" });
+  const [karaOneriErr, setKaraOneriErr] = useState("");
+
+  async function karaOneriGonder(d) {
+    setKaraOneriErr("");
+    try {
+      await api.createKara({
+        customer_id: d.customer_id || null, ad: d.customer_name, telefon: d.customer_phone,
+        sebep: karaOneriForm.sebep, kategori: karaOneriForm.kategori || null,
+      });
+      setKaraOneriAcik(null);
+    } catch (e) { setKaraOneriErr(e.message); }
+  }
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -469,7 +485,10 @@ export default function Debts({ user }) {
           {arama ? "Aramayla eşleşen kayıt yok" : (tab === "alacak" ? "Açık alacak yok" : tab === "gecmis" ? "Geçmiş kayıt yok" : "Dükkan borcu yok")}
         </div>
       ) : (
-        activeList.map((d) => (
+        activeList.map((d) => {
+          const gunGecikme = d.due_date ? Math.floor((Date.now() - new Date(d.due_date)) / 86400000) : null;
+          const cokGecikmis = tab === "alacak" && (d.remaining || 0) > 0 && gunGecikme !== null && gunGecikme > 14;
+          return (
           <div key={d.id} id={`debt-row-${d.id}`} className="card" style={{
             marginBottom: 8, transition: "box-shadow 0.3s, background 0.3s",
             ...(highlightId === d.id ? { boxShadow: "0 0 0 2px var(--accent)", background: "rgba(99,102,241,0.08)" } : {}),
@@ -548,6 +567,35 @@ export default function Debts({ user }) {
               )}
             </div>
             )}
+            {cokGecikmis && (
+              <div style={{ marginTop: 8 }}>
+                {karaOneriAcik !== d.id ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(239,68,68,0.08)", borderRadius: 8, padding: "6px 10px" }}>
+                    <span style={{ fontSize: 12, color: "var(--danger)", flex: 1 }}>{gunGecikme} gündür ödenmedi</span>
+                    <button className="btn btn-ghost btn-sm" style={{ padding: "3px 8px", fontSize: 12, display: "flex", alignItems: "center", gap: 5, color: "var(--danger)" }}
+                      onClick={() => { setKaraOneriAcik(d.id); setKaraOneriForm({ sebep: `${gunGecikme} gündür ödeme yapmadı (borç: ₺${(d.remaining || 0).toLocaleString("tr-TR")})`, kategori: "odeme_yapmadi" }); setKaraOneriErr(""); }}>
+                      <Ban size={12} strokeWidth={2} /> Kara Listeye Ekle
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ background: "var(--bg2)", borderRadius: 10, padding: 10 }}>
+                    {karaOneriErr && <div style={{ color: "var(--danger)", fontSize: 12, marginBottom: 6 }}>{karaOneriErr}</div>}
+                    <select className="form-select" style={{ marginBottom: 6 }} value={karaOneriForm.kategori}
+                      onChange={e => setKaraOneriForm(f => ({ ...f, kategori: e.target.value }))}>
+                      {Object.entries(KATEGORI_META).map(([k, m]) => (
+                        <option key={k} value={k}>{m.label}</option>
+                      ))}
+                    </select>
+                    <input className="form-input" style={{ marginBottom: 8 }} value={karaOneriForm.sebep}
+                      onChange={e => setKaraOneriForm(f => ({ ...f, sebep: e.target.value }))} />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="btn btn-danger btn-sm" onClick={() => karaOneriGonder(d)}>Ekle</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setKaraOneriAcik(null)}>İptal</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {expandedId === d.id && (
               <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
                 {/* Taksit planı */}
@@ -618,7 +666,8 @@ export default function Debts({ user }) {
               </div>
             )}
           </div>
-        ))
+          );
+        })
       )}
       {/* Ödeme modalı */}
       {payModal && (

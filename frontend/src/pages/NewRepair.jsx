@@ -100,9 +100,18 @@ export default function NewRepair() {
   // Arıza öneriler (geçmiş)
   const [arizaGecmis, setArizaGecmis] = useState([]);
 
-  // Kara liste uyarı
+  // Kara liste uyarı — hem telefon hem IMEI ayrı ayrı kontrol edilip
+  // sonuçlar birleştiriliyor (biri boş dönse diğerinin bulduğu eşleşmeyi
+  // silmesin diye).
   const [karaUyari, setKaraUyari] = useState([]);
   const karaTimer = useRef(null);
+  const karaTimerImei = useRef(null);
+  const karaSonuclar = useRef({ tel: [], imei: [] });
+  function karaBirlestir() {
+    const map = new Map();
+    [...karaSonuclar.current.tel, ...karaSonuclar.current.imei].forEach(k => map.set(k.id, k));
+    setKaraUyari(Array.from(map.values()));
+  }
 
   // Tek mikrofonla karışık anlatıp AI'ın alanları ayırması
   const [sesDinleniyor, setSesDinleniyor] = useState(false);
@@ -144,20 +153,30 @@ export default function NewRepair() {
     setShowMusteriOner(false);
     // Kara liste kontrolü
     if (m.phone) {
-      api.karaListe(m.phone).then(r => setKaraUyari(r || [])).catch(() => {});
+      api.karaListe(m.phone).then(r => { karaSonuclar.current.tel = r || []; karaBirlestir(); }).catch(() => {});
     }
   }
 
   function set(k, v) {
     setForm(f => ({ ...f, [k]: v }));
+    if (k === "imei") {
+      clearTimeout(karaTimerImei.current);
+      if (v.length >= 8) {
+        karaTimerImei.current = setTimeout(() => {
+          api.karaListe(v).then(r => { karaSonuclar.current.imei = r || []; karaBirlestir(); }).catch(() => {});
+        }, 600);
+      } else {
+        karaSonuclar.current.imei = []; karaBirlestir();
+      }
+    }
     if (k === "customer_phone") {
       clearTimeout(karaTimer.current);
       if (v.length >= 7) {
         karaTimer.current = setTimeout(() => {
-          api.karaListe(v).then(r => setKaraUyari(r || [])).catch(() => {});
+          api.karaListe(v).then(r => { karaSonuclar.current.tel = r || []; karaBirlestir(); }).catch(() => {});
         }, 600);
       } else {
-        setKaraUyari([]);
+        karaSonuclar.current.tel = []; karaBirlestir();
       }
     }
   }

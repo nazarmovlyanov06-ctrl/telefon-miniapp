@@ -52,17 +52,29 @@ export default function IkinciEl({ user }) {
   const [showKimdenOner, setShowKimdenOner] = useState(false);
   const [satMusteriOner, setSatMusteriOner] = useState([]);
   const [showSatMusteriOner, setShowSatMusteriOner] = useState(false);
+  // Kara liste uyarısı — sayfada birden fazla alan (alış: kimden telefonu +
+  // IMEI, satış: müşteri telefonu) aynı anda kontrol edilebildiği için her
+  // birinin sonucu ayrı bir "kaynak" altında tutulup birleştiriliyor —
+  // aksi halde biri boş dönünce diğerinin bulduğu eşleşmeyi silerdi.
   const [karaUyari, setKaraUyari] = useState([]);
-  const karaTimer = useRef(null);
+  const karaTimers = useRef({});
+  const karaSonuclar = useRef({});
 
-  function karaKontrolEt(telefon) {
-    clearTimeout(karaTimer.current);
-    if (telefon.length >= 7) {
-      karaTimer.current = setTimeout(() => {
-        api.karaListe(telefon).then(r => setKaraUyari(r || [])).catch(() => {});
+  function karaBirlestir() {
+    const map = new Map();
+    Object.values(karaSonuclar.current).forEach(arr => (arr || []).forEach(k => map.set(k.id, k)));
+    setKaraUyari(Array.from(map.values()));
+  }
+
+  function karaKontrolEt(kaynak, deger, minLen = 7) {
+    clearTimeout(karaTimers.current[kaynak]);
+    if (deger && deger.length >= minLen) {
+      karaTimers.current[kaynak] = setTimeout(() => {
+        api.karaListe(deger).then(r => { karaSonuclar.current[kaynak] = r || []; karaBirlestir(); }).catch(() => {});
       }, 600);
     } else {
-      setKaraUyari([]);
+      karaSonuclar.current[kaynak] = [];
+      karaBirlestir();
     }
   }
   const [imeiSon4, setImeiSon4] = useState("");
@@ -122,7 +134,7 @@ export default function IkinciEl({ user }) {
       await api.createIkinciEl({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
       setShowForm(false);
       setForm({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {} });
-      setKaraUyari([]);
+      karaSonuclar.current = {}; setKaraUyari([]);
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -162,7 +174,7 @@ export default function IkinciEl({ user }) {
       });
       setShowSat(false); setSelected(null);
       setSatForm({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
-      setKaraUyari([]);
+      karaSonuclar.current = {}; setKaraUyari([]);
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -306,7 +318,7 @@ export default function IkinciEl({ user }) {
                   <label className="form-label">IMEI</label>
                   <ImeiInput
                     value={form.imei}
-                    onChange={v => setForm({ ...form, imei: v })}
+                    onChange={v => { setForm({ ...form, imei: v }); karaKontrolEt("alis_imei", v, 8); }}
                     placeholder="15 haneli veya kamerayla okut"
                   />
                 </div>
@@ -320,7 +332,7 @@ export default function IkinciEl({ user }) {
                     <div className="ac-dropdown">
                       {kimdenOner.map(m => (
                         <div key={m.id}
-                          onMouseDown={() => { setForm(f => ({ ...f, kimden: m.name, kimden_telefon: m.phone || f.kimden_telefon })); setShowKimdenOner(false); if (m.phone) karaKontrolEt(m.phone); }}
+                          onMouseDown={() => { setForm(f => ({ ...f, kimden: m.name, kimden_telefon: m.phone || f.kimden_telefon })); setShowKimdenOner(false); if (m.phone) karaKontrolEt("alis_tel", m.phone); }}
                           style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
                             borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                           <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
@@ -333,7 +345,7 @@ export default function IkinciEl({ user }) {
                 <div className="form-group">
                   <label className="form-label">Kimden (Telefon) *</label>
                   <input className="form-input" required inputMode="tel" value={form.kimden_telefon}
-                    onChange={e => { setForm(f => ({ ...f, kimden_telefon: e.target.value })); karaKontrolEt(e.target.value); }}
+                    onChange={e => { setForm(f => ({ ...f, kimden_telefon: e.target.value })); karaKontrolEt("alis_tel", e.target.value); }}
                     placeholder="0555..." />
                   {form.kimden && form.kimden_telefon && (
                     <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri listesine otomatik eklenecek</div>
@@ -500,7 +512,7 @@ export default function IkinciEl({ user }) {
                             <div className="ac-dropdown">
                               {satMusteriOner.map(m => (
                                 <div key={m.id}
-                                  onMouseDown={() => { setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon })); setShowSatMusteriOner(false); if (m.phone) karaKontrolEt(m.phone); }}
+                                  onMouseDown={() => { setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon })); setShowSatMusteriOner(false); if (m.phone) karaKontrolEt("satis_tel", m.phone); }}
                                   style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
                                     borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                                   <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
@@ -513,7 +525,7 @@ export default function IkinciEl({ user }) {
                         <div className="form-group">
                           <label className="form-label">Müşteri Telefonu *</label>
                           <input className="form-input" required inputMode="tel" value={satForm.musteri_telefon}
-                            onChange={e => { setSatForm(f => ({ ...f, musteri_telefon: e.target.value })); karaKontrolEt(e.target.value); }}
+                            onChange={e => { setSatForm(f => ({ ...f, musteri_telefon: e.target.value })); karaKontrolEt("satis_tel", e.target.value); }}
                             placeholder="0555..." />
                           {satForm.musteri_adi && satForm.musteri_telefon && (
                             <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri listesine otomatik eklenecek</div>

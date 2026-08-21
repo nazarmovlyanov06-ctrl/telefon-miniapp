@@ -25,6 +25,21 @@ async def _dukkan_by_slug(db: asyncpg.Connection, slug: str):
     return row
 
 
+async def _kara_listede_mi(db: asyncpg.Connection, dukkan_id: int, customer_id: int, telefon: str) -> bool:
+    """Kara listedeki müşteri portala giriş/kayıt yapamaz — customer_id veya
+    (format farkına dayanıklı, sadece rakamlar karşılaştırılarak) telefon
+    eşleşmesiyle kontrol edilir."""
+    return bool(await db.fetchval(
+        """SELECT 1 FROM kara_liste k WHERE k.dukkan_id=$1 AND (
+             k.customer_id = $2
+             OR (k.telefon IS NOT NULL AND $3::text IS NOT NULL
+                 AND regexp_replace(k.telefon, '\\D', '', 'g') = regexp_replace($3, '\\D', '', 'g')
+                 AND regexp_replace(k.telefon, '\\D', '', 'g') != '')
+           ) LIMIT 1""",
+        dukkan_id, customer_id, telefon,
+    ))
+
+
 @router.get("/dukkan/{slug}")
 async def dukkan_vitrin(slug: str, db: asyncpg.Connection = Depends(get_db)):
     d = await _dukkan_by_slug(db, slug)
@@ -262,6 +277,8 @@ async def musteri_kayit(slug: str, body: dict, db: asyncpg.Connection = Depends(
         raise HTTPException(404, "Bu bilgilerle eşleşen bir tamir kaydı bulunamadı")
     if row["sifre_hash"]:
         raise HTTPException(400, "Bu telefon numarası zaten kayıtlı, giriş yapın")
+    if await _kara_listede_mi(db, d["id"], row["customer_id"], telefon):
+        raise HTTPException(403, "Bu hesap için portal erişimi kısıtlanmıştır. Lütfen dükkanla iletişime geçin.")
 
     await db.execute("UPDATE customers SET sifre_hash = $1 WHERE id = $2", hash_sifre(yeni_sifre), row["customer_id"])
     token = olustur_musteri_token(row["customer_id"], d["id"])
@@ -285,6 +302,8 @@ async def musteri_acik_kayit(slug: str, body: dict, db: asyncpg.Connection = Dep
         raise HTTPException(400, "Ad ve telefon gerekli")
     if len(sifre) < 6:
         raise HTTPException(400, "Şifre en az 6 karakter olmalı")
+    if await _kara_listede_mi(db, d["id"], 0, telefon):
+        raise HTTPException(403, "Bu hesap için portal erişimi kısıtlanmıştır. Lütfen dükkanla iletişime geçin.")
 
     mevcut = await db.fetchrow(
         "SELECT id, sifre_hash FROM customers WHERE dukkan_id = $1 AND phone = $2 ORDER BY id LIMIT 1",
@@ -330,13 +349,15 @@ async def musteri_giris(slug: str, body: dict, db: asyncpg.Connection = Depends(
     telefon = (body.get("telefon") or "").strip()
     sifre = body.get("sifre") or ""
     row = await db.fetchrow(
-        """SELECT id, sifre_hash FROM customers
+        """SELECT id, sifre_hash, phone FROM customers
            WHERE dukkan_id = $1 AND phone = $2 AND sifre_hash IS NOT NULL
            ORDER BY id LIMIT 1""",
         d["id"], telefon,
     )
     if not row or not dogrula_sifre(sifre, row["sifre_hash"]):
         raise HTTPException(401, "Telefon veya şifre hatalı")
+    if await _kara_listede_mi(db, d["id"], row["id"], row["phone"]):
+        raise HTTPException(403, "Bu hesap için portal erişimi kısıtlanmıştır. Lütfen dükkanla iletişime geçin.")
     token = olustur_musteri_token(row["id"], d["id"])
     return {"token": token}
 

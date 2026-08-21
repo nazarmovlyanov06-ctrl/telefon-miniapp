@@ -6,6 +6,7 @@ import {
   CheckCircle2, Calendar, Printer,
 } from "lucide-react";
 import UrunEtiketModal from "../components/UrunEtiketModal";
+import { KATEGORI_META } from "./KaraListe";
 
 // Yedek telefonun barkotlu tanım etiketi — hangi müşteride olduğunu
 // gösterir. Fiyat kavramı yok (satış ürünü değil), o yüzden satis_fiyati
@@ -29,6 +30,17 @@ export default function Loaner() {
   const fileInputRef = useRef(null);
   const [err, setErr] = useState("");
   const [etiketModalItems, setEtiketModalItems] = useState(null);
+  const [karaOneriAcik, setKaraOneriAcik] = useState(null); // loaner id
+  const [karaOneriForm, setKaraOneriForm] = useState({ sebep: "", kategori: "diger" });
+  const [karaOneriErr, setKaraOneriErr] = useState("");
+
+  async function karaOneriGonder(l) {
+    setKaraOneriErr("");
+    try {
+      await api.createKara({ ad: l.musteri_adi, sebep: karaOneriForm.sebep, kategori: karaOneriForm.kategori || null });
+      setKaraOneriAcik(null);
+    } catch (e) { setKaraOneriErr(e.message); }
+  }
   const [form, setForm] = useState({ musteri_adi: "", cihaz: "", teslim_tarihi: today(), notlar: "" });
   const [musteriler, setMusteriler] = useState([]);
   const [oneriler, setOneriler] = useState([]);
@@ -308,6 +320,7 @@ export default function Loaner() {
         ) : list.map(l => {
           const gun = daysOut(l.teslim_tarihi);
           const warn = gun >= 7;
+          const cokGecikmis = gun >= 21;
           return (
             <div key={l.id} className="card">
               <div className="card-row">
@@ -336,6 +349,35 @@ export default function Loaner() {
                   </button>
                 </div>
               </div>
+              {cokGecikmis && (
+                <div style={{ marginTop: 8 }}>
+                  {karaOneriAcik !== l.id ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(239,68,68,0.08)", borderRadius: 8, padding: "6px 10px" }}>
+                      <span style={{ fontSize: 12, color: "var(--danger)", flex: 1 }}>{gun} gündür iade edilmedi</span>
+                      <button className="btn btn-ghost btn-sm" style={{ padding: "3px 8px", fontSize: 12, display: "flex", alignItems: "center", gap: 5, color: "var(--danger)" }}
+                        onClick={() => { setKaraOneriAcik(l.id); setKaraOneriForm({ sebep: `Yedek telefonu ${gun} gündür iade etmedi (${l.cihaz})`, kategori: "diger" }); setKaraOneriErr(""); }}>
+                        <TriangleAlert size={12} strokeWidth={2} /> Kara Listeye Ekle
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ background: "var(--bg2)", borderRadius: 10, padding: 10 }}>
+                      {karaOneriErr && <div style={{ color: "var(--danger)", fontSize: 12, marginBottom: 6 }}>{karaOneriErr}</div>}
+                      <select className="form-select" style={{ marginBottom: 6 }} value={karaOneriForm.kategori}
+                        onChange={e => setKaraOneriForm(f => ({ ...f, kategori: e.target.value }))}>
+                        {Object.entries(KATEGORI_META).map(([k, m]) => (
+                          <option key={k} value={k}>{m.label}</option>
+                        ))}
+                      </select>
+                      <input className="form-input" style={{ marginBottom: 8 }} value={karaOneriForm.sebep}
+                        onChange={e => setKaraOneriForm(f => ({ ...f, sebep: e.target.value }))} />
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button className="btn btn-danger btn-sm" onClick={() => karaOneriGonder(l)}>Ekle</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setKaraOneriAcik(null)}>İptal</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })
