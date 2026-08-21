@@ -510,9 +510,14 @@ CREATE TABLE IF NOT EXISTS kara_liste (
     telefon TEXT,
     imei TEXT,
     sebep TEXT NOT NULL,
+    kategori TEXT,
     notlar TEXT,
-    created_at TIMESTAMP DEFAULT now()
+    customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+    created_by INTEGER REFERENCES kullanicilar(id),
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS idx_kara_liste_customer ON kara_liste(dukkan_id, customer_id);
 
 CREATE TABLE IF NOT EXISTS sifir_cihazlar (
     id SERIAL PRIMARY KEY,

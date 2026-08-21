@@ -314,6 +314,7 @@ export const api = {
   // Kara Liste
   karaListe: (q) => get(`/kara-liste/${q ? "?q=" + encodeURIComponent(q) : ""}`),
   createKara: (data) => post("/kara-liste/", data),
+  updateKara: (id, data) => put(`/kara-liste/${id}`, data),
   deleteKara: (id) => del(`/kara-liste/${id}`),
 
   // Parca Iade

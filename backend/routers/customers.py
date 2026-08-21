@@ -13,6 +13,18 @@ _MUSTERI_KOLONLARI = """id, dukkan_id, name, phone, notes, visit_count,
        portal_kayit_at, dukkan_gordu, created_at,
        (sifre_hash IS NOT NULL) AS portal_uye"""
 
+# Kara listeyle eşleşme customer_id üzerinden (varsa) veya telefonun sadece
+# rakamlarının birebir aynı olmasıyla (format farkına dayanıklı) yapılır —
+# ham ILIKE substring eşleşmesi "0555..." ile "555..." gibi yazımları
+# kaçırıyordu.
+_KARA_LISTE_ALT_SORGU = """EXISTS(
+    SELECT 1 FROM kara_liste k WHERE k.dukkan_id = customers.dukkan_id
+    AND (k.customer_id = customers.id
+         OR (k.telefon IS NOT NULL AND customers.phone IS NOT NULL
+             AND regexp_replace(k.telefon, '\\D', '', 'g') = regexp_replace(customers.phone, '\\D', '', 'g')
+             AND regexp_replace(k.telefon, '\\D', '', 'g') != ''))
+) AS is_blacklisted"""
+
 
 @router.get("/")
 async def list_customers(
@@ -23,14 +35,14 @@ async def list_customers(
 ):
     if q:
         rows = await db.fetch(
-            f"""SELECT {_MUSTERI_KOLONLARI} FROM customers
+            f"""SELECT {_MUSTERI_KOLONLARI}, {_KARA_LISTE_ALT_SORGU} FROM customers
                WHERE dukkan_id = $1 AND (name ILIKE $2 OR phone ILIKE $2)
                ORDER BY created_at DESC LIMIT 50""",
             dukkan_id, f"%{q}%",
         )
     else:
         rows = await db.fetch(
-            f"SELECT {_MUSTERI_KOLONLARI} FROM customers WHERE dukkan_id = $1 ORDER BY created_at DESC LIMIT 100",
+            f"SELECT {_MUSTERI_KOLONLARI}, {_KARA_LISTE_ALT_SORGU} FROM customers WHERE dukkan_id = $1 ORDER BY created_at DESC LIMIT 100",
             dukkan_id,
         )
     return [dict(r) for r in rows]
@@ -73,12 +85,27 @@ async def get_customer(
     db: asyncpg.Connection = Depends(get_db),
 ):
     row = await db.fetchrow(
-        f"SELECT {_MUSTERI_KOLONLARI} FROM customers WHERE id = $1 AND dukkan_id = $2",
+        f"SELECT {_MUSTERI_KOLONLARI}, {_KARA_LISTE_ALT_SORGU} FROM customers WHERE id = $1 AND dukkan_id = $2",
         customer_id, dukkan_id,
     )
     if not row:
         raise HTTPException(404, "Musteri bulunamadi")
-    return dict(row)
+    musteri = dict(row)
+    if musteri["is_blacklisted"]:
+        kara = await db.fetchrow(
+            """SELECT id, sebep, kategori FROM kara_liste
+               WHERE dukkan_id=$1 AND (customer_id=$2
+                     OR (telefon IS NOT NULL AND $3::text IS NOT NULL
+                         AND regexp_replace(telefon, '\\D', '', 'g') = regexp_replace($3, '\\D', '', 'g')
+                         AND regexp_replace(telefon, '\\D', '', 'g') != ''))
+               ORDER BY created_at DESC LIMIT 1""",
+            dukkan_id, customer_id, musteri.get("phone"),
+        )
+        if kara:
+            musteri["kara_liste_id"] = kara["id"]
+            musteri["kara_liste_sebep"] = kara["sebep"]
+            musteri["kara_liste_kategori"] = kara["kategori"]
+    return musteri
 
 
 @router.post("/")

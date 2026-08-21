@@ -5,8 +5,9 @@ import {
   User, Pencil, CircleX, Phone, FileText, Calendar,
   Wrench, Banknote, CalendarCheck, CreditCard, Smartphone, Package,
   FileClock, CheckCircle2, Home, X, ArrowRight, KeyRound, Copy, Check, MessageCircle,
-  Headphones,
+  Headphones, Ban,
 } from "lucide-react";
+import { KATEGORI_META } from "./KaraListe";
 
 const STATUS_LABEL = {
   bekliyor: "Bekliyor", tamirde: "Tamirde",
@@ -163,6 +164,8 @@ export default function CustomerDetail() {
   const [dukkanSlug, setDukkanSlug] = useState(null);
   const [portalSaving, setPortalSaving] = useState(false);
   const [portalSonuc, setPortalSonuc] = useState(null); // { gecici_sifre, phone, yeni_hesap }
+  const [karaForm, setKaraForm] = useState(null); // null kapalı, obje: { sebep, kategori }
+  const [karaErr, setKaraErr] = useState("");
 
   function ozetTumunuGor(hedefTab) {
     setOzetAcik(null);
@@ -200,6 +203,24 @@ export default function CustomerDetail() {
     finally { setPortalSaving(false); }
   }
 
+  async function karaListeyeEkle(e) {
+    e.preventDefault(); setKaraErr("");
+    try {
+      await api.createKara({
+        customer_id: id, ad: customer.name, telefon: customer.phone,
+        sebep: karaForm.sebep, kategori: karaForm.kategori || null,
+      });
+      setKaraForm(null);
+      await load();
+    } catch (e) { setKaraErr(e.message); }
+  }
+
+  async function karaListedenCikar() {
+    if (!confirm("Bu müşteriyi kara listeden çıkarmak istiyor musun?")) return;
+    await api.deleteKara(customer.kara_liste_id);
+    await load();
+  }
+
   async function save(e) {
     e.preventDefault(); setErr("");
     try {
@@ -229,6 +250,58 @@ export default function CustomerDetail() {
       </div>
 
       {err && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
+
+      {customer.is_blacklisted ? (
+        <div className="card" style={{ borderLeft: "3px solid var(--danger)", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontWeight: 700, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}>
+                <Ban size={15} strokeWidth={2} /> Kara Listede
+              </div>
+              {KATEGORI_META[customer.kara_liste_kategori] && (
+                <div style={{ fontSize: 12, fontWeight: 600, color: KATEGORI_META[customer.kara_liste_kategori].renk, marginTop: 4 }}>
+                  {KATEGORI_META[customer.kara_liste_kategori].label}
+                </div>
+              )}
+              <div style={{ fontSize: 13, marginTop: 4 }}>{customer.kara_liste_sebep}</div>
+            </div>
+            <button className="btn btn-ghost btn-sm" style={{ flexShrink: 0 }} onClick={karaListedenCikar}>Çıkar</button>
+          </div>
+        </div>
+      ) : karaForm ? (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <form onSubmit={karaListeyeEkle}>
+            <div style={{ fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 6, color: "var(--danger)" }}>
+              <Ban size={15} strokeWidth={2} /> Kara Listeye Ekle
+            </div>
+            {karaErr && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {karaErr}</div>}
+            <div className="form-group">
+              <label className="form-label">Kategori</label>
+              <select className="form-select" value={karaForm.kategori}
+                onChange={e => setKaraForm(f => ({ ...f, kategori: e.target.value }))}>
+                <option value="">Seçiniz (opsiyonel)</option>
+                {Object.entries(KATEGORI_META).map(([k, m]) => (
+                  <option key={k} value={k}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Sebep *</label>
+              <input className="form-input" required value={karaForm.sebep}
+                onChange={e => setKaraForm(f => ({ ...f, sebep: e.target.value }))} placeholder="Çalıntı cihaz, ödeme yapmadı..." />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="submit" className="btn btn-danger">Ekle</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setKaraForm(null)}>İptal</button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <button className="btn btn-ghost btn-sm" style={{ marginBottom: 14, color: "var(--danger)", display: "flex", alignItems: "center", gap: 6 }}
+          onClick={() => { setKaraForm({ sebep: "", kategori: "" }); setKaraErr(""); }}>
+          <Ban size={13} strokeWidth={2} /> Kara Listeye Ekle
+        </button>
+      )}
 
       {edit ? (
         <div className="card">

@@ -4,7 +4,7 @@ import { api, fotoUrl } from "../api";
 import {
   Tag, CircleX, TriangleAlert, Trash2, Search, Filter, X, Pencil,
   Headphones, ArrowDownCircle, ArrowUpCircle, RefreshCw, Phone, Package,
-  Truck, PackagePlus, Printer, ScanLine, Camera,
+  Truck, PackagePlus, Printer, ScanLine, Camera, Ban,
 } from "lucide-react";
 import UrunGorsel from "../components/UrunGorsel";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
@@ -247,6 +247,19 @@ export default function Aksesuar({ user }) {
   const [sepetGoster, setSepetGoster] = useState(false);
   const [sepetOdemeAcik, setSepetOdemeAcik] = useState(false);
   const [sepetOdemeData, setSepetOdemeData] = useState({ musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
+  const [karaUyari, setKaraUyari] = useState([]);
+  const karaTimer = useRef(null);
+
+  function karaKontrolEt(telefon) {
+    clearTimeout(karaTimer.current);
+    if (telefon.length >= 7) {
+      karaTimer.current = setTimeout(() => {
+        api.karaListe(telefon).then(r => setKaraUyari(r || [])).catch(() => {});
+      }, 600);
+    } else {
+      setKaraUyari([]);
+    }
+  }
 
   // Satış Geçmişi sekmesi
   const [satislar, setSatislar] = useState([]);
@@ -378,7 +391,7 @@ export default function Aksesuar({ user }) {
   function satAc(item) {
     setDetayItem(null);
     setSatData({ miktar: "1", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
-    setErr("");
+    setErr(""); setKaraUyari([]);
     setSatForm(item);
   }
 
@@ -430,12 +443,13 @@ export default function Aksesuar({ user }) {
     setSepet([]);
     setSepetGoster(false);
     setSepetOdemeAcik(false);
+    setKaraUyari([]);
   }
   const sepetToplam = sepet.reduce((t, k) => t + k.miktar * (k.aksesuar.satis_fiyati || 0), 0);
 
   function sepetOdemeAc() {
     setSepetOdemeData({ musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
-    setErr("");
+    setErr(""); setKaraUyari([]);
     setSepetOdemeAcik(true);
   }
 
@@ -488,6 +502,7 @@ export default function Aksesuar({ user }) {
         tarih: today(), odemeler, taksit_sayi: parseInt(satData.taksit_sayi) || 1,
       });
       setSatForm(null);
+      setKaraUyari([]);
       load();
       if (tab === "gecmis") satisYukle();
     } catch (e) { setErr(e.message); }
@@ -858,7 +873,16 @@ export default function Aksesuar({ user }) {
             </div>
             <div className="form-group">
               <label className="form-label">Müşteri Telefonu (opsiyonel)</label>
-              <input className="form-input" type="tel" value={sepetOdemeData.musteri_telefon} onChange={e => setSepetOdemeData({ ...sepetOdemeData, musteri_telefon: e.target.value })} />
+              <input className="form-input" type="tel" value={sepetOdemeData.musteri_telefon}
+                onChange={e => { setSepetOdemeData({ ...sepetOdemeData, musteri_telefon: e.target.value }); karaKontrolEt(e.target.value); }} />
+              {karaUyari.length > 0 && (
+                <div style={{ background: "rgba(239,68,68,0.12)", borderRadius: 8, padding: "8px 12px", marginTop: 8, borderLeft: "3px solid #ef4444" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", display: "flex", alignItems: "center", gap: 6 }}><Ban size={14} strokeWidth={2} /> Kara Listede!</div>
+                  {karaUyari.map(k => (
+                    <div key={k.id} style={{ fontSize: 12, color: "var(--text)", marginTop: 2 }}>{k.ad}{k.sebep ? ` — ${k.sebep}` : ""}</div>
+                  ))}
+                </div>
+              )}
             </div>
             <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8 }}>
               Toplam: {sepetToplam.toLocaleString("tr-TR")} ₺
@@ -921,7 +945,16 @@ export default function Aksesuar({ user }) {
             </div>
             <div className="form-group">
               <label className="form-label">Müşteri Telefonu (opsiyonel — müşteri portalında görünmesi için)</label>
-              <input className="form-input" type="tel" value={satData.musteri_telefon} onChange={e => setSatData({ ...satData, musteri_telefon: e.target.value })} />
+              <input className="form-input" type="tel" value={satData.musteri_telefon}
+                onChange={e => { setSatData({ ...satData, musteri_telefon: e.target.value }); karaKontrolEt(e.target.value); }} />
+              {karaUyari.length > 0 && (
+                <div style={{ background: "rgba(239,68,68,0.12)", borderRadius: 8, padding: "8px 12px", marginTop: 8, borderLeft: "3px solid #ef4444" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", display: "flex", alignItems: "center", gap: 6 }}><Ban size={14} strokeWidth={2} /> Kara Listede!</div>
+                  {karaUyari.map(k => (
+                    <div key={k.id} style={{ fontSize: 12, color: "var(--text)", marginTop: 2 }}>{k.ad}{k.sebep ? ` — ${k.sebep}` : ""}</div>
+                  ))}
+                </div>
+              )}
             </div>
             <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8 }}>
               Toplam: {(parseInt(satData.miktar || 1) * (satForm.satis_fiyati || 0)).toLocaleString("tr-TR")} ₺

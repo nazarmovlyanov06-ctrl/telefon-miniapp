@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import ImeiInput from "../components/ImeiInput";
@@ -7,7 +7,7 @@ import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolu
 import {
   Store, Package, CheckCircle2, Search, CircleX, User, Smartphone,
   HardDrive, Cpu, Wrench, Trash2, Banknote, Phone, Radio, History,
-  X, Inbox, Send, Clock, Printer,
+  X, Inbox, Send, Clock, Printer, Ban,
 } from "lucide-react";
 import UrunEtiketModal from "../components/UrunEtiketModal";
 
@@ -52,6 +52,19 @@ export default function IkinciEl({ user }) {
   const [showKimdenOner, setShowKimdenOner] = useState(false);
   const [satMusteriOner, setSatMusteriOner] = useState([]);
   const [showSatMusteriOner, setShowSatMusteriOner] = useState(false);
+  const [karaUyari, setKaraUyari] = useState([]);
+  const karaTimer = useRef(null);
+
+  function karaKontrolEt(telefon) {
+    clearTimeout(karaTimer.current);
+    if (telefon.length >= 7) {
+      karaTimer.current = setTimeout(() => {
+        api.karaListe(telefon).then(r => setKaraUyari(r || [])).catch(() => {});
+      }, 600);
+    } else {
+      setKaraUyari([]);
+    }
+  }
   const [imeiSon4, setImeiSon4] = useState("");
   const [imeiGecmis, setImeiGecmis] = useState(null);
   const [imeiLoading, setImeiLoading] = useState(false);
@@ -148,6 +161,7 @@ export default function IkinciEl({ user }) {
       });
       setShowSat(false); setSelected(null);
       setSatForm({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
+      setKaraUyari([]);
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -477,7 +491,7 @@ export default function IkinciEl({ user }) {
                             <div className="ac-dropdown">
                               {satMusteriOner.map(m => (
                                 <div key={m.id}
-                                  onMouseDown={() => { setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon })); setShowSatMusteriOner(false); }}
+                                  onMouseDown={() => { setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon })); setShowSatMusteriOner(false); if (m.phone) karaKontrolEt(m.phone); }}
                                   style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
                                     borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                                   <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
@@ -490,10 +504,20 @@ export default function IkinciEl({ user }) {
                         <div className="form-group">
                           <label className="form-label">Müşteri Telefonu *</label>
                           <input className="form-input" required inputMode="tel" value={satForm.musteri_telefon}
-                            onChange={e => setSatForm(f => ({ ...f, musteri_telefon: e.target.value }))}
+                            onChange={e => { setSatForm(f => ({ ...f, musteri_telefon: e.target.value })); karaKontrolEt(e.target.value); }}
                             placeholder="0555..." />
                           {satForm.musteri_adi && satForm.musteri_telefon && (
                             <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri listesine otomatik eklenecek</div>
+                          )}
+                          {karaUyari.length > 0 && (
+                            <div style={{ background: "rgba(239,68,68,0.12)", borderRadius: 8, padding: "8px 12px", marginTop: 8, borderLeft: "3px solid #ef4444" }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", display: "flex", alignItems: "center", gap: 6 }}><Ban size={14} strokeWidth={2} /> Kara Listede!</div>
+                              {karaUyari.map(k => (
+                                <div key={k.id} style={{ fontSize: 12, color: "var(--text)", marginTop: 2 }}>
+                                  {k.ad}{k.sebep ? ` — ${k.sebep}` : ""}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
                         <div className="form-group">

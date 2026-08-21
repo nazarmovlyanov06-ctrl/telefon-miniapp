@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { CalendarClock, Phone, CheckCircle2, X, Eye } from "lucide-react";
+import { CalendarClock, Phone, CheckCircle2, X, Eye, Ban } from "lucide-react";
 
 const DURUM_META = {
   yeni: { label: "Yeni", color: "var(--blue)" },
@@ -63,7 +63,14 @@ export default function RandevuTalepleri() {
           }}>
             <div className="card-row" style={{ alignItems: "flex-start" }}>
               <div>
-                <div style={{ fontWeight: 600 }}>{t.musteri_adi}</div>
+                <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                  {t.musteri_adi}
+                  {t.is_blacklisted && (
+                    <span className="badge" style={{ background: "rgba(248,113,113,0.15)", color: "var(--red)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <Ban size={11} strokeWidth={2} /> Kara Listede
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 13, color: "var(--hint)", display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
                   <Phone size={11} strokeWidth={2} /> {t.telefon}
                 </div>

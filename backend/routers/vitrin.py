@@ -154,8 +154,14 @@ async def randevu_talepleri(
     db: asyncpg.Connection = Depends(get_db),
 ):
     rows = await db.fetch(
-        """SELECT id, musteri_adi, telefon, cihaz_model, aciklama, durum, created_at
-           FROM randevu_talepleri WHERE dukkan_id = $1 ORDER BY created_at DESC""",
+        """SELECT r.id, r.musteri_adi, r.telefon, r.cihaz_model, r.aciklama, r.durum, r.created_at,
+                  EXISTS(
+                      SELECT 1 FROM kara_liste k WHERE k.dukkan_id = r.dukkan_id
+                      AND k.telefon IS NOT NULL AND r.telefon IS NOT NULL
+                      AND regexp_replace(k.telefon, '\\D', '', 'g') = regexp_replace(r.telefon, '\\D', '', 'g')
+                      AND regexp_replace(k.telefon, '\\D', '', 'g') != ''
+                  ) AS is_blacklisted
+           FROM randevu_talepleri r WHERE r.dukkan_id = $1 ORDER BY r.created_at DESC""",
         dukkan_id,
     )
     return [dict(r) for r in rows]

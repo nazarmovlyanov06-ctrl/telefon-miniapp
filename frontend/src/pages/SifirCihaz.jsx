@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import UrunGorsel from "../components/UrunGorsel";
@@ -6,7 +6,7 @@ import ImeiInput from "../components/ImeiInput";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 import {
   Store, Package, CheckCircle2, CircleX, Smartphone, Trash2, Banknote,
-  User, Phone, Radio, History, X, Inbox, Send, Clock, Printer,
+  User, Phone, Radio, History, X, Inbox, Send, Clock, Printer, Ban,
 } from "lucide-react";
 import UrunEtiketModal from "../components/UrunEtiketModal";
 
@@ -42,6 +42,19 @@ export default function SifirCihaz({ user }) {
   const [musteriler, setMusteriler] = useState([]);
   const [satMusteriOner, setSatMusteriOner] = useState([]);
   const [showSatMusteriOner, setShowSatMusteriOner] = useState(false);
+  const [karaUyari, setKaraUyari] = useState([]);
+  const karaTimer = useRef(null);
+
+  function karaKontrolEt(telefon) {
+    clearTimeout(karaTimer.current);
+    if (telefon.length >= 7) {
+      karaTimer.current = setTimeout(() => {
+        api.karaListe(telefon).then(r => setKaraUyari(r || [])).catch(() => {});
+      }, 600);
+    } else {
+      setKaraUyari([]);
+    }
+  }
   const [imeiModal, setImeiModal] = useState(null);
   const [imeiModalData, setImeiModalData] = useState([]);
   const [imeiModalLoading, setImeiModalLoading] = useState(false);
@@ -122,6 +135,7 @@ export default function SifirCihaz({ user }) {
       });
       setShowSat(false); setSelected(null);
       setSatForm({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
+      setKaraUyari([]);
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -372,6 +386,7 @@ export default function SifirCihaz({ user }) {
                                   onMouseDown={() => {
                                     setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon }));
                                     setShowSatMusteriOner(false);
+                                    if (m.phone) karaKontrolEt(m.phone);
                                   }}
                                   style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
                                     borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
@@ -386,11 +401,21 @@ export default function SifirCihaz({ user }) {
                         <div className="form-group">
                           <label className="form-label">Müşteri Telefonu *</label>
                           <input className="form-input" required inputMode="tel" value={satForm.musteri_telefon}
-                            onChange={e => setSatForm(f => ({ ...f, musteri_telefon: e.target.value }))}
+                            onChange={e => { setSatForm(f => ({ ...f, musteri_telefon: e.target.value })); karaKontrolEt(e.target.value); }}
                             placeholder="0555..." />
                           {satForm.musteri_adi && satForm.musteri_telefon && (
                             <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>
                               ✓ Müşteri listesine otomatik eklenecek
+                            </div>
+                          )}
+                          {karaUyari.length > 0 && (
+                            <div style={{ background: "rgba(239,68,68,0.12)", borderRadius: 8, padding: "8px 12px", marginTop: 8, borderLeft: "3px solid #ef4444" }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", display: "flex", alignItems: "center", gap: 6 }}><Ban size={14} strokeWidth={2} /> Kara Listede!</div>
+                              {karaUyari.map(k => (
+                                <div key={k.id} style={{ fontSize: 12, color: "var(--text)", marginTop: 2 }}>
+                                  {k.ad}{k.sebep ? ` — ${k.sebep}` : ""}
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
