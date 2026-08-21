@@ -31,6 +31,18 @@ def make_repair_no(last_id: int) -> str:
     return f"T{today}{last_id + 1:04d}"
 
 
+def _tarih_parse(deger):
+    # Frontend <input type="date"> "YYYY-MM-DD" string gönderir — asyncpg DATE
+    # kolonu için bunu gerçek bir date nesnesine çevirmek gerekiyor, aksi
+    # halde "'str' object has no attribute 'toordinal'" hatasıyla düşer.
+    if not deger:
+        return None
+    try:
+        return datetime.date.fromisoformat(deger)
+    except ValueError:
+        return None
+
+
 async def _bildirim_ekle(db, dukkan_id, customer_id, repair_id, baslik, mesaj):
     if not customer_id or not mesaj:
         return
@@ -203,7 +215,7 @@ async def create_repair(
         user["id"],
         body.get("screen_lock_type"),
         body.get("screen_lock_value"),
-        body.get("tahmini_teslim_tarihi") or None,
+        _tarih_parse(body.get("tahmini_teslim_tarihi")),
     )
     return {"id": new_repair["id"], "repair_no": repair_no}
 
@@ -233,7 +245,7 @@ async def update_repair(
     tamirde_at = now if yeni_durum == "tamirde" else None
     completed_at = now if yeni_durum == "hazir" else None
     delivered_at = now if yeni_durum == "teslim" else None
-    tahmini_teslim_tarihi = body.get("tahmini_teslim_tarihi") or None
+    tahmini_teslim_tarihi = _tarih_parse(body.get("tahmini_teslim_tarihi"))
 
     # "Kime teslim edildi" — sadece bu çağrı teslim'e geçiriyorsa kaydedilir,
     # aksi halde mevcut durum_detay korunur (aşağıda COALESCE ile).
