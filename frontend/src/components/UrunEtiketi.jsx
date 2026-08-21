@@ -68,10 +68,22 @@ export function EtiketIcerik({ item, ayarlar = ETIKET_AYAR_VARSAYILAN, duzenlene
   // serbestçe taşınabildiği için bu tam bir metin sarma değil, makul bir
   // varsayılan boşluk.
   const ustBosluk = logoGoster ? Math.min((logoYPct / 100) * yukseklikMm + logoYukseklikMm / 2, yukseklikMm * 0.6) : 0;
-  // Barkod, metin bloğuyla birlikte kutunun sabit yüksekliğine (çerçeveye) taşmadan
-  // sığsın diye etiket boyutuna göre ölçeklenir — küçük etiketlerde otomatik küçülür.
-  const barkotYukseklik = Math.max(18, Math.min(34, yukseklikMm * 1.15 - (kategoriGoster && item.kategori ? 6 : 0)));
-  const barkotFontSize = barkotYukseklik < 26 ? 8 : 10;
+
+  // Barkod, üstündeki tüm metin bloğuyla (logo boşluğu dahil) birlikte kutunun
+  // sabit yüksekliğine taşmadan sığsın diye kalan alana göre ölçeklenir — bu
+  // hesap yapılmazsa (özellikle logo+kategori birlikteyken) barkot çerçevenin
+  // dışına taşabiliyordu.
+  const MM_PX = 3.7795;
+  const kutuIcYukseklikPx = yukseklikMm * MM_PX - 10; // 5px+5px dikey padding
+  const ustBoslukPx = ustBosluk * MM_PX;
+  const kategoriPx = kategoriGoster && item.kategori ? 12 : 0;
+  const adPx = 15;
+  const ayiriciPx = ayiriciGoster ? 8 : 0;
+  const fiyatPx = 19;
+  const metinToplamPx = kategoriPx + adPx + ayiriciPx + fiyatPx;
+  const barkotIcinKalanPx = kutuIcYukseklikPx - ustBoslukPx - metinToplamPx;
+  const barkotFontSize = barkotIcinKalanPx < 40 ? 8 : 10;
+  const barkotYukseklik = Math.max(12, Math.min(34, barkotIcinKalanPx - (barkotFontSize + 8)));
 
   function pxMmOrani() {
     const rect = kutuRef.current.getBoundingClientRect();
