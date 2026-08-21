@@ -3,6 +3,18 @@ import { BarkotSVG } from "./UrunEtiketi";
 
 const KILIT_ETIKET = { pin: "PIN", pattern: "Desen" };
 
+// Yazdırma sırasında CSS değişkenleri (var(--orange) vb.) kullanılamaz —
+// etiket her zaman beyaz kağıda basılıyor, o yüzden durum renkleri burada
+// sabit (print-safe) hex değerlerle tanımlanıyor.
+const DURUM_ETIKET = {
+  bekliyor: { label: "Bekliyor", renk: "#c47a1f", bg: "#fdf1e0" },
+  tamirde: { label: "Tamirde", renk: "#1d6fc4", bg: "#e3edfb" },
+  parca_bekleniyor: { label: "Parça Bekleniyor", renk: "#7c3aed", bg: "#efe7fd" },
+  hazir: { label: "Hazır", renk: "#15803d", bg: "#e2f6e8" },
+  teslim: { label: "Teslim Edildi", renk: "#4b5563", bg: "#eceef0" },
+  iptal: { label: "İptal", renk: "#b91c1c", bg: "#fbe4e4" },
+};
+
 function Satir({ label, value }) {
   if (!value) return null;
   return (
@@ -30,6 +42,7 @@ export function TamirEtiketi({ repair, ayarlar = {} }) {
     ? `${KILIT_ETIKET[repair.screen_lock_type] || repair.screen_lock_type}${repair.screen_lock_value ? ` · ${repair.screen_lock_value}` : ""}`
     : "";
   const kod = repair.repair_no || `TMR${String(repair.id).padStart(6, "0")}`;
+  const durum = DURUM_ETIKET[repair.status];
 
   return (
     <div className="etiket-tek">
@@ -40,7 +53,15 @@ export function TamirEtiketi({ repair, ayarlar = {} }) {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
           {logoGoster && <img src={fotoUrl(ayarlar.logo_url)} alt="" style={{ width: 16, height: 16, objectFit: "contain", flexShrink: 0 }} />}
-          <div style={{ fontWeight: 800, fontSize: 11 }}>{kod}</div>
+          <div style={{ fontWeight: 800, fontSize: 11, flex: 1 }}>{kod}</div>
+          {durum && (
+            <div style={{
+              fontSize: 8, fontWeight: 700, color: durum.renk, background: durum.bg,
+              padding: "2px 6px", borderRadius: 5, whiteSpace: "nowrap", flexShrink: 0,
+            }}>
+              {durum.label}
+            </div>
+          )}
         </div>
         <div style={{ flex: 1, minHeight: 0 }}>
           <Satir label="Müşteri" value={repair.customer_name} />
