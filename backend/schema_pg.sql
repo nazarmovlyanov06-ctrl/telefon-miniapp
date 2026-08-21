@@ -356,6 +356,7 @@ CREATE TABLE IF NOT EXISTS ikinci_el (
     customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     gorsel_url TEXT,
     aksesuarlar JSONB,
+    liste_fiyati REAL,
     created_at TIMESTAMP DEFAULT now()
 );
 
@@ -542,6 +543,7 @@ CREATE TABLE IF NOT EXISTS sifir_cihazlar (
     customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     gorsel_url TEXT,
     aksesuarlar JSONB,
+    liste_fiyati REAL,
     created_at TIMESTAMP DEFAULT now()
 );
 

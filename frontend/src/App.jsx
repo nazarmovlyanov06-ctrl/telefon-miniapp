@@ -43,6 +43,7 @@ import Debts from "./pages/Debts";
 import Settings from "./pages/Settings";
 import Toptanci from "./pages/Toptanci";
 import IkinciEl from "./pages/IkinciEl";
+import Katalog from "./pages/Katalog";
 import Garanti from "./pages/Garanti";
 import Kasa from "./pages/Kasa";
 import Gider from "./pages/Gider";
@@ -180,6 +181,7 @@ function AppRoutes({ user }) {
         <Route path="/settings" element={<Settings user={user} />} />
         <Route path="/toptanci" element={<Toptanci />} />
         <Route path="/ikinciel" element={<IkinciEl user={user} />} />
+        <Route path="/katalog" element={<Katalog />} />
         <Route path="/garanti" element={<Garanti />} />
         <Route path="/kasa" element={user?.rol === "patron" ? <Kasa /> : <Navigate to="/" replace />} />
         <Route path="/gider" element={<Gider user={user} />} />

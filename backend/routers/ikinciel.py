@@ -103,6 +103,25 @@ async def list_stok(
     return await _with_masraflar(db, dukkan_id, rows)
 
 
+@router.get("/katalog")
+async def katalog(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Müşteriye elde gösterilecek vitrin listesi — alış fiyatı, kimden/imei/
+    notlar gibi dükkan-içi bilgiler bilinçli olarak SELECT'e hiç alınmıyor,
+    sadece liste_fiyati (varsa) dönüyor; böylece bir ekran görüntüsü ya da
+    ağ isteği incelemesiyle bile maliyet asla sızmaz."""
+    rows = await db.fetch(
+        """SELECT id, model, renk, depolama, ram, gorsel_url, liste_fiyati, kaynak
+           FROM ikinci_el WHERE dukkan_id = $1 AND durum = 'stokta'
+           ORDER BY liste_fiyati ASC NULLS LAST, created_at DESC""",
+        dukkan_id,
+    )
+    return [dict(r) for r in rows]
+
+
 @router.get("/satilanlar")
 async def list_satilanlar(
     dukkan_id: int = Depends(get_dukkan_id),
@@ -145,18 +164,19 @@ async def create_cihaz(
     kimden = body.get("kimden") or ""
     kimden_telefon = body.get("kimden_telefon") or ""
     aksesuarlar = json.dumps(body["aksesuarlar"], ensure_ascii=False) if body.get("aksesuarlar") else None
+    liste_fiyati = float(body["liste_fiyati"]) if body.get("liste_fiyati") not in (None, "") else None
     async with db.transaction():
         row = await db.fetchrow(
             """INSERT INTO ikinci_el
                (dukkan_id, model, imei, renk, depolama, ram, ozellikler,
-                kimden, kimden_telefon, alis_fiyati, notlar, durum, kaynak, aksesuarlar)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'stokta', $12, $13::jsonb)
+                kimden, kimden_telefon, alis_fiyati, notlar, durum, kaynak, aksesuarlar, liste_fiyati)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'stokta', $12, $13::jsonb, $14)
                RETURNING id""",
             dukkan_id, body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
             body.get("ram"), body.get("ozellikler"),
             kimden, kimden_telefon,
             float(body["alis_fiyati"]), body.get("notlar"),
-            body.get("kaynak", "dukkan"), aksesuarlar,
+            body.get("kaynak", "dukkan"), aksesuarlar, liste_fiyati,
         )
         if kimden and kimden_telefon:
             existing = await db.fetchrow(
@@ -186,13 +206,14 @@ async def update_cihaz(
     burada değiştirilmiyor — o akış hâlâ /sat üzerinden yürüyor."""
     if not body.get("model") or body.get("alis_fiyati") is None:
         raise HTTPException(400, "Model ve alış fiyatı zorunlu")
+    liste_fiyati = float(body["liste_fiyati"]) if body.get("liste_fiyati") not in (None, "") else None
     result = await db.execute(
         """UPDATE ikinci_el SET model=$1, imei=$2, renk=$3, depolama=$4, ram=$5,
-           ozellikler=$6, kimden=$7, kimden_telefon=$8, alis_fiyati=$9, notlar=$10
-           WHERE id=$11 AND dukkan_id=$12""",
+           ozellikler=$6, kimden=$7, kimden_telefon=$8, alis_fiyati=$9, notlar=$10, liste_fiyati=$11
+           WHERE id=$12 AND dukkan_id=$13""",
         body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
         body.get("ram"), body.get("ozellikler"), body.get("kimden"), body.get("kimden_telefon"),
-        float(body["alis_fiyati"]), body.get("notlar"), cihaz_id, dukkan_id,
+        float(body["alis_fiyati"]), body.get("notlar"), liste_fiyati, cihaz_id, dukkan_id,
     )
     if result == "UPDATE 0":
         raise HTTPException(404, "Cihaz bulunamadı")

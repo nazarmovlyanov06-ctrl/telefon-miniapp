@@ -6,7 +6,7 @@ import {
   Smartphone, Headphones, Factory, Undo2,
   ShieldCheck, PhoneCall, Ban, MessageSquareWarning,
   Banknote, BarChart3, ScanLine, Settings, LogOut, Store, CalendarClock,
-  Star, Repeat, MessageCircle, Printer,
+  Star, Repeat, MessageCircle, Printer, LayoutGrid,
 } from "lucide-react";
 import { api, setToken } from "../api";
 
@@ -28,6 +28,7 @@ const FINANS = [
 const SATIS_STOK = [
   { path: "/ikinciel", icon: Smartphone, label: "2. El Cihaz" },
   { path: "/sifir-cihaz", icon: Smartphone, label: "Sıfır Cihaz" },
+  { path: "/katalog", icon: LayoutGrid, label: "Katalog" },
   { path: "/aksesuar", icon: Headphones, label: "Aksesuar" },
   { path: "/toptanci", icon: Factory, label: "Toptancı" },
   { path: "/parca-iade", icon: Undo2, label: "Parça İade" },

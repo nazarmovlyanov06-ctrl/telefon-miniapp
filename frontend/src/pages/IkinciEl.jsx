@@ -81,7 +81,7 @@ export default function IkinciEl({ user }) {
   const [etiketModalItems, setEtiketModalItems] = useState(null);
   const [topluEtiketModal, setTopluEtiketModal] = useState(false);
   const [topluEtiketSecili, setTopluEtiketSecili] = useState(new Set());
-  const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {} });
+  const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", liste_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {} });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
   const [err, setErr] = useState("");
@@ -152,7 +152,8 @@ export default function IkinciEl({ user }) {
     setDuzenleForm({
       model: c.model, imei: c.imei || "", renk: c.renk || "", depolama: c.depolama || "",
       ram: c.ram || "", ozellikler: c.ozellikler || "", kimden: c.kimden || "",
-      kimden_telefon: c.kimden_telefon || "", alis_fiyati: c.alis_fiyati ?? "", notlar: c.notlar || "",
+      kimden_telefon: c.kimden_telefon || "", alis_fiyati: c.alis_fiyati ?? "",
+      liste_fiyati: c.liste_fiyati ?? "", notlar: c.notlar || "",
     });
     loadFotolar(c.id);
   }
@@ -191,7 +192,7 @@ export default function IkinciEl({ user }) {
   async function submitDuzenle(e) {
     e.preventDefault(); setErr("");
     try {
-      await api.updateIkinciEl(selected.id, { ...duzenleForm, alis_fiyati: parseFloat(duzenleForm.alis_fiyati) });
+      await api.updateIkinciEl(selected.id, { ...duzenleForm, alis_fiyati: parseFloat(duzenleForm.alis_fiyati), liste_fiyati: duzenleForm.liste_fiyati ? parseFloat(duzenleForm.liste_fiyati) : null });
       setShowDuzenle(false);
       const [l, o, s] = await Promise.all([api.ikinciElList(), api.ikinciElOzet(), api.ikinciElSatilanlar()]);
       setList(l); setOzet(o); setSatilanlar(s);
@@ -229,9 +230,9 @@ export default function IkinciEl({ user }) {
   async function submitAlim(e) {
     e.preventDefault(); setErr("");
     try {
-      await api.createIkinciEl({ ...form, alis_fiyati: parseFloat(form.alis_fiyati) });
+      await api.createIkinciEl({ ...form, alis_fiyati: parseFloat(form.alis_fiyati), liste_fiyati: form.liste_fiyati ? parseFloat(form.liste_fiyati) : null });
       setShowForm(false);
-      setForm({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {} });
+      setForm({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", liste_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {} });
       karaSonuclar.current = {}; setKaraUyari([]);
       load();
     } catch (e) { setErr(e.message); }
@@ -497,6 +498,10 @@ export default function IkinciEl({ user }) {
                 <div className="form-group">
                   <label className="form-label">Alış Fiyatı (₺) *</label>
                   <input className="form-input" type="number" required value={form.alis_fiyati} onChange={e => setForm({ ...form, alis_fiyati: e.target.value })} placeholder="0" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Liste Fiyatı (₺) — Katalogda gösterilir</label>
+                  <input className="form-input" type="number" value={form.liste_fiyati} onChange={e => setForm({ ...form, liste_fiyati: e.target.value })} placeholder="Boş bırakılırsa katalogda fiyat görünmez" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Not</label>
@@ -868,6 +873,10 @@ export default function IkinciEl({ user }) {
                   <div className="form-group">
                     <label className="form-label">Alış Fiyatı (₺) *</label>
                     <input className="form-input" type="number" required value={duzenleForm.alis_fiyati} onChange={e => setDuzenleForm(f => ({ ...f, alis_fiyati: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Liste Fiyatı (₺) — Katalogda gösterilir</label>
+                    <input className="form-input" type="number" value={duzenleForm.liste_fiyati} onChange={e => setDuzenleForm(f => ({ ...f, liste_fiyati: e.target.value }))} placeholder="Boş bırakılırsa katalogda fiyat görünmez" />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Not</label>

@@ -8,7 +8,7 @@ import {
   TriangleAlert, Plus, Wrench, X, ArrowRight, TrendingUp,
   ChevronDown, ChevronUp, Landmark, Target, Factory, Undo2, PhoneCall,
   Ban, MessageSquareWarning, Store, CalendarClock, Star, Repeat,
-  MessageCircle, Banknote, ScanLine, Users, SlidersHorizontal, Check, Bell, Clock,
+  MessageCircle, Banknote, ScanLine, Users, SlidersHorizontal, Check, Bell, Clock, LayoutGrid,
 } from "lucide-react";
 
 /* ── Kalıcı tarayıcı tercihleri ──────────────────────────────────────── */
@@ -31,6 +31,7 @@ function acikBolumleriOku() {
 const TUM_MODULLER = [
   { icon: Smartphone, label: "2. El", path: "/ikinciel", color: "var(--purple)" },
   { icon: Package, label: "Sıfır Cihaz", path: "/sifir-cihaz", color: "var(--blue)" },
+  { icon: LayoutGrid, label: "Katalog", path: "/katalog", color: "var(--gold)" },
   { icon: ShieldCheck, label: "Garanti", path: "/garanti", color: "var(--green)" },
   { icon: ClipboardList, label: "Siparişler", path: "/parts?tab=orders", color: "var(--orange)" },
   { icon: Headphones, label: "Aksesuar", path: "/aksesuar", color: "var(--purple)" },

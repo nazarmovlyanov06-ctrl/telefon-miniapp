@@ -230,6 +230,7 @@ export const api = {
   ikinciElSatilanlar: () => get("/ikinciel/satilanlar"),
   ikinciElIMEI: (son4) => get(`/ikinciel/imei-gecmis/${son4}`),
   ikinciElIMEITam: (imei) => get(`/ikinciel/imei-tam/${encodeURIComponent(imei)}`),
+  ikinciElKatalog: () => get("/ikinciel/katalog"),
   sifirIMEITam: (imei) => get(`/sifir-cihaz/imei-tam/${encodeURIComponent(imei)}`),
 
   // Sıfır Cihaz
@@ -242,6 +243,8 @@ export const api = {
   deleteSifir: (id) => del(`/sifir-cihaz/${id}`),
   sifirSat: (id, data) => post(`/sifir-cihaz/${id}/sat`, data),
   sifirSatilanlar: () => get("/sifir-cihaz/satilanlar"),
+  sifirKatalog: () => get("/sifir-cihaz/katalog"),
+  sifirListeFiyatGuncelle: (id, liste_fiyati) => put(`/sifir-cihaz/${id}/liste-fiyat`, { liste_fiyati }),
 
   // Garanti
   garantiList: (params = {}) => {

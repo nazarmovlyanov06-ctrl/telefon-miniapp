@@ -42,6 +42,23 @@ async def list_stok(
     return [dict(r) for r in rows]
 
 
+@router.get("/katalog")
+async def katalog(
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Bkz. ikinciel.py'deki katalog uç noktası — aynı gerekçeyle alış
+    fiyatı/kimden/imei/notlar SELECT'e hiç alınmıyor."""
+    rows = await db.fetch(
+        """SELECT id, model, renk, depolama, gorsel_url, liste_fiyati, kaynak
+           FROM sifir_cihazlar WHERE dukkan_id = $1 AND durum = 'stokta'
+           ORDER BY liste_fiyati ASC NULLS LAST, created_at DESC""",
+        dukkan_id,
+    )
+    return [dict(r) for r in rows]
+
+
 @router.get("/satilanlar")
 async def list_satilanlar(
     dukkan_id: int = Depends(get_dukkan_id),
@@ -84,15 +101,16 @@ async def create_cihaz(
     kimden = body.get("kimden") or ""
     kimden_telefon = body.get("kimden_telefon") or ""
     aksesuarlar = json.dumps(body["aksesuarlar"], ensure_ascii=False) if body.get("aksesuarlar") else None
+    liste_fiyati = float(body["liste_fiyati"]) if body.get("liste_fiyati") not in (None, "") else None
     async with db.transaction():
         row = await db.fetchrow(
             """INSERT INTO sifir_cihazlar
-               (dukkan_id, model, imei, renk, depolama, kimden, kimden_telefon, kaynak, alis_fiyati, notlar, alis_tarihi, aksesuarlar)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb) RETURNING id""",
+               (dukkan_id, model, imei, renk, depolama, kimden, kimden_telefon, kaynak, alis_fiyati, notlar, alis_tarihi, aksesuarlar, liste_fiyati)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13) RETURNING id""",
             dukkan_id, body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
             kimden, kimden_telefon, body.get("kaynak", "dukkan"),
             float(body["alis_fiyati"]), body.get("notlar"),
-            body.get("alis_tarihi", date.today().isoformat()), aksesuarlar,
+            body.get("alis_tarihi", date.today().isoformat()), aksesuarlar, liste_fiyati,
         )
         if kimden and kimden_telefon:
             existing = await db.fetchrow(
@@ -105,6 +123,27 @@ async def create_cihaz(
                     dukkan_id, kimden, kimden_telefon,
                 )
     return {"id": row["id"]}
+
+
+@router.put("/{cihaz_id}/liste-fiyat")
+async def liste_fiyat_guncelle(
+    cihaz_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    """Sıfır Cihaz'da henüz genel bir düzenleme formu yok — katalog fiyatını
+    zaten stokta olan cihazlar için de girebilsin diye tek alanlık bu uç
+    nokta eklendi."""
+    liste_fiyati = float(body["liste_fiyati"]) if body.get("liste_fiyati") not in (None, "") else None
+    result = await db.execute(
+        "UPDATE sifir_cihazlar SET liste_fiyati=$1 WHERE id=$2 AND dukkan_id=$3",
+        liste_fiyati, cihaz_id, dukkan_id,
+    )
+    if result == "UPDATE 0":
+        raise HTTPException(404, "Cihaz bulunamadı")
+    return {"ok": True}
 
 
 @router.delete("/{cihaz_id}")
