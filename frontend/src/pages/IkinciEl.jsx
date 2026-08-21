@@ -1,17 +1,33 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api";
+import { api, fotoUrl } from "../api";
 import ImeiInput from "../components/ImeiInput";
 import UrunGorsel from "../components/UrunGorsel";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 import {
   Store, Package, CheckCircle2, Search, CircleX, User, Smartphone,
   HardDrive, Cpu, Wrench, Trash2, Banknote, Phone, Radio, History,
-  X, Inbox, Send, Clock, Printer, Ban,
+  X, Inbox, Send, Clock, Printer, Ban, Camera, Pencil,
 } from "lucide-react";
 import UrunEtiketModal from "../components/UrunEtiketModal";
 
 const AKSESUAR_ETIKETLERI = { kutu: "Kutu", sarj_aleti: "Şarj Aleti", kilif: "Kılıf", kulaklik: "Kulaklık" };
+
+// 60 günden fazla stokta bekleyen cihaz "durgun" sayılır — dükkan sahibi
+// fiyat indirimi/promosyon kararını buna göre verebilsin diye.
+const DURGUN_ESIK_GUN = 60;
+function gunSayisi(tarihStr) {
+  if (!tarihStr) return 0;
+  return Math.floor((Date.now() - new Date(tarihStr)) / 86400000);
+}
+
+const SIRALAMA_SECENEKLERI = [
+  { key: "yeni", label: "En Yeni" },
+  { key: "eski", label: "En Eski" },
+  { key: "fiyat_yuksek", label: "Fiyat: Yüksek" },
+  { key: "fiyat_dusuk", label: "Fiyat: Düşük" },
+  { key: "durgun", label: "Durgun Önce" },
+];
 
 // Etiket bileşeni {id, ad, satis_fiyati, kategori, barkot} bekliyor — 2.El
 // cihazın kendi alan adlarını buna çevirir. Fiyat sadece SATILDIĞINDA
@@ -106,6 +122,12 @@ export default function IkinciEl({ user }) {
   const [imeiModalData, setImeiModalData] = useState([]);
   const [imeiModalDiger, setImeiModalDiger] = useState({ sifir_cihaz: [], tamir: [] });
   const [imeiModalLoading, setImeiModalLoading] = useState(false);
+  const [siralama, setSiralama] = useState("yeni");
+  const [showDuzenle, setShowDuzenle] = useState(false);
+  const [duzenleForm, setDuzenleForm] = useState(null);
+  const [fotolar, setFotolar] = useState([]);
+  const [fotoLoading, setFotoLoading] = useState(false);
+  const fotoInputRef = useRef(null);
 
   useEffect(() => {
     load();
@@ -120,9 +142,57 @@ export default function IkinciEl({ user }) {
   }
 
   function selectCihaz(c) {
-    const isSame = selected?.id === c.id;
-    setSelected(isSame ? null : c);
-    setShowMasraf(false); setShowSat(false);
+    setSelected(c);
+    setShowMasraf(false); setShowSat(false); setShowDuzenle(false);
+    setDuzenleForm({
+      model: c.model, imei: c.imei || "", renk: c.renk || "", depolama: c.depolama || "",
+      ram: c.ram || "", ozellikler: c.ozellikler || "", kimden: c.kimden || "",
+      kimden_telefon: c.kimden_telefon || "", alis_fiyati: c.alis_fiyati ?? "", notlar: c.notlar || "",
+    });
+    loadFotolar(c.id);
+  }
+
+  function closeSelected() {
+    setSelected(null); setShowMasraf(false); setShowSat(false); setShowDuzenle(false); setFotolar([]);
+  }
+
+  async function loadFotolar(id) {
+    setFotoLoading(true);
+    try { setFotolar(await api.ikinciElFotolar(id)); } catch { setFotolar([]); }
+    finally { setFotoLoading(false); }
+  }
+
+  async function addFoto(e) {
+    const file = e.target.files?.[0];
+    if (!file || !selected) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        await api.addIkinciElFoto(selected.id, { foto: ev.target.result, aciklama: "" });
+        setFotolar(await api.ikinciElFotolar(selected.id));
+      } catch (_) {}
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  async function deleteFoto(fotoId) {
+    try {
+      await api.deleteIkinciElFoto(selected.id, fotoId);
+      setFotolar(await api.ikinciElFotolar(selected.id));
+    } catch (_) {}
+  }
+
+  async function submitDuzenle(e) {
+    e.preventDefault(); setErr("");
+    try {
+      await api.updateIkinciEl(selected.id, { ...duzenleForm, alis_fiyati: parseFloat(duzenleForm.alis_fiyati) });
+      setShowDuzenle(false);
+      const [l, o, s] = await Promise.all([api.ikinciElList(), api.ikinciElOzet(), api.ikinciElSatilanlar()]);
+      setList(l); setOzet(o); setSatilanlar(s);
+      const updated = l.find(x => x.id === selected.id);
+      if (updated) setSelected(updated);
+    } catch (e) { setErr(e.message); }
   }
 
   function handleSatMusteriChange(val) {
@@ -229,6 +299,14 @@ export default function IkinciEl({ user }) {
 
   const filteredList = kaynak === "hepsi" ? list : list.filter(c => (c.kaynak || "dukkan") === kaynak);
   const filteredSatilanlar = kaynak === "hepsi" ? satilanlar : satilanlar.filter(c => (c.kaynak || "dukkan") === kaynak);
+  const sortedList = [...filteredList].sort((a, b) => {
+    const maliyet = (c) => (c.alis_fiyati || 0) + (c.toplam_masraf || 0);
+    if (siralama === "eski") return new Date(a.created_at) - new Date(b.created_at);
+    if (siralama === "fiyat_yuksek") return maliyet(b) - maliyet(a);
+    if (siralama === "fiyat_dusuk") return maliyet(a) - maliyet(b);
+    if (siralama === "durgun") return gunSayisi(b.created_at) - gunSayisi(a.created_at);
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
 
@@ -264,17 +342,25 @@ export default function IkinciEl({ user }) {
       )}
 
       {/* Kaynak filtresi */}
-      <div className="tabs" style={{ marginBottom: 8 }}>
-        {[
-          { key: "hepsi", label: "Hepsi", icon: null },
-          { key: "dukkan", label: "Dükkan", icon: Store },
-          { key: "getmobile", label: "Getmobil", icon: Package },
-        ].map(k => (
-          <button key={k.key} className={`tab ${kaynak === k.key ? "active" : ""}`}
-            onClick={() => setKaynak(k.key)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {k.icon && <k.icon size={13} strokeWidth={2} />}{k.label}
-          </button>
-        ))}
+      <div className="card-row" style={{ marginBottom: 8, gap: 8 }}>
+        <div className="tabs" style={{ flex: 1, margin: 0 }}>
+          {[
+            { key: "hepsi", label: "Hepsi", icon: null },
+            { key: "dukkan", label: "Dükkan", icon: Store },
+            { key: "getmobile", label: "Getmobil", icon: Package },
+          ].map(k => (
+            <button key={k.key} className={`tab ${kaynak === k.key ? "active" : ""}`}
+              onClick={() => setKaynak(k.key)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {k.icon && <k.icon size={13} strokeWidth={2} />}{k.label}
+            </button>
+          ))}
+        </div>
+        {tab === "stok" && (
+          <select className="form-select" value={siralama} onChange={e => setSiralama(e.target.value)}
+            style={{ width: "auto", fontSize: 12, padding: "6px 8px", flexShrink: 0 }}>
+            {SIRALAMA_SECENEKLERI.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        )}
       </div>
 
       <div className="tabs" style={{ marginBottom: 12 }}>
@@ -411,194 +497,48 @@ export default function IkinciEl({ user }) {
 
           {filteredList.length === 0 ? (
             <div className="card" style={{ textAlign: "center", color: "var(--hint)" }}>Stokta 2. el cihaz yok</div>
-          ) : filteredList.map(c => {
-            const isSelected = selected?.id === c.id;
-            const cMasraflar = c.masraflar || [];
-            return (
-              <div key={c.id}>
-                <div className="card" onClick={() => selectCihaz(c)} style={{ cursor: "pointer" }}>
-                  <div className="card-row" style={{ marginBottom: 6, alignItems: "flex-start" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <UrunGorsel url={c.gorsel_url} yukle={f => api.ikinciElGorselYukle(c.id, f)} />
-                      <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 7 }}>
-                        <Smartphone size={16} strokeWidth={2} /> {c.model}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right", minWidth: 80 }}>
-                      <div style={{ fontWeight: 700 }}>
-                        {priceHidden ? "••••" : ((c.alis_fiyati || 0) + (c.toplam_masraf || 0)).toLocaleString("tr-TR") + " ₺"}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--hint)" }}>maliyet</div>
-                      {(c.toplam_masraf || 0) > 0 && (
-                        <>
-                          <div style={{ fontWeight: 600, color: "var(--red)", fontSize: 13, marginTop: 2 }}>
-                            {priceHidden ? "••••" : (c.toplam_masraf || 0).toLocaleString("tr-TR") + " ₺"}
-                          </div>
-                          <div style={{ fontSize: 11, color: "var(--hint)" }}>masraf</div>
-                        </>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {sortedList.map(c => {
+                const gun = gunSayisi(c.created_at);
+                const durgun = gun >= DURGUN_ESIK_GUN;
+                const maliyet = (c.alis_fiyati || 0) + (c.toplam_masraf || 0);
+                return (
+                  <div key={c.id} className="card" style={{ padding: 0, overflow: "hidden", cursor: "pointer", margin: 0 }}
+                    onClick={() => selectCihaz(c)}>
+                    <div style={{ position: "relative", aspectRatio: "1 / 1" }}>
+                      <UrunGorsel url={c.gorsel_url} yukle={f => api.ikinciElGorselYukle(c.id, f)} boyut="100%" />
+                      {durgun && (
+                        <span style={{
+                          position: "absolute", top: 6, left: 6, fontSize: 10, fontWeight: 700,
+                          padding: "2px 7px", borderRadius: 20, background: "rgba(239,68,68,0.9)", color: "#fff",
+                          display: "flex", alignItems: "center", gap: 3,
+                        }}><Clock size={9} strokeWidth={2.5} /> {gun}g</span>
                       )}
-                      <div style={{ fontWeight: 600, fontSize: 13, marginTop: 2 }}>
-                        {priceHidden ? "••••" : (c.alis_fiyati || 0).toLocaleString("tr-TR") + " ₺"}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--hint)" }}>alış fiyatı</div>
-                    </div>
-                  </div>
-                  {/* Özellik chipler */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 4 }}>
-                    {c.renk && <Chip>{c.renk}</Chip>}
-                    {c.depolama && <Chip icon={HardDrive}>{c.depolama}</Chip>}
-                    {c.ram && <Chip icon={Cpu}>{c.ram}</Chip>}
-                    {c.ozellikler && <Chip color="orange">{c.ozellikler}</Chip>}
-                    {c.kaynak === "getmobile" && <Chip color="blue" icon={Package}>Getmobil</Chip>}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    {c.imei && <span>IMEI: {c.imei}</span>}
-                    {c.kimden && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><User size={11} strokeWidth={2} /> {c.kimden}</span>}
-                    {c.alis_tarihi && <span>{c.alis_tarihi}</span>}
-                  </div>
-                </div>
-                {isSelected && (
-                  <div className="card" style={{ marginTop: -8, borderRadius: "0 0 12px 12px", background: "var(--bg2)" }}>
-                    {/* Masraf listesi */}
-                    {cMasraflar.length > 0 && (
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}>
-                          <Wrench size={12} strokeWidth={2} /> Masraflar (toplam: {(c.toplam_masraf || 0).toLocaleString("tr-TR")}₺)
-                        </div>
-                        {cMasraflar.map(m => (
-                          <div key={m.id} style={{
-                            display: "flex", justifyContent: "space-between", alignItems: "center",
-                            fontSize: 13, padding: "6px 0",
-                            borderBottom: "1px solid var(--divider)",
-                          }}>
-                            <div>
-                              <div>{m.aciklama}</div>
-                              <div style={{ fontSize: 11, color: "var(--hint)" }}>{m.tarih || "—"}</div>
-                            </div>
-                            <span style={{ fontWeight: 700 }}>₺{(m.tutar || 0).toLocaleString("tr-TR")}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setShowMasraf(true); setShowSat(false); }}>+ Masraf</button>
-                      <button className="btn btn-primary btn-sm" onClick={() => { setShowSat(true); setShowMasraf(false); }} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <Banknote size={13} strokeWidth={2} /> Sat
-                      </button>
-                      <button className="btn btn-ghost btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}
-                        onClick={() => setEtiketModalItems([cihazToItem(c)])}>
-                        <Printer size={13} strokeWidth={2} /> Etiket Yazdır
-                      </button>
-                      {user?.rol === "patron" && (
-                        deleteId === c.id ? (
-                          <>
-                            <button className="btn btn-sm" style={{ background: "var(--red)", color: "#191b20", padding: "4px 12px", fontSize: 13 }}
-                              onClick={() => deleteCihaz(c.id)}>Sil</button>
-                            <button className="btn btn-ghost btn-sm"
-                              onClick={() => setDeleteId(null)}>İptal</button>
-                          </>
-                        ) : (
-                          <button className="btn btn-ghost btn-sm" style={{ color: "var(--red)", display: "flex", alignItems: "center", gap: 6 }}
-                            onClick={() => setDeleteId(c.id)}><Trash2 size={13} strokeWidth={2} /> Sil</button>
-                        )
+                      {c.kaynak === "getmobile" && (
+                        <span style={{
+                          position: "absolute", top: 6, right: 6, fontSize: 10, fontWeight: 700,
+                          padding: "2px 7px", borderRadius: 20, background: "rgba(94,168,255,0.9)", color: "#fff",
+                        }}>Getmobil</span>
                       )}
                     </div>
-                    {showMasraf && (
-                      <form onSubmit={submitMasraf} style={{ marginTop: 10 }}>
-                        {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0" }}>{err}</div>}
-                        <div className="form-group">
-                          <label className="form-label">Masraf Açıklaması</label>
-                          <input className="form-input" required value={masrafForm.aciklama} onChange={e => setMasrafForm({ ...masrafForm, aciklama: e.target.value })} placeholder="Ekran, temizlik, batarya..." />
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                          <div className="form-group">
-                            <label className="form-label">Tutar (₺)</label>
-                            <input className="form-input" type="number" required value={masrafForm.tutar} onChange={e => setMasrafForm({ ...masrafForm, tutar: e.target.value })} />
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Tarih</label>
-                            <input className="form-input" type="date" value={masrafForm.tarih} onChange={e => setMasrafForm({ ...masrafForm, tarih: e.target.value })} />
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
-                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowMasraf(false)}>İptal</button>
-                        </div>
-                      </form>
-                    )}
-                    {showSat && (
-                      <form onSubmit={submitSat} style={{ marginTop: 10 }}>
-                        {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "8px 0" }}>{err}</div>}
-                        <div className="form-group" style={{ position: "relative" }}>
-                          <label className="form-label">Müşteri Adı *</label>
-                          <input className="form-input" required value={satForm.musteri_adi}
-                            onChange={e => handleSatMusteriChange(e.target.value)}
-                            onBlur={() => setTimeout(() => setShowSatMusteriOner(false), 150)}
-                            placeholder="Ad Soyad" autoComplete="off" />
-                          {showSatMusteriOner && (
-                            <div className="ac-dropdown">
-                              {satMusteriOner.map(m => (
-                                <div key={m.id}
-                                  onMouseDown={() => { setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon })); setShowSatMusteriOner(false); if (m.phone) karaKontrolEt("satis_tel", m.phone); }}
-                                  style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
-                                    borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
-                                  {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Müşteri Telefonu *</label>
-                          <input className="form-input" required inputMode="tel" value={satForm.musteri_telefon}
-                            onChange={e => { setSatForm(f => ({ ...f, musteri_telefon: e.target.value })); karaKontrolEt("satis_tel", e.target.value); }}
-                            placeholder="0555..." />
-                          {satForm.musteri_adi && satForm.musteri_telefon && (
-                            <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri listesine otomatik eklenecek</div>
-                          )}
-                          {karaUyari.length > 0 && (
-                            <div style={{ background: "rgba(239,68,68,0.12)", borderRadius: 8, padding: "8px 12px", marginTop: 8, borderLeft: "3px solid #ef4444" }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", display: "flex", alignItems: "center", gap: 6 }}><Ban size={14} strokeWidth={2} /> Kara Listede!</div>
-                              {karaUyari.map(k => (
-                                <div key={k.id} style={{ fontSize: 12, color: "var(--text)", marginTop: 2 }}>
-                                  {k.ad}{k.sebep ? ` — ${k.sebep}` : ""}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Satış Fiyatı (₺)</label>
-                          <input className="form-input" type="number" required value={satForm.satis_fiyati} onChange={e => setSatForm({ ...satForm, satis_fiyati: e.target.value })} />
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                        <div className="form-group">
-                          <label className="form-label">Kanal</label>
-                          <select className="form-select" value={satForm.satis_kanali} onChange={e => setSatForm({ ...satForm, satis_kanali: e.target.value })}>
-                            {["Dükkan", "Getmobil", "Instagram", "Sahibinden", "Diğer"].map(k => <option key={k}>{k}</option>)}
-                          </select>
-                        </div>
-                        </div>
-                        <OdemeBolustur toplam={parseFloat(satForm.satis_fiyati) || 0} yon="gelir"
-                          value={satForm.odemeler} onChange={v => setSatForm(f => ({ ...f, odemeler: v }))}
-                          taksitSayi={satForm.taksit_sayi} onTaksitSayiChange={v => setSatForm(f => ({ ...f, taksit_sayi: v }))} />
-                        {satForm.satis_fiyati && (
-                          <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8, fontWeight: 600 }}>
-                            Kâr: {(parseFloat(satForm.satis_fiyati) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺
-                          </div>
-                        )}
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button type="submit" className="btn btn-primary btn-sm">Sat</button>
-                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowSat(false)}>İptal</button>
-                        </div>
-                      </form>
-                    )}
+                    <div style={{ padding: "8px 10px 10px" }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {c.model}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--hint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 1 }}>
+                        {[c.renk, c.depolama].filter(Boolean).join(" · ") || " "}
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 13, marginTop: 5 }}>
+                        {priceHidden ? "••••" : maliyet.toLocaleString("tr-TR") + " ₺"}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--hint)" }}>maliyet</div>
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </>
       )}
 
@@ -787,6 +727,281 @@ export default function IkinciEl({ user }) {
           </div>
         </div>
       )}
+
+      {/* Cihaz Detay Modalı — kart tasarımına geçince eski satır-içi açılan
+          panel yerine tek bir modal kullanılıyor; düzenleme formu ve
+          fotoğraf galerisi de buraya eklendi. */}
+      {selected && (() => {
+        const c = selected;
+        const cMasraflar = c.masraflar || [];
+        const gun = gunSayisi(c.created_at);
+        return (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+          }} onClick={closeSelected}>
+            <div className="card" style={{ width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto" }}
+              onClick={e => e.stopPropagation()}>
+              <div className="card-row" style={{ marginBottom: 10, alignItems: "flex-start" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <UrunGorsel url={c.gorsel_url} yukle={f => api.ikinciElGorselYukle(c.id, f)} boyut={46} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{c.model}</div>
+                    {gun >= DURGUN_ESIK_GUN && (
+                      <div style={{ fontSize: 11, color: "var(--red)", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                        <Clock size={10} strokeWidth={2.5} /> {gun} gündür stokta
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                  <button className="btn btn-ghost btn-sm" title="Düzenle"
+                    onClick={() => { setShowDuzenle(v => !v); setShowMasraf(false); setShowSat(false); }}>
+                    <Pencil size={14} strokeWidth={2} />
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={closeSelected}><X size={15} strokeWidth={2} /></button>
+                </div>
+              </div>
+
+              {err && <div style={{ color: "var(--red)", fontSize: 13, padding: "4px 0 10px", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><CircleX size={14} strokeWidth={2} /> {err}</div>}
+
+              {showDuzenle ? (
+                <form onSubmit={submitDuzenle} style={{ marginBottom: 14 }}>
+                  <div className="form-group">
+                    <label className="form-label">Model *</label>
+                    <input className="form-input" required value={duzenleForm.model} onChange={e => setDuzenleForm(f => ({ ...f, model: e.target.value }))} />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div className="form-group">
+                      <label className="form-label">Renk</label>
+                      <input className="form-input" value={duzenleForm.renk} onChange={e => setDuzenleForm(f => ({ ...f, renk: e.target.value }))} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Hafıza</label>
+                      <input className="form-input" value={duzenleForm.depolama} onChange={e => setDuzenleForm(f => ({ ...f, depolama: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div className="form-group">
+                      <label className="form-label">RAM</label>
+                      <input className="form-input" value={duzenleForm.ram} onChange={e => setDuzenleForm(f => ({ ...f, ram: e.target.value }))} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Özellikler</label>
+                      <input className="form-input" value={duzenleForm.ozellikler} onChange={e => setDuzenleForm(f => ({ ...f, ozellikler: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">IMEI</label>
+                    <input className="form-input" value={duzenleForm.imei} onChange={e => setDuzenleForm(f => ({ ...f, imei: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Kimden</label>
+                    <input className="form-input" value={duzenleForm.kimden} onChange={e => setDuzenleForm(f => ({ ...f, kimden: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Kimden Telefon</label>
+                    <input className="form-input" value={duzenleForm.kimden_telefon} onChange={e => setDuzenleForm(f => ({ ...f, kimden_telefon: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Alış Fiyatı (₺) *</label>
+                    <input className="form-input" type="number" required value={duzenleForm.alis_fiyati} onChange={e => setDuzenleForm(f => ({ ...f, alis_fiyati: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Not</label>
+                    <input className="form-input" value={duzenleForm.notlar} onChange={e => setDuzenleForm(f => ({ ...f, notlar: e.target.value }))} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowDuzenle(false)}>İptal</button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 6 }}>
+                    {c.renk && <Chip>{c.renk}</Chip>}
+                    {c.depolama && <Chip icon={HardDrive}>{c.depolama}</Chip>}
+                    {c.ram && <Chip icon={Cpu}>{c.ram}</Chip>}
+                    {c.ozellikler && <Chip color="orange">{c.ozellikler}</Chip>}
+                    {c.kaynak === "getmobile" && <Chip color="blue" icon={Package}>Getmobil</Chip>}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--hint)", display: "flex", flexDirection: "column", gap: 3, marginBottom: 12 }}>
+                    {c.imei && (
+                      <span onClick={() => openImeiModal(c.imei, c.model)}
+                        style={{ cursor: "pointer", color: "var(--primary)", fontWeight: 600, textDecoration: "underline", display: "flex", alignItems: "center", gap: 4, width: "fit-content" }}>
+                        <History size={11} strokeWidth={2} /> IMEI: {c.imei}
+                      </span>
+                    )}
+                    {c.kimden && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><User size={11} strokeWidth={2} /> {c.kimden}{c.kimden_telefon ? ` · ${c.kimden_telefon}` : ""}</span>}
+                    {c.alis_tarihi && <span>Alış: {c.alis_tarihi}</span>}
+                  </div>
+                </>
+              )}
+
+              {/* Ek Fotoğraflar galerisi */}
+              <div style={{ marginBottom: 14, borderTop: "1px solid var(--divider)", paddingTop: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--hint)", display: "flex", alignItems: "center", gap: 5 }}>
+                    <Camera size={12} strokeWidth={2} /> Ek Fotoğraflar ({fotolar.length})
+                  </div>
+                  <button className="btn btn-ghost btn-sm" onClick={() => fotoInputRef.current?.click()}>+ Ekle</button>
+                </div>
+                <input ref={fotoInputRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={addFoto} />
+                {fotoLoading ? (
+                  <div style={{ fontSize: 12, color: "var(--hint)" }}>Yükleniyor...</div>
+                ) : fotolar.length > 0 && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                    {fotolar.map(f => (
+                      <div key={f.id} style={{ position: "relative" }}>
+                        <img src={fotoUrl(f.foto)} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8 }} />
+                        <button onClick={() => deleteFoto(f.id)} title="Sil"
+                          style={{ position: "absolute", top: 3, right: 3, width: 18, height: 18, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+                          <X size={10} strokeWidth={3} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Masraf listesi */}
+              {cMasraflar.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--hint)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <Wrench size={12} strokeWidth={2} /> Masraflar (toplam: {(c.toplam_masraf || 0).toLocaleString("tr-TR")}₺)
+                  </div>
+                  {cMasraflar.map(m => (
+                    <div key={m.id} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      fontSize: 13, padding: "6px 0",
+                      borderBottom: "1px solid var(--divider)",
+                    }}>
+                      <div>
+                        <div>{m.aciklama}</div>
+                        <div style={{ fontSize: 11, color: "var(--hint)" }}>{m.tarih || "—"}</div>
+                      </div>
+                      <span style={{ fontWeight: 700 }}>₺{(m.tutar || 0).toLocaleString("tr-TR")}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setShowMasraf(true); setShowSat(false); setShowDuzenle(false); }}>+ Masraf</button>
+                <button className="btn btn-primary btn-sm" onClick={() => { setShowSat(true); setShowMasraf(false); setShowDuzenle(false); }} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Banknote size={13} strokeWidth={2} /> Sat
+                </button>
+                <button className="btn btn-ghost btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  onClick={() => setEtiketModalItems([cihazToItem(c)])}>
+                  <Printer size={13} strokeWidth={2} /> Etiket Yazdır
+                </button>
+                {user?.rol === "patron" && (
+                  deleteId === c.id ? (
+                    <>
+                      <button className="btn btn-sm" style={{ background: "var(--red)", color: "#191b20", padding: "4px 12px", fontSize: 13 }}
+                        onClick={() => deleteCihaz(c.id)}>Sil</button>
+                      <button className="btn btn-ghost btn-sm"
+                        onClick={() => setDeleteId(null)}>İptal</button>
+                    </>
+                  ) : (
+                    <button className="btn btn-ghost btn-sm" style={{ color: "var(--red)", display: "flex", alignItems: "center", gap: 6 }}
+                      onClick={() => setDeleteId(c.id)}><Trash2 size={13} strokeWidth={2} /> Sil</button>
+                  )
+                )}
+              </div>
+              {showMasraf && (
+                <form onSubmit={submitMasraf} style={{ marginTop: 10 }}>
+                  <div className="form-group">
+                    <label className="form-label">Masraf Açıklaması</label>
+                    <input className="form-input" required value={masrafForm.aciklama} onChange={e => setMasrafForm({ ...masrafForm, aciklama: e.target.value })} placeholder="Ekran, temizlik, batarya..." />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div className="form-group">
+                      <label className="form-label">Tutar (₺)</label>
+                      <input className="form-input" type="number" required value={masrafForm.tutar} onChange={e => setMasrafForm({ ...masrafForm, tutar: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Tarih</label>
+                      <input className="form-input" type="date" value={masrafForm.tarih} onChange={e => setMasrafForm({ ...masrafForm, tarih: e.target.value })} />
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowMasraf(false)}>İptal</button>
+                  </div>
+                </form>
+              )}
+              {showSat && (
+                <form onSubmit={submitSat} style={{ marginTop: 10 }}>
+                  <div className="form-group" style={{ position: "relative" }}>
+                    <label className="form-label">Müşteri Adı *</label>
+                    <input className="form-input" required value={satForm.musteri_adi}
+                      onChange={e => handleSatMusteriChange(e.target.value)}
+                      onBlur={() => setTimeout(() => setShowSatMusteriOner(false), 150)}
+                      placeholder="Ad Soyad" autoComplete="off" />
+                    {showSatMusteriOner && (
+                      <div className="ac-dropdown">
+                        {satMusteriOner.map(m => (
+                          <div key={m.id}
+                            onMouseDown={() => { setSatForm(f => ({ ...f, musteri_adi: m.name, musteri_telefon: m.phone || f.musteri_telefon })); setShowSatMusteriOner(false); if (m.phone) karaKontrolEt("satis_tel", m.phone); }}
+                            style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14,
+                              borderBottom: "1px solid var(--divider)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                            <span style={{ display: "flex", alignItems: "center", gap: 6 }}><User size={13} strokeWidth={2} /> {m.name}</span>
+                            {m.phone && <span style={{ fontSize: 12, color: "var(--hint)" }}>{m.phone}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Müşteri Telefonu *</label>
+                    <input className="form-input" required inputMode="tel" value={satForm.musteri_telefon}
+                      onChange={e => { setSatForm(f => ({ ...f, musteri_telefon: e.target.value })); karaKontrolEt("satis_tel", e.target.value); }}
+                      placeholder="0555..." />
+                    {satForm.musteri_adi && satForm.musteri_telefon && (
+                      <div style={{ fontSize: 11, color: "var(--success)", marginTop: 3 }}>✓ Müşteri listesine otomatik eklenecek</div>
+                    )}
+                    {karaUyari.length > 0 && (
+                      <div style={{ background: "rgba(239,68,68,0.12)", borderRadius: 8, padding: "8px 12px", marginTop: 8, borderLeft: "3px solid #ef4444" }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", display: "flex", alignItems: "center", gap: 6 }}><Ban size={14} strokeWidth={2} /> Kara Listede!</div>
+                        {karaUyari.map(k => (
+                          <div key={k.id} style={{ fontSize: 12, color: "var(--text)", marginTop: 2 }}>
+                            {k.ad}{k.sebep ? ` — ${k.sebep}` : ""}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Satış Fiyatı (₺)</label>
+                    <input className="form-input" type="number" required value={satForm.satis_fiyati} onChange={e => setSatForm({ ...satForm, satis_fiyati: e.target.value })} />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div className="form-group">
+                      <label className="form-label">Kanal</label>
+                      <select className="form-select" value={satForm.satis_kanali} onChange={e => setSatForm({ ...satForm, satis_kanali: e.target.value })}>
+                        {["Dükkan", "Getmobil", "Instagram", "Sahibinden", "Diğer"].map(k => <option key={k}>{k}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <OdemeBolustur toplam={parseFloat(satForm.satis_fiyati) || 0} yon="gelir"
+                    value={satForm.odemeler} onChange={v => setSatForm(f => ({ ...f, odemeler: v }))}
+                    taksitSayi={satForm.taksit_sayi} onTaksitSayiChange={v => setSatForm(f => ({ ...f, taksit_sayi: v }))} />
+                  {satForm.satis_fiyati && (
+                    <div style={{ fontSize: 13, color: "var(--success)", marginBottom: 8, fontWeight: 600 }}>
+                      Kâr: {(parseFloat(satForm.satis_fiyati) - (c.alis_fiyati || 0) - (c.toplam_masraf || 0)).toLocaleString("tr-TR")} ₺
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="submit" className="btn btn-primary btn-sm">Sat</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowSat(false)}>İptal</button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {tab === "imei" && (
         <div>
