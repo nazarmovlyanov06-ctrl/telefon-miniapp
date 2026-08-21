@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS parts (
     sale_price REAL DEFAULT 0,
     supplier TEXT,
     notes TEXT,
+    barkot TEXT,
     created_by INTEGER REFERENCES kullanicilar(id),
     created_at TIMESTAMP DEFAULT now()
 );

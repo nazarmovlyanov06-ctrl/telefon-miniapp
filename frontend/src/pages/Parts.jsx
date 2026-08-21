@@ -3,13 +3,20 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import {
   Package, Truck, CheckCircle2, Search, Plus, X, History, TriangleAlert, Trash2, CircleX,
-  Pencil, Wrench, Banknote, Zap, Undo2, DollarSign, RefreshCw, User, Factory,
+  Pencil, Wrench, Banknote, Zap, Undo2, DollarSign, RefreshCw, User, Factory, Printer,
 } from "lucide-react";
 import BrandModelPicker from "../components/BrandModelPicker";
 import PartTypePicker from "../components/PartTypePicker";
 import PartsBrowser from "../components/PartsBrowser";
 import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolustur";
 import { partTypeIcon } from "../partTypeIcons";
+import UrunEtiketModal from "../components/UrunEtiketModal";
+
+// Etiket bileşeni {id, ad, satis_fiyati, kategori, barkot} bekliyor — Parça
+// Stok'un kendi alan adlarını (name/sale_price/device_model) buna çevirir.
+function partToItem(p) {
+  return { id: p.id, ad: p.name, satis_fiyati: p.sale_price, kategori: p.device_model || p.part_type, barkot: p.barkot };
+}
 
 const TABS = [
   { key: "stok", label: "Stok" },
@@ -112,7 +119,7 @@ export default function Parts({ user }) {
   const [ekleErr, setEkleErr] = useState("");
   const [ekleTopOner, setEkleTopOner] = useState([]);
   const [showEkleTopOner, setShowEkleTopOner] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", device_model: "", part_type: "", min_quantity: "2", purchase_price: "", sale_price: "" });
+  const [editForm, setEditForm] = useState({ name: "", device_model: "", part_type: "", min_quantity: "2", purchase_price: "", sale_price: "", barkot: "" });
   const [editErr, setEditErr] = useState("");
 
   // Yeni parça form — mevcut parça önerisi
@@ -127,6 +134,11 @@ export default function Parts({ user }) {
   const [sortBy, setSortBy] = useState("yeni"); // "yeni" | "stok" | "isim"
   const [err, setErr] = useState("");
   const [priceHidden, setPriceHidden] = useState(() => localStorage.getItem("priceHidden") === "1");
+
+  // Etiket yazdırma (tek + toplu)
+  const [etiketModalItems, setEtiketModalItems] = useState(null);
+  const [topluEtiketModal, setTopluEtiketModal] = useState(false);
+  const [topluEtiketSecili, setTopluEtiketSecili] = useState(new Set());
 
   useEffect(() => {
     api.toptanciList().then(setToptancilar).catch(() => {});
@@ -259,6 +271,7 @@ export default function Parts({ user }) {
       min_quantity: String(p.min_quantity ?? 2),
       purchase_price: p.purchase_price ? String(p.purchase_price) : "",
       sale_price: p.sale_price ? String(p.sale_price) : "",
+      barkot: p.barkot || "",
     });
     setEditErr("");
     // Önceki incelenen parçanın geçmişi burada tutulmasın — panel her yeni
@@ -284,6 +297,7 @@ export default function Parts({ user }) {
         min_quantity: parseInt(editForm.min_quantity) || 0,
         purchase_price: editForm.purchase_price ? parseFloat(editForm.purchase_price) : 0,
         sale_price: editForm.sale_price ? parseFloat(editForm.sale_price) : 0,
+        barkot: editForm.barkot || null,
       });
       setSelectedPart(null);
       api.parts(q ? { q } : {}).then(setParts);
@@ -465,6 +479,10 @@ export default function Parts({ user }) {
                   placeholder="Parça ara..." value={q} onChange={(e) => setQ(e.target.value)} />
               </div>
             </div>
+            <button className="btn btn-ghost btn-sm" title="Toplu Etiket Yazdır"
+              onClick={() => { setTopluEtiketSecili(new Set()); setTopluEtiketModal(true); }}>
+              <Printer size={14} strokeWidth={2.4} />
+            </button>
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(v => !v)}><Plus size={14} strokeWidth={2.4} /> Ekle</button>
           </div>
           {lowStock && (
@@ -804,6 +822,12 @@ export default function Parts({ user }) {
                       <button
                         className="btn btn-ghost btn-sm"
                         style={{ padding: "4px 8px", fontSize: 16 }}
+                        onClick={e => { e.stopPropagation(); setEtiketModalItems([partToItem(p)]); }}
+                        title="Etiket Yazdır"
+                      ><Printer size={15} strokeWidth={2}/></button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ padding: "4px 8px", fontSize: 16 }}
                         onClick={e => { e.stopPropagation(); openPanel(p, "gecmis"); }}
                         title="Stok geçmişi"
                       ><History size={15} strokeWidth={2}/></button>
@@ -1037,9 +1061,19 @@ export default function Parts({ user }) {
                               onChange={e => setEditForm(f => ({ ...f, sale_price: e.target.value }))}
                               placeholder="Müşteriye satılacak fiyat" />
                           </div>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Barkot (opsiyonel)</label>
+                            <input className="form-input" value={editForm.barkot}
+                              onChange={e => setEditForm(f => ({ ...f, barkot: e.target.value }))}
+                              placeholder="Üretici barkodu varsa..." />
+                          </div>
                           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                             <button type="submit" className="btn btn-primary btn-sm">Kaydet</button>
                             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedPart(null)}>İptal</button>
+                            <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}
+                              onClick={() => setEtiketModalItems([partToItem(p)])}>
+                              <Printer size={13} strokeWidth={2} /> Etiket Yazdır
+                            </button>
                           </div>
                         </form>
                       )}
@@ -1462,6 +1496,53 @@ export default function Parts({ user }) {
           </div>
         );
       })()}
+
+      {topluEtiketModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setTopluEtiketModal(false)}>
+          <div className="card" style={{ width: "100%", maxWidth: 420, maxHeight: "80vh", display: "flex", flexDirection: "column" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>Toplu Etiket Yazdır ({topluEtiketSecili.size})</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setTopluEtiketModal(false)}><X size={16} strokeWidth={2} /></button>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 8 }}>Etiketi basılacak parçaları seç.</div>
+            <div style={{ overflowY: "auto", flex: 1, marginBottom: 12 }}>
+              {filteredParts.map(p => {
+                const secili = topluEtiketSecili.has(p.id);
+                return (
+                  <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: "1px solid var(--divider)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={secili} style={{ width: 16, height: 16, flexShrink: 0 }}
+                      onChange={() => setTopluEtiketSecili(s => {
+                        const yeni = new Set(s);
+                        if (secili) yeni.delete(p.id); else yeni.add(p.id);
+                        return yeni;
+                      })} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--hint)" }}>{p.device_model}{p.part_type ? ` · ${p.part_type}` : ""}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" disabled={topluEtiketSecili.size === 0} style={{ flex: 1 }}
+                onClick={() => {
+                  setEtiketModalItems(filteredParts.filter(p => topluEtiketSecili.has(p.id)).map(partToItem));
+                  setTopluEtiketModal(false);
+                }}>
+                {topluEtiketSecili.size} Etiket Yazdır
+              </button>
+              <button className="btn btn-ghost" onClick={() => setTopluEtiketModal(false)}>Kapat</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {etiketModalItems && (
+        <UrunEtiketModal items={etiketModalItems} barkotOnEk="PRC" onClose={() => setEtiketModalItems(null)} />
+      )}
     </div>
   );
 }

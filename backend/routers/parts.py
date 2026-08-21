@@ -43,8 +43,8 @@ async def create_part(
 ):
     row = await db.fetchrow(
         """INSERT INTO parts (dukkan_id, name, device_model, part_type, quantity, min_quantity,
-           purchase_price, sale_price, toptanci_id, created_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id""",
+           purchase_price, sale_price, toptanci_id, created_by, category, barkot)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id""",
         dukkan_id,
         body["name"],
         body.get("device_model"),
@@ -55,6 +55,8 @@ async def create_part(
         body.get("sale_price"),
         body.get("toptanci_id"),
         user["id"],
+        body.get("category"),
+        body.get("barkot") or None,
     )
     await _toptanci_alis_kaydet(
         db, dukkan_id, body.get("toptanci_id"), body["name"],
@@ -124,8 +126,8 @@ async def update_part(
 ):
     await db.execute(
         """UPDATE parts SET name=$1, device_model=$2, part_type=$3, quantity=$4,
-           min_quantity=$5, purchase_price=$6, sale_price=$7
-           WHERE id=$8 AND dukkan_id=$9""",
+           min_quantity=$5, purchase_price=$6, sale_price=$7, category=$8, barkot=$9
+           WHERE id=$10 AND dukkan_id=$11""",
         body["name"],
         body.get("device_model"),
         body.get("part_type"),
@@ -133,6 +135,8 @@ async def update_part(
         body.get("min_quantity", 2),
         body.get("purchase_price"),
         body.get("sale_price"),
+        body.get("category"),
+        body.get("barkot") or None,
         part_id,
         dukkan_id,
     )

@@ -4,9 +4,11 @@ import { fotoUrl } from "../api";
 
 // Ürünün kendi barkodu yoksa (üretici barkodu girilmemişse) id'den türetilen
 // bir kod basılır — ayrıca saklanmaz, hem yazdırırken hem ararken aynı
-// formülle (AKS + 6 haneli id) üretilip/çözülür.
-export function barkotDegeri(item) {
-  return item.barkot || `AKS${String(item.id).padStart(6, "0")}`;
+// formülle (önek + 6 haneli id) üretilip/çözülür. Önek modüle göre değişir
+// (Aksesuar: AKS, Parça: PRC, ...) — aksi halde farklı tablolardaki aynı
+// id'li kayıtlar aynı barkodu üretip yanlış üründe eşleşebilirdi.
+export function barkotDegeri(item, onEk = "AKS") {
+  return item.barkot || `${onEk}${String(item.id).padStart(6, "0")}`;
 }
 
 // Barkot sabit bir doğal boyutta üretilir, sonra viewBox ile kapsayan
@@ -174,14 +176,14 @@ function SurukleBoyutKutu({
  * ORANSIZ yeniden boyutlandırılabilir — Etiket Ayarları sayfasındaki canlı
  * düzenleyici bunu kullanır, gerçek yazdırma/önizlemede bu prop hiç verilmez. */
 export function EtiketIcerik({
-  item, ayarlar = ETIKET_AYAR_VARSAYILAN, duzenlenebilir = false,
+  item, ayarlar = ETIKET_AYAR_VARSAYILAN, duzenlenebilir = false, barkotOnEk = "AKS",
   onLogoTasi, onLogoBoyutlandir, onMetinTasi, onMetinBoyutlandir, onBarkotTasi, onBarkotBoyutlandir,
 }) {
   const kutuRef = useRef(null);
   const [merkezX, setMerkezX] = useState(false);
   const [merkezY, setMerkezY] = useState(false);
   function ortaHizala(x, y) { setMerkezX(x); setMerkezY(y); }
-  const kod = barkotDegeri(item);
+  const kod = barkotDegeri(item, barkotOnEk);
   const logoGoster = ayarlar.etiket_logo_goster && ayarlar.logo_url;
   const kategoriGoster = ayarlar.etiket_kategori_goster !== false;
   const ayiriciGoster = !!ayarlar.etiket_ayirici_cizgi_goster;
