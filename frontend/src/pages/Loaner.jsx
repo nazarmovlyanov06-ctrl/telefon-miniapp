@@ -3,8 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { api, fotoUrl } from "../api";
 import {
   Smartphone, ClipboardList, CircleX, User, Camera, X, TriangleAlert,
-  CheckCircle2, Calendar,
+  CheckCircle2, Calendar, Printer,
 } from "lucide-react";
+import UrunEtiketModal from "../components/UrunEtiketModal";
+
+// Yedek telefonun barkotlu tanım etiketi — hangi müşteride olduğunu
+// gösterir. Fiyat kavramı yok (satış ürünü değil), o yüzden satis_fiyati
+// hep null bırakılır — EtiketIcerik bu durumda fiyat satırını atlar.
+function loanerToItem(l) {
+  return { id: l.id, ad: l.cihaz, satis_fiyati: null, kategori: l.musteri_adi, barkot: null };
+}
 
 export default function Loaner() {
   const navigate = useNavigate();
@@ -20,6 +28,7 @@ export default function Loaner() {
   const [fotoLoading, setFotoLoading] = useState(false);
   const fileInputRef = useRef(null);
   const [err, setErr] = useState("");
+  const [etiketModalItems, setEtiketModalItems] = useState(null);
   const [form, setForm] = useState({ musteri_adi: "", cihaz: "", teslim_tarihi: today(), notlar: "" });
   const [musteriler, setMusteriler] = useState([]);
   const [oneriler, setOneriler] = useState([]);
@@ -321,6 +330,10 @@ export default function Loaner() {
                   <button className="btn btn-ghost btn-sm" onClick={() => openFotolar(l)} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Camera size={14} strokeWidth={2} />
                   </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setEtiketModalItems([loanerToItem(l)])}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "center" }} title="Etiket Yazdır">
+                    <Printer size={14} strokeWidth={2} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -362,6 +375,10 @@ export default function Loaner() {
             {l.notlar && <div style={{ fontSize: 12, color: "var(--hint)", marginTop: 4 }}>{l.notlar}</div>}
           </div>
         ))
+      )}
+
+      {etiketModalItems && (
+        <UrunEtiketModal items={etiketModalItems} baslik="Yedek Telefon Etiketi" barkotOnEk="YDK" onClose={() => setEtiketModalItems(null)} />
       )}
     </div>
   );

@@ -231,8 +231,12 @@ export function EtiketIcerik({
               <div style={{ fontSize: 8 * metinOlcek, color: "#666", textTransform: "uppercase", letterSpacing: 0.3, lineHeight: 1.2 }}>{item.kategori}</div>
             )}
             <div style={{ fontWeight: 700, fontSize: 11.5 * metinOlcek, lineHeight: 1.2, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.ad}</div>
-            {ayiriciGoster && <div style={{ borderTop: "1px solid #ccc", margin: `${3 * metinOlcek}px 6px` }} />}
-            <div style={{ fontWeight: 800, fontSize: 14.5 * metinOlcek, lineHeight: 1.2, marginTop: ayiriciGoster ? 2 : 0 }}>{item.satis_fiyati}₺</div>
+            {item.satis_fiyati != null && (
+              <>
+                {ayiriciGoster && <div style={{ borderTop: "1px solid #ccc", margin: `${3 * metinOlcek}px 6px` }} />}
+                <div style={{ fontWeight: 800, fontSize: 14.5 * metinOlcek, lineHeight: 1.2, marginTop: ayiriciGoster ? 2 : 0 }}>{item.satis_fiyati}₺</div>
+              </>
+            )}
           </div>
         </SurukleBoyutKutu>
 

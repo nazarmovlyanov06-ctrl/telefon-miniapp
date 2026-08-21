@@ -7,10 +7,24 @@ import OdemeBolustur, { varsayilanOdemeSatirlari } from "../components/OdemeBolu
 import {
   Store, Package, CheckCircle2, Search, CircleX, User, Smartphone,
   HardDrive, Cpu, Wrench, Trash2, Banknote, Phone, Radio, History,
-  X, Inbox, Send, Clock,
+  X, Inbox, Send, Clock, Printer,
 } from "lucide-react";
+import UrunEtiketModal from "../components/UrunEtiketModal";
 
 const AKSESUAR_ETIKETLERI = { kutu: "Kutu", sarj_aleti: "Şarj Aleti", kilif: "Kılıf", kulaklik: "Kulaklık" };
+
+// Etiket bileşeni {id, ad, satis_fiyati, kategori, barkot} bekliyor — 2.El
+// cihazın kendi alan adlarını buna çevirir. Fiyat sadece SATILDIĞINDA
+// belli olduğu için stoktaki cihazlarda satis_fiyati boş kalabilir —
+// EtiketIcerik bu durumda fiyat satırını atlar. Barkot olarak IMEI
+// kullanılır (zaten benzersiz), yoksa id'den türetilir.
+function cihazToItem(c) {
+  return {
+    id: c.id, ad: c.model, satis_fiyati: c.satis_fiyati || null,
+    kategori: [c.renk, c.depolama].filter(Boolean).join(" · ") || null,
+    barkot: c.imei || null,
+  };
+}
 
 export default function IkinciEl({ user }) {
   const navigate = useNavigate();
@@ -26,6 +40,9 @@ export default function IkinciEl({ user }) {
   const [showMasraf, setShowMasraf] = useState(false);
   const [showSat, setShowSat] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [etiketModalItems, setEtiketModalItems] = useState(null);
+  const [topluEtiketModal, setTopluEtiketModal] = useState(false);
+  const [topluEtiketSecili, setTopluEtiketSecili] = useState(new Set());
   const [form, setForm] = useState({ model: "", imei: "", renk: "", depolama: "", ram: "", ozellikler: "", kimden: "", kimden_telefon: "", alis_fiyati: "", kaynak: "dukkan", notlar: "", aksesuarlar: {} });
   const [masrafForm, setMasrafForm] = useState({ aciklama: "", tutar: "", tarih: today() });
   const [satForm, setSatForm] = useState({ satis_fiyati: "", satis_kanali: "Dükkan", musteri_adi: "", musteri_telefon: "", odemeler: null, taksit_sayi: "1" });
@@ -165,7 +182,13 @@ export default function IkinciEl({ user }) {
     <div className="page">
       <div className="card-row" style={{ marginBottom: 14 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Geri</button>
-        <h1 className="page-title" style={{ margin: 0 }}>2. El Cihaz</h1>
+        <h1 className="page-title" style={{ margin: 0, flex: 1 }}>2. El Cihaz</h1>
+        {tab === "stok" && (
+          <button className="btn btn-ghost btn-sm" title="Toplu Etiket Yazdır"
+            onClick={() => { setTopluEtiketSecili(new Set()); setTopluEtiketModal(true); }}>
+            <Printer size={14} strokeWidth={2.4} />
+          </button>
+        )}
         {tab === "stok" && <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Alım</button>}
       </div>
 
@@ -399,6 +422,10 @@ export default function IkinciEl({ user }) {
                       <button className="btn btn-ghost btn-sm" onClick={() => { setShowMasraf(true); setShowSat(false); }}>+ Masraf</button>
                       <button className="btn btn-primary btn-sm" onClick={() => { setShowSat(true); setShowMasraf(false); }} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <Banknote size={13} strokeWidth={2} /> Sat
+                      </button>
+                      <button className="btn btn-ghost btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}
+                        onClick={() => setEtiketModalItems([cihazToItem(c)])}>
+                        <Printer size={13} strokeWidth={2} /> Etiket Yazdır
                       </button>
                       {user?.rol === "patron" && (
                         deleteId === c.id ? (
@@ -732,6 +759,53 @@ export default function IkinciEl({ user }) {
             </div>
           ))}
         </div>
+      )}
+
+      {topluEtiketModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setTopluEtiketModal(false)}>
+          <div className="card" style={{ width: "100%", maxWidth: 420, maxHeight: "80vh", display: "flex", flexDirection: "column" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>Toplu Etiket Yazdır ({topluEtiketSecili.size})</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setTopluEtiketModal(false)}><X size={16} strokeWidth={2} /></button>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--hint)", marginBottom: 8 }}>Etiketi basılacak cihazları seç.</div>
+            <div style={{ overflowY: "auto", flex: 1, marginBottom: 12 }}>
+              {filteredList.map(c => {
+                const secili = topluEtiketSecili.has(c.id);
+                return (
+                  <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: "1px solid var(--divider)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={secili} style={{ width: 16, height: 16, flexShrink: 0 }}
+                      onChange={() => setTopluEtiketSecili(s => {
+                        const yeni = new Set(s);
+                        if (secili) yeni.delete(c.id); else yeni.add(c.id);
+                        return yeni;
+                      })} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.model}</div>
+                      <div style={{ fontSize: 11, color: "var(--hint)" }}>{[c.renk, c.depolama].filter(Boolean).join(" · ")}{c.imei ? ` · ${c.imei}` : ""}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary" disabled={topluEtiketSecili.size === 0} style={{ flex: 1 }}
+                onClick={() => {
+                  setEtiketModalItems(filteredList.filter(c => topluEtiketSecili.has(c.id)).map(cihazToItem));
+                  setTopluEtiketModal(false);
+                }}>
+                {topluEtiketSecili.size} Etiket Yazdır
+              </button>
+              <button className="btn btn-ghost" onClick={() => setTopluEtiketModal(false)}>Kapat</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {etiketModalItems && (
+        <UrunEtiketModal items={etiketModalItems} barkotOnEk="IKI" onClose={() => setEtiketModalItems(null)} />
       )}
     </div>
   );
