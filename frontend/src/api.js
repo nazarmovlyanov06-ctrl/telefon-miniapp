@@ -232,6 +232,7 @@ export const api = {
   ikinciElIMEITam: (imei) => get(`/ikinciel/imei-tam/${encodeURIComponent(imei)}`),
   ikinciElKatalog: () => get("/ikinciel/katalog"),
   sifirIMEITam: (imei) => get(`/sifir-cihaz/imei-tam/${encodeURIComponent(imei)}`),
+  sifirIMEI: (son4) => get(`/sifir-cihaz/imei-gecmis/${son4}`),
 
   // Sıfır Cihaz
   sifirList: (params = {}) => {
@@ -241,10 +242,15 @@ export const api = {
   sifirOzet: () => get("/sifir-cihaz/ozet"),
   createSifir: (data) => post("/sifir-cihaz/", data),
   deleteSifir: (id) => del(`/sifir-cihaz/${id}`),
+  updateSifir: (id, data) => put(`/sifir-cihaz/${id}`, data),
+  sifirFotolar: (id) => get(`/sifir-cihaz/${id}/fotograflar`),
+  addSifirFoto: (id, data) => post(`/sifir-cihaz/${id}/fotograflar`, data),
+  deleteSifirFoto: (id, fotoId) => del(`/sifir-cihaz/${id}/fotograflar/${fotoId}`),
+  sifirMasraf: (id, data) => post(`/sifir-cihaz/${id}/masraf`, data),
+  sifirMasraflar: (id) => get(`/sifir-cihaz/${id}/masraflar`),
   sifirSat: (id, data) => post(`/sifir-cihaz/${id}/sat`, data),
   sifirSatilanlar: () => get("/sifir-cihaz/satilanlar"),
   sifirKatalog: () => get("/sifir-cihaz/katalog"),
-  sifirKatalogDetayGuncelle: (id, data) => put(`/sifir-cihaz/${id}/katalog-detay`, data),
 
   // Garanti
   garantiList: (params = {}) => {

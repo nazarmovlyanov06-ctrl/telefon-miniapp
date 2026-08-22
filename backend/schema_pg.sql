@@ -551,6 +551,24 @@ CREATE TABLE IF NOT EXISTS sifir_cihazlar (
     created_at TIMESTAMP DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS sifir_cihaz_masraflar (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    cihaz_id INTEGER REFERENCES sifir_cihazlar(id) ON DELETE CASCADE,
+    aciklama TEXT NOT NULL,
+    tutar REAL NOT NULL,
+    tarih TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sifir_cihaz_fotograflari (
+    id SERIAL PRIMARY KEY,
+    dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
+    cihaz_id INTEGER REFERENCES sifir_cihazlar(id) ON DELETE CASCADE,
+    foto TEXT NOT NULL,
+    aciklama TEXT,
+    created_at TIMESTAMP DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS parca_iadeler (
     id SERIAL PRIMARY KEY,
     dukkan_id INTEGER NOT NULL REFERENCES dukkanlar(id) ON DELETE CASCADE,
@@ -741,3 +759,5 @@ CREATE INDEX IF NOT EXISTS idx_kasa_dukkan ON kasa_hareketleri(dukkan_id);
 CREATE INDEX IF NOT EXISTS idx_kullanicilar_dukkan ON kullanicilar(dukkan_id);
 CREATE INDEX IF NOT EXISTS idx_ikincel_dukkan ON ikinci_el(dukkan_id);
 CREATE INDEX IF NOT EXISTS idx_sifir_dukkan ON sifir_cihazlar(dukkan_id);
+CREATE INDEX IF NOT EXISTS idx_sifir_masraflar_cihaz ON sifir_cihaz_masraflar(cihaz_id);
+CREATE INDEX IF NOT EXISTS idx_sifir_fotograflari_cihaz ON sifir_cihaz_fotograflari(cihaz_id);

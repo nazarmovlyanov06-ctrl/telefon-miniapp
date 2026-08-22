@@ -311,6 +311,46 @@ export default function Stats() {
         </>
       )}
 
+      {/* En çok satan Sıfır Cihaz modeller — bkz. yukarıdaki 2.El bölümü,
+          aynı gerekçe */}
+      {data.sifir_top?.length > 0 && (
+        <>
+          <div className="section-title">En Çok Satan Sıfır Modeller</div>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="card-row">
+              <span style={{ color: "var(--hint)" }}>Toplam Sıfır Kârı</span>
+              <span style={{ fontWeight: 700, color: "var(--success)" }}>₺{Math.round(data.sifir_kar_toplam || 0).toLocaleString("tr-TR")}</span>
+            </div>
+            {data.sifir_ort_satis_gun != null && (
+              <div className="card-row">
+                <span style={{ color: "var(--hint)" }}>Ortalama Satış Süresi</span>
+                <span style={{ fontWeight: 700 }}>{Math.round(data.sifir_ort_satis_gun)} gün</span>
+              </div>
+            )}
+          </div>
+          <div className="card">
+            {data.sifir_top.map((m, i) => (
+              <div key={i} style={{ marginBottom: i < data.sifir_top.length - 1 ? 12 : 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 13 }}>
+                  <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Package size={12} stroke="var(--blue)" strokeWidth={2} /> {m.model}
+                  </span>
+                  <span style={{ color: "var(--hint)", fontWeight: 700, flexShrink: 0 }}>{m.adet} adet · ₺{Math.round(m.ciro).toLocaleString("tr-TR")}</span>
+                </div>
+                <div style={{ height: 6, background: "var(--bg2)", borderRadius: 4 }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${(m.ciro / data.sifir_top[0].ciro) * 100}%`,
+                    background: "var(--blue)",
+                    borderRadius: 4,
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       {/* En çok harcayan müşteriler */}
       {data.musteri_top.length > 0 && (
         <>

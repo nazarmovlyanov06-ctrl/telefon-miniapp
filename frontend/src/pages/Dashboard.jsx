@@ -69,7 +69,7 @@ function hizliErisimOku() {
 // stok) sırası — basılı tutup titretip sürükleyerek değiştirilebilir, cihazda
 // saklanır.
 const BLOK_ANAHTAR = "dashboard_blok_sirasi";
-const VARSAYILAN_BLOK_SIRASI = ["durum", "kasa", "kazanc", "borc", "garanti", "arama", "hizli", "bekleyenler", "stok", "durgun_2el"];
+const VARSAYILAN_BLOK_SIRASI = ["durum", "kasa", "kazanc", "borc", "garanti", "arama", "hizli", "bekleyenler", "stok", "durgun_2el", "durgun_sifir"];
 function blokSirasiOku() {
   try {
     const v = JSON.parse(localStorage.getItem(BLOK_ANAHTAR));
@@ -464,6 +464,29 @@ function Durgun2ElDetayModal({ liste, onClose }) {
   );
 }
 
+/* ── Durgun Sıfır Cihaz stok önizlemesi — bkz. yukarıdaki 2.El ile aynı. ── */
+
+function DurgunSifirDetayModal({ liste, onClose }) {
+  const navigate = useNavigate();
+  return (
+    <AltPencere onClose={onClose}>
+      <PencereBaslik onClose={onClose}>Durgun Sıfır Stok</PencereBaslik>
+      <button className="btn btn-primary btn-sm" onClick={() => navigate("/sifir-cihaz?sort=durgun")}
+        style={{ width: "100%", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        Tümünü Gör <ArrowRight size={13} strokeWidth={2.4} />
+      </button>
+      {liste.length === 0 ? (
+        <div style={{ color: "var(--hint)", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Durgun stok yok</div>
+      ) : liste.map((s, i) => (
+        <div key={s.id} className="card-row" style={{ padding: "9px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none" }}>
+          <span style={{ fontSize: 13 }}>{s.model}</span>
+          <span style={{ fontWeight: 700, color: "var(--red)" }}>{s.gun} gün</span>
+        </div>
+      ))}
+    </AltPencere>
+  );
+}
+
 /* ── Bugün Gelir/Gider ve Bu Ay Kazanç ─────────────────────────────────── */
 
 function KasaHareketModal({ tip, onClose }) {
@@ -648,6 +671,7 @@ export default function Dashboard({ user, bildirimSayisi = 0, onBildirimOkundu }
   const [acikBorcAcik, setAcikBorcAcik] = useState(false);
   const [stokAcik, setStokAcik] = useState(false);
   const [durgun2ElAcik, setDurgun2ElAcik] = useState(false);
+  const [durgunSifirAcik, setDurgunSifirAcik] = useState(false);
   const [hizliErisim, setHizliErisim] = useState(hizliErisimOku);
   const [hizliDuzenleAcik, setHizliDuzenleAcik] = useState(false);
   const navigate = useNavigate();
@@ -826,6 +850,7 @@ export default function Dashboard({ user, bildirimSayisi = 0, onBildirimOkundu }
   const kasa = data?.kasa_bugun || {};
   const stokListe = uyarilar.stok || [];
   const durgunListe = uyarilar.durgun_2el || [];
+  const durgunSifirListe = uyarilar.durgun_sifir || [];
 
   const isim = user?.ad?.split(" ")[0] || "";
   const saat = new Date().getHours();
@@ -1041,6 +1066,19 @@ export default function Dashboard({ user, bildirimSayisi = 0, onBildirimOkundu }
           </div>
         );
 
+      case "durgun_sifir":
+        if (durgunSifirListe.length === 0) return null;
+        return (
+          <div className="card" onClick={() => !titriyor && setDurgunSifirAcik(true)} style={{ cursor: "pointer" }}>
+            <div className="card-row">
+              <span style={{ color: "var(--red)", fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                <Clock size={15} strokeWidth={2} /> Durgun Sıfır Stok
+              </span>
+              <span style={{ fontWeight: 700, color: "var(--red)", fontSize: 13 }}>{durgunSifirListe.length} cihaz →</span>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1131,6 +1169,7 @@ export default function Dashboard({ user, bildirimSayisi = 0, onBildirimOkundu }
       {kazancAcik && <BuAyKazancModal kaynaklar={bu_ay.kaynaklar || []} toplam={bu_ay.gelir || 0} onClose={() => setKazancAcik(false)} />}
       {stokAcik && <StokDetayModal liste={stokListe} onClose={() => setStokAcik(false)} />}
       {durgun2ElAcik && <Durgun2ElDetayModal liste={durgunListe} onClose={() => setDurgun2ElAcik(false)} />}
+      {durgunSifirAcik && <DurgunSifirDetayModal liste={durgunSifirListe} onClose={() => setDurgunSifirAcik(false)} />}
       {aktifTamirAcik && <AktifTamirModal onClose={() => setAktifTamirAcik(false)} />}
       {acikBorcAcik && (
         <AcikBorcModal onClose={() => setAcikBorcAcik(false)}

@@ -152,9 +152,17 @@ export default function Katalog() {
                   </div>
                 )}
 
-                {detay.tur === "sifir" && c.fatura_turu && (
-                  <Detay icon={Receipt} label="Fatura Türü"
-                    value={c.fatura_turu === "MF" ? "Müşteri Faturalı (MF)" : "Adına Fatura (AF)"} />
+                {detay.tur === "sifir" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {c.fatura_turu && (
+                      <Detay icon={Receipt} label="Fatura Türü"
+                        value={c.fatura_turu === "MF" ? "Müşteri Faturalı (MF)" : "Adına Fatura (AF)"} />
+                    )}
+                    {secilenAksesuarlar.length > 0 && (
+                      <Detay icon={Box} label="Yanında Gelenler"
+                        value={secilenAksesuarlar.map(([, label]) => label).join(", ")} />
+                    )}
+                  </div>
                 )}
               </div>
             </div>

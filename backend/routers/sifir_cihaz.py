@@ -3,11 +3,36 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from database import get_db
 from auth import get_current_user, get_dukkan_id
-from photo_storage import save_upload
+from photo_storage import save_upload, save_photo, delete_photo
 from odeme_yardimci import kaydet_odeme
 from datetime import date
 
 router = APIRouter(prefix="/sifir-cihaz", tags=["sifir-cihaz"])
+
+
+async def _with_masraflar(db: asyncpg.Connection, dukkan_id: int, rows: list) -> list:
+    out = [dict(r) for r in rows]
+    for r in out:
+        m = await db.fetch(
+            "SELECT * FROM sifir_cihaz_masraflar WHERE cihaz_id=$1 AND dukkan_id=$2 ORDER BY tarih",
+            r["id"], dukkan_id,
+        )
+        r["masraflar"] = [dict(x) for x in m]
+    return out
+
+
+async def _diger_tablo_eslesmeler(db: asyncpg.Connection, dukkan_id: int, imei_kosulu: str, deger):
+    """Bkz. ikinciel.py'deki aynı isimli fonksiyon — tersi yönde: bir Sıfır
+    Cihaz IMEI'si aratılınca 2.El veya Tamir'de de kaydı var mı bakılıyor."""
+    ikinci_el = await db.fetch(
+        f"SELECT id, model, durum, alis_fiyati, satis_fiyati, created_at FROM ikinci_el WHERE {imei_kosulu} AND dukkan_id = $2 ORDER BY created_at DESC",
+        deger, dukkan_id,
+    )
+    tamir = await db.fetch(
+        f"SELECT repair_no, device_model, status, created_at FROM repairs WHERE {imei_kosulu} AND dukkan_id = $2 ORDER BY created_at DESC",
+        deger, dukkan_id,
+    )
+    return {"ikinci_el": [dict(r) for r in ikinci_el], "tamir": [dict(r) for r in tamir]}
 
 
 @router.get("/imei-tam/{imei}")
@@ -18,10 +43,38 @@ async def imei_tam_gecmis(
     db: asyncpg.Connection = Depends(get_db),
 ):
     rows = await db.fetch(
-        "SELECT * FROM sifir_cihazlar WHERE imei = $1 AND dukkan_id = $2 ORDER BY created_at ASC",
+        """SELECT c.*,
+                  COALESCE((SELECT SUM(m.tutar) FROM sifir_cihaz_masraflar m
+                            WHERE m.cihaz_id = c.id), 0) as toplam_masraf
+           FROM sifir_cihazlar c
+           WHERE c.imei = $1 AND c.dukkan_id = $2
+           ORDER BY c.created_at ASC""",
         imei, dukkan_id,
     )
-    return [dict(r) for r in rows]
+    sonuc = await _with_masraflar(db, dukkan_id, rows)
+    diger = await _diger_tablo_eslesmeler(db, dukkan_id, "imei = $1", imei)
+    return {"sifir_cihaz": sonuc, **diger}
+
+
+@router.get("/imei-gecmis/{son4}")
+async def imei_gecmis(
+    son4: str,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch(
+        """SELECT c.*,
+                  COALESCE((SELECT SUM(m.tutar) FROM sifir_cihaz_masraflar m
+                            WHERE m.cihaz_id = c.id), 0) as toplam_masraf
+           FROM sifir_cihazlar c
+           WHERE c.dukkan_id = $1 AND c.imei LIKE $2 AND c.imei IS NOT NULL AND c.imei != ''
+           ORDER BY c.created_at ASC""",
+        dukkan_id, f"%{son4}",
+    )
+    sonuc = await _with_masraflar(db, dukkan_id, rows)
+    diger = await _diger_tablo_eslesmeler(db, dukkan_id, "imei LIKE $1", f"%{son4}")
+    return {"sifir_cihaz": sonuc, **diger}
 
 
 @router.get("/listesi")
@@ -31,15 +84,21 @@ async def list_stok(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    where = ["dukkan_id = $1", "durum = 'stokta'"]
+    where = ["c.dukkan_id = $1", "c.durum = 'stokta'"]
     params = [dukkan_id]
     if kaynak:
         params.append(kaynak)
-        where.append(f"COALESCE(kaynak, 'dukkan') = ${len(params)}")
+        where.append(f"COALESCE(c.kaynak, 'dukkan') = ${len(params)}")
     rows = await db.fetch(
-        f"SELECT * FROM sifir_cihazlar WHERE {' AND '.join(where)} ORDER BY created_at DESC", *params
+        f"""SELECT c.*,
+                  COALESCE((SELECT SUM(m.tutar) FROM sifir_cihaz_masraflar m
+                            WHERE m.cihaz_id = c.id), 0) as toplam_masraf
+           FROM sifir_cihazlar c
+           WHERE {' AND '.join(where)}
+           ORDER BY c.created_at DESC""",
+        *params,
     )
-    return [dict(r) for r in rows]
+    return await _with_masraflar(db, dukkan_id, rows)
 
 
 @router.get("/katalog")
@@ -51,7 +110,7 @@ async def katalog(
     """Bkz. ikinciel.py'deki katalog uç noktası — aynı gerekçeyle alış
     fiyatı/kimden/imei/notlar SELECT'e hiç alınmıyor."""
     rows = await db.fetch(
-        """SELECT id, model, renk, depolama, gorsel_url, liste_fiyati, kaynak, fatura_turu
+        """SELECT id, model, renk, depolama, gorsel_url, liste_fiyati, kaynak, fatura_turu, aksesuarlar
            FROM sifir_cihazlar WHERE dukkan_id = $1 AND durum = 'stokta'
            ORDER BY liste_fiyati ASC NULLS LAST, created_at DESC""",
         dukkan_id,
@@ -66,8 +125,27 @@ async def list_satilanlar(
     db: asyncpg.Connection = Depends(get_db),
 ):
     rows = await db.fetch(
-        "SELECT * FROM sifir_cihazlar WHERE dukkan_id = $1 AND durum = 'satildi' ORDER BY satis_tarihi DESC",
+        """SELECT c.*,
+                  COALESCE((SELECT SUM(m.tutar) FROM sifir_cihaz_masraflar m
+                            WHERE m.cihaz_id = c.id), 0) as toplam_masraf
+           FROM sifir_cihazlar c
+           WHERE c.dukkan_id = $1 AND c.durum = 'satildi'
+           ORDER BY c.satis_tarihi DESC""",
         dukkan_id,
+    )
+    return await _with_masraflar(db, dukkan_id, rows)
+
+
+@router.get("/{cihaz_id}/masraflar")
+async def get_masraflar(
+    cihaz_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch(
+        "SELECT * FROM sifir_cihaz_masraflar WHERE cihaz_id=$1 AND dukkan_id=$2 ORDER BY tarih",
+        cihaz_id, dukkan_id,
     )
     return [dict(r) for r in rows]
 
@@ -78,20 +156,26 @@ async def ozet(
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    rows = await db.fetch("SELECT * FROM sifir_cihazlar WHERE dukkan_id = $1", dukkan_id)
+    rows = await db.fetch(
+        """SELECT c.id, c.model, c.alis_fiyati, c.satis_fiyati, c.durum,
+                  COALESCE((SELECT SUM(m.tutar) FROM sifir_cihaz_masraflar m
+                            WHERE m.cihaz_id = c.id), 0) as toplam_masraf
+           FROM sifir_cihazlar c WHERE c.dukkan_id = $1""",
+        dukkan_id,
+    )
     rows = [dict(r) for r in rows]
-    stokta = satildi = 0
     toplam_alis = toplam_satis = kar = 0.0
+    stokta = satildi = 0
     for r in rows:
-        if r["durum"] == "stokta":
-            stokta += 1
-        elif r["durum"] == "satildi":
+        if r["durum"] == "satildi":
             satildi += 1
             satis = r["satis_fiyati"] or 0
-            alis = r["alis_fiyati"] or 0
+            maliyet = (r["alis_fiyati"] or 0) + (r["toplam_masraf"] or 0)
             toplam_satis += satis
-            toplam_alis += alis
-            kar += satis - alis
+            toplam_alis += maliyet
+            kar += satis - maliyet
+        else:
+            stokta += 1
     return {
         "stokta_adet": stokta, "satilan_adet": satildi,
         "toplam_alis": toplam_alis, "toplam_satis": toplam_satis, "net_kar": kar,
@@ -133,22 +217,30 @@ async def create_cihaz(
     return {"id": row["id"]}
 
 
-@router.put("/{cihaz_id}/katalog-detay")
-async def katalog_detay_guncelle(
+@router.put("/{cihaz_id}")
+async def update_cihaz(
     cihaz_id: int,
     body: dict,
     dukkan_id: int = Depends(get_dukkan_id),
     user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db),
 ):
-    """Sıfır Cihaz'da henüz genel bir düzenleme formu yok — katalog fiyatını
-    ve fatura türünü (MF/AF) zaten stokta olan cihazlar için de girebilsin
-    diye bu uç nokta eklendi."""
+    """Bkz. ikinciel.py'deki update_cihaz — aynı gerekçeyle: bir yazım
+    hatasını düzeltmek için kaydı silip yeniden girmek gerekmesin diye.
+    Satış/durum bilgisi kasıtlı olarak burada değiştirilmiyor, o akış hâlâ
+    /sat üzerinden yürüyor."""
+    if not body.get("model") or body.get("alis_fiyati") is None:
+        raise HTTPException(400, "Model ve alış fiyatı zorunlu")
     liste_fiyati = float(body["liste_fiyati"]) if body.get("liste_fiyati") not in (None, "") else None
-    fatura_turu = body.get("fatura_turu") or None
     result = await db.execute(
-        "UPDATE sifir_cihazlar SET liste_fiyati=$1, fatura_turu=$2 WHERE id=$3 AND dukkan_id=$4",
-        liste_fiyati, fatura_turu, cihaz_id, dukkan_id,
+        """UPDATE sifir_cihazlar SET model=$1, imei=$2, renk=$3, depolama=$4,
+           kimden=$5, kimden_telefon=$6, alis_fiyati=$7, notlar=$8, liste_fiyati=$9, fatura_turu=$10
+           WHERE id=$11 AND dukkan_id=$12""",
+        body["model"], body.get("imei"), body.get("renk"), body.get("depolama"),
+        body.get("kimden"), body.get("kimden_telefon"),
+        float(body["alis_fiyati"]), body.get("notlar"), liste_fiyati,
+        body.get("fatura_turu") or None,
+        cihaz_id, dukkan_id,
     )
     if result == "UPDATE 0":
         raise HTTPException(404, "Cihaz bulunamadı")
@@ -164,8 +256,26 @@ async def delete_cihaz(
 ):
     if user["rol"] != "patron":
         raise HTTPException(403, "Sadece patron silebilir")
-    await db.execute("DELETE FROM sifir_cihazlar WHERE id = $1 AND dukkan_id = $2", cihaz_id, dukkan_id)
+    async with db.transaction():
+        await db.execute("DELETE FROM sifir_cihaz_masraflar WHERE cihaz_id = $1 AND dukkan_id = $2", cihaz_id, dukkan_id)
+        await db.execute("DELETE FROM sifir_cihazlar WHERE id = $1 AND dukkan_id = $2", cihaz_id, dukkan_id)
     return {"ok": True}
+
+
+@router.post("/{cihaz_id}/masraf")
+async def add_masraf(
+    cihaz_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    row = await db.fetchrow(
+        "INSERT INTO sifir_cihaz_masraflar (dukkan_id, cihaz_id, aciklama, tutar, tarih) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        dukkan_id, cihaz_id, body["aciklama"], float(body["tutar"]),
+        body.get("tarih", date.today().isoformat()),
+    )
+    return {"id": row["id"]}
 
 
 @router.post("/{cihaz_id}/sat")
@@ -246,3 +356,62 @@ async def gorsel_yukle(
         url, kayit_id, dukkan_id,
     )
     return {"url": url}
+
+
+# ── Ek fotoğraflar — bkz. ikinciel.py'deki aynı bölüm, aynı gerekçe.
+
+@router.get("/{cihaz_id}/fotograflar")
+async def cihaz_fotolar(
+    cihaz_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    rows = await db.fetch(
+        "SELECT id, foto, aciklama, created_at FROM sifir_cihaz_fotograflari WHERE cihaz_id = $1 AND dukkan_id = $2 ORDER BY created_at",
+        cihaz_id, dukkan_id,
+    )
+    return [dict(r) for r in rows]
+
+
+@router.post("/{cihaz_id}/fotograflar")
+async def cihaz_foto_ekle(
+    cihaz_id: int,
+    body: dict,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    foto = body.get("foto", "")
+    if not foto:
+        raise HTTPException(400, "Fotoğraf verisi gerekli")
+    try:
+        foto_path = save_photo(foto, "sifircihazfoto", cihaz_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await db.execute(
+        "INSERT INTO sifir_cihaz_fotograflari (dukkan_id, cihaz_id, foto, aciklama) VALUES ($1, $2, $3, $4)",
+        dukkan_id, cihaz_id, foto_path, body.get("aciklama"),
+    )
+    return {"ok": True}
+
+
+@router.delete("/{cihaz_id}/fotograflar/{foto_id}")
+async def cihaz_foto_sil(
+    cihaz_id: int,
+    foto_id: int,
+    dukkan_id: int = Depends(get_dukkan_id),
+    user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db),
+):
+    row = await db.fetchrow(
+        "SELECT foto FROM sifir_cihaz_fotograflari WHERE id = $1 AND cihaz_id = $2 AND dukkan_id = $3",
+        foto_id, cihaz_id, dukkan_id,
+    )
+    await db.execute(
+        "DELETE FROM sifir_cihaz_fotograflari WHERE id = $1 AND cihaz_id = $2 AND dukkan_id = $3",
+        foto_id, cihaz_id, dukkan_id,
+    )
+    if row:
+        delete_photo(row["foto"])
+    return {"ok": True}

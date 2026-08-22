@@ -64,6 +64,18 @@ async def dashboard(
         dukkan_id,
     )]
 
+    # Aynı durgun stok mantığı Sıfır Cihaz için de — yeni bir telefon aylarca
+    # satılmadan beklerse (özellikle 2.El'den bile daha hızlı değer kaybeder)
+    # bunu da Ana Sayfa'da görsün.
+    durgun_sifir_uyari = [dict(r) for r in await db.fetch(
+        """SELECT id, model, alis_fiyati,
+                  (now()::date - created_at::date) as gun
+           FROM sifir_cihazlar
+           WHERE dukkan_id=$1 AND durum='stokta' AND created_at <= now() - interval '60 days'
+           ORDER BY created_at ASC LIMIT 5""",
+        dukkan_id,
+    )]
+
     # Dashboard'daki satırlara tıklayınca ayrı bir istek atmadan detay penceresi
     # açılabilsin diye buradaki sorgular sadece uyarı satırı için değil, o
     # kaydın tam detayını göstermeye yetecek kolonları da döndürüyor.
@@ -151,7 +163,10 @@ async def dashboard(
             "tamir": bu_ay_tamir,
             "kaynaklar": bu_ay_kaynaklar if patron_mu else [],
         },
-        "uyarilar": {"stok": stok_uyari, "garanti": garanti_uyari, "borc": borc_uyari, "durgun_2el": durgun_2el_uyari},
+        "uyarilar": {
+            "stok": stok_uyari, "garanti": garanti_uyari, "borc": borc_uyari,
+            "durgun_2el": durgun_2el_uyari, "durgun_sifir": durgun_sifir_uyari,
+        },
         "aranacaklar": aranacaklar,
         "son_tamirler": son_tamirler,
         "bugun": {
@@ -325,6 +340,35 @@ async def genel_stats(
         dukkan_id,
     )
 
+    # Sıfır Cihaz için de aynı analiz — bkz. yukarıdaki ikinciel_top.
+    sifir_top_rows = await db.fetch(
+        """SELECT model, COUNT(*) as adet, SUM(satis_fiyati) as ciro,
+                  SUM(alis_fiyati) as alis_toplam,
+                  SUM(COALESCE((SELECT SUM(m.tutar) FROM sifir_cihaz_masraflar m WHERE m.cihaz_id=c.id), 0)) as masraf_toplam
+           FROM sifir_cihazlar c
+           WHERE c.dukkan_id=$1 AND c.durum='satildi'
+           GROUP BY model
+           ORDER BY ciro DESC LIMIT 8""",
+        dukkan_id,
+    )
+    sifir_top = [
+        {"model": r["model"], "adet": r["adet"], "ciro": float(r["ciro"] or 0),
+         "kar": float((r["ciro"] or 0) - (r["alis_toplam"] or 0) - (r["masraf_toplam"] or 0))}
+        for r in sifir_top_rows
+    ]
+    sifir_kar_toplam = await db.fetchval(
+        """SELECT COALESCE(SUM(c.satis_fiyati - c.alis_fiyati -
+                  COALESCE((SELECT SUM(m.tutar) FROM sifir_cihaz_masraflar m WHERE m.cihaz_id=c.id), 0)), 0)
+           FROM sifir_cihazlar c WHERE c.dukkan_id=$1 AND c.durum='satildi'""",
+        dukkan_id,
+    ) or 0
+    sifir_ort_satis_gun = await db.fetchval(
+        """SELECT AVG(satis_tarihi::date - created_at::date)
+           FROM sifir_cihazlar WHERE dukkan_id=$1 AND durum='satildi'
+                 AND satis_tarihi IS NOT NULL AND satis_tarihi != ''""",
+        dukkan_id,
+    )
+
     async def scalar(sql, *params):
         return await db.fetchval(sql, *params) or 0
 
@@ -340,6 +384,9 @@ async def genel_stats(
         "ikinciel_top": ikinciel_top,
         "ikinciel_kar_toplam": ikinciel_kar_toplam,
         "ikinciel_ort_satis_gun": float(ikinciel_ort_satis_gun) if ikinciel_ort_satis_gun is not None else None,
+        "sifir_top": sifir_top,
+        "sifir_kar_toplam": sifir_kar_toplam,
+        "sifir_ort_satis_gun": float(sifir_ort_satis_gun) if sifir_ort_satis_gun is not None else None,
         "sayilar": {
             "musteri": await scalar("SELECT COUNT(*) FROM customers WHERE dukkan_id=$1", dukkan_id),
             "tamir_toplam": await scalar("SELECT COUNT(*) FROM repairs WHERE dukkan_id=$1", dukkan_id),
